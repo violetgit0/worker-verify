@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Management – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole"></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"    class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link active"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">Staff Management</h1>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openStaffModal()">➕ Add Staff</button>
+    </header>
+
+    <main class="page-body">
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Staff Member</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Bank Details</th>
+                <th>Workers</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staffTable">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">Loading staff…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Create / Edit Staff Modal -->
+<div class="modal-overlay" id="staffModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title" id="staffModalTitle">Add Staff</h2>
+      <button class="btn-icon" onclick="closeModal('staffModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="staffForm" enctype="multipart/form-data">
+        <input type="hidden" id="editStaffId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="required">*</span></label>
+            <input type="text" id="sf_fullName" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone <span class="required">*</span></label>
+            <input type="tel" id="sf_phone" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Username <span class="required">*</span></label>
+            <input type="text" id="sf_username" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email <span class="required">*</span></label>
+            <input type="email" id="sf_email" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-group" id="passwordGroup">
+          <label class="form-label">Password <span class="required">*</span></label>
+          <input type="password" id="sf_password" class="form-control" placeholder="Min 6 characters" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Account Number</label>
+            <input type="text" id="sf_accountNumber" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bank Name</label>
+            <input type="text" id="sf_bankName" class="form-control" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Passport Photo</label>
+          <div class="file-upload-area" onclick="document.getElementById('sf_photo').click()">
+            <div class="file-upload-icon">📸</div>
+            <div class="file-upload-text">Click to upload passport photo (JPG, PNG – max 5MB)</div>
+            <img id="sf_photoPreview" class="file-preview hidden" />
+            <input type="file" id="sf_photo" accept="image/*" onchange="previewImage(this,'sf_photoPreview')" />
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('staffModal')">Cancel</button>
+      <button class="btn btn-primary" id="staffSubmitBtn" onclick="submitStaff()">Create Staff</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetPwdModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Reset Password</h2>
+      <button class="btn-icon" onclick="closeModal('resetPwdModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">New Password <span class="required">*</span></label>
+        <input type="password" id="newStaffPassword" class="form-control" placeholder="Enter new password" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('resetPwdModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitResetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Delete Staff</h2>
+      <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm">Are you sure you want to delete <strong id="deleteStaffName"></strong>? This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const currentUser = requireAuth(['super_admin']);
+  let staffList = [];
+  let targetStaffId = null;
+
+  if (currentUser) {
+    populateSidebarUser();
+    loadStaff();
+  }
+
+  async function loadStaff() {
+    try {
+      const res = await API.getAllStaff();
+      staffList = res.staff;
+      renderStaff(staffList);
+    } catch (err) {
+      showToast('Failed to load staff: ' + err.message, 'error');
+    }
+  }
+
+  function renderStaff(staff) {
+    const tbody = document.getElementById('staffTable');
+    if (!staff.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;">
+        <div class="empty-icon">👤</div><p class="text-muted">No staff accounts yet</p>
+      </td></tr>`;
+      return;
+    }
+    tbody.innerHTML = staff.map((s, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>
+          <div class="flex items-center gap-2">
+            ${s.passportPhoto ? `<img src="${s.passportPhoto}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" />` : '<div style="width:34px;height:34px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>'}
+            <div><div class="font-semibold">${s.fullName}</div><div class="text-xs text-muted">@${s.username}</div></div>
+          </div>
+        </td>
+        <td>${s.phone}</td>
+        <td>${s.email}</td>
+        <td>
+          ${s.accountNumber ? `<div class="text-sm">${s.accountNumber}</div><div class="text-xs text-muted">${s.bankName}</div>` : '<span class="text-muted">—</span>'}
+        </td>
+        <td>—</td>
+        <td><span class="badge ${s.isActive ? 'badge-success' : 'badge-danger'}">${s.isActive ? 'Active' : 'Inactive'}</span></td>
+        <td>
+          <div class="table-actions">
+            <button class="btn btn-sm btn-outline" onclick="openEditModal('${s._id}')">Edit</button>
+            <button class="btn btn-sm btn-warning" onclick="openResetPwd('${s._id}')">Reset Pwd</button>
+            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${s.fullName}')">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openStaffModal() {
+    document.getElementById('staffModalTitle').textContent = 'Add Staff';
+    document.getElementById('staffSubmitBtn').textContent = 'Create Staff';
+    document.getElementById('editStaffId').value = '';
+    document.getElementById('staffForm').reset();
+    document.getElementById('passwordGroup').style.display = '';
+    document.getElementById('sf_photoPreview').classList.add('hidden');
+    document.getElementById('staffModal').classList.add('open');
+  }
+
+  function openEditModal(id) {
+    const s = staffList.find(x => x._id === id);
+    if (!s) return;
+    document.getElementById('staffModalTitle').textContent = 'Edit Staff';
+    document.getElementById('staffSubmitBtn').textContent = 'Save Changes';
+    document.getElementById('editStaffId').value = id;
+    document.getElementById('sf_fullName').value = s.fullName;
+    document.getElementById('sf_phone').value = s.phone;
+    document.getElementById('sf_username').value = s.username;
+    document.getElementById('sf_email').value = s.email;
+    document.getElementById('sf_accountNumber').value = s.accountNumber || '';
+    document.getElementById('sf_bankName').value = s.bankName || '';
+    document.getElementById('passwordGroup').style.display = 'none';
+    if (s.passportPhoto) {
+      const preview = document.getElementById('sf_photoPreview');
+      preview.src = s.passportPhoto;
+      preview.classList.remove('hidden');
+    }
+    document.getElementById('staffModal').classList.add('open');
+  }
+
+  async function submitStaff() {
+    const id = document.getElementById('editStaffId').value;
+    const fd = new FormData();
+    fd.append('fullName',      document.getElementById('sf_fullName').value.trim());
+    fd.append('phone',         document.getElementById('sf_phone').value.trim());
+    fd.append('username',      document.getElementById('sf_username').value.trim());
+    fd.append('email',         document.getElementById('sf_email').value.trim());
+    fd.append('accountNumber', document.getElementById('sf_accountNumber').value.trim());
+    fd.append('bankName',      document.getElementById('sf_bankName').value.trim());
+
+    if (!id) {
+      const pwd = document.getElementById('sf_password').value;
+      if (!pwd || pwd.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+      fd.append('password', pwd);
+    }
+
+    const photoFile = document.getElementById('sf_photo').files[0];
+    if (photoFile) fd.append('passportPhoto', photoFile);
+
+    try {
+      if (id) {
+        await API.updateStaff(id, fd);
+        showToast('Staff updated successfully', 'success');
+      } else {
+        await API.createStaff(fd);
+        showToast('Staff account created', 'success');
+      }
+      closeModal('staffModal');
+      loadStaff();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function openResetPwd(id) {
+    targetStaffId = id;
+    document.getElementById('newStaffPassword').value = '';
+    document.getElementById('resetPwdModal').classList.add('open');
+  }
+
+  async function submitResetPassword() {
+    const pwd = document.getElementById('newStaffPassword').value.trim();
+    if (!pwd || pwd.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+    try {
+      await API.resetStaffPassword(targetStaffId, { newPassword: pwd });
+      showToast('Password reset successfully', 'success');
+      closeModal('resetPwdModal');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function openDelete(id, name) {
+    targetStaffId = id;
+    document.getElementById('deleteStaffName').textContent = name;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+
+  async function confirmDelete() {
+    try {
+      await API.deleteStaff(targetStaffId);
+      showToast('Staff account deleted', 'success');
+      closeModal('deleteModal');
+      loadStaff();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function previewImage(input, previewId) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById(previewId);
+      img.src = e.target.result;
+      img.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+</script>
+</body>
+</html>

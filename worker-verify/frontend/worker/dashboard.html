@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Dashboard – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body style="background:var(--gray-50);">
+
+<!-- ── Camera overlay (shown during clock-in) ───────────────────────────────── -->
+<div id="cameraOverlay" class="camera-overlay" style="display:none;">
+  <div style="color:white;font-weight:600;font-size:1rem;margin-bottom:12px;" id="cameraTitle">Take Selfie to Clock In</div>
+
+  <!-- Live preview -->
+  <div id="cameraLiveView" style="text-align:center;">
+    <video id="cameraVideo" class="camera-preview" autoplay muted playsinline></video>
+    <div class="camera-overlay-label">Position your face in the circle, then tap the button</div>
+    <button class="camera-capture-ring" onclick="captureSelfie()" title="Capture">📸</button>
+    <div style="margin-top:16px;">
+      <button class="camera-retake-btn" onclick="cancelCamera()">✕ Cancel</button>
+    </div>
+  </div>
+
+  <!-- After capture: confirm view -->
+  <div id="cameraConfirmView" style="display:none;text-align:center;">
+    <img id="selfiePreview" class="camera-preview" alt="Your selfie" />
+    <div class="camera-overlay-label" id="confirmLabel">Looking good! Confirm to clock in.</div>
+    <div id="gpsStatusOverlay" style="color:rgba(255,255,255,.7);font-size:.78rem;margin-top:8px;min-height:20px;"></div>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:center;">
+      <button class="camera-retake-btn" onclick="retakeSelfie()">↩ Retake</button>
+      <button id="confirmClockBtn"
+              style="background:var(--success);color:white;border:none;padding:12px 28px;border-radius:12px;font-weight:600;font-size:.95rem;cursor:pointer;"
+              onclick="submitClockIn()">
+        ✓ Confirm Clock In
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main page ─────────────────────────────────────────────────────────────── -->
+<div class="worker-page">
+
+  <div class="worker-page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:.82rem;opacity:.7;">Welcome back,</div>
+        <div style="font-size:1.1rem;font-weight:700;" id="workerName">—</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="text-align:right;">
+          <div id="workerBranch" style="font-size:.78rem;opacity:.7;"></div>
+          <div id="workerShift"  style="font-size:.78rem;opacity:.7;"></div>
+        </div>
+        <button style="background:rgba(255,255,255,.15);border:none;color:white;padding:6px 12px;border-radius:8px;font-size:.8rem;cursor:pointer;" onclick="workerLogout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="worker-page-body">
+
+    <!-- Clock status card -->
+    <div class="clock-status-card" id="clockCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div>
+          <div class="clock-date" id="clockDate"></div>
+          <div class="clock-time" id="clockTime"></div>
+        </div>
+        <div id="todayStatusBadge"></div>
+      </div>
+      <div id="clockAction" style="text-align:center;padding:10px 0;">
+        <div style="color:var(--gray-400);font-size:.85rem;">Loading…</div>
+      </div>
+      <div id="gpsStatusMain" style="margin-top:8px;font-size:.75rem;color:var(--gray-500);text-align:center;display:none;"></div>
+    </div>
+
+    <!-- Monthly summary -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div class="branch-stat" style="text-align:center;background:white;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+        <div class="branch-stat-value" style="color:var(--success);" id="mPresent">—</div>
+        <div class="branch-stat-label">Present</div>
+      </div>
+      <div class="branch-stat" style="text-align:center;background:white;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+        <div class="branch-stat-value" style="color:var(--warning);" id="mLate">—</div>
+        <div class="branch-stat-label">Late</div>
+      </div>
+      <div class="branch-stat" style="text-align:center;background:white;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+        <div class="branch-stat-value" style="color:var(--danger);" id="mAbsent">—</div>
+        <div class="branch-stat-label">Absent</div>
+      </div>
+    </div>
+
+    <!-- Latest payroll -->
+    <div style="background:white;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-weight:600;font-size:.9rem;">Latest Payroll</div>
+        <a href="attendance.html#payroll" style="font-size:.78rem;color:var(--primary);">View all →</a>
+      </div>
+      <div id="latestPayrollBody" style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:8px;">Loading…</div>
+    </div>
+
+    <!-- Recent attendance -->
+    <div style="background:white;border-radius:14px;padding:16px;margin-bottom:80px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-weight:600;font-size:.9rem;">Recent Attendance</div>
+        <a href="attendance.html" style="font-size:.78rem;color:var(--primary);">View all →</a>
+      </div>
+      <div id="recentAttList">
+        <div style="text-align:center;color:var(--gray-400);font-size:.85rem;padding:12px;">Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="worker-nav">
+    <a href="dashboard.html" class="worker-nav-item active"><span>🏠</span><span>Home</span></a>
+    <a href="attendance.html" class="worker-nav-item"><span>🕐</span><span>Attendance</span></a>
+    <a href="attendance.html#payroll" class="worker-nav-item"><span>💰</span><span>Payroll</span></a>
+  </nav>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const token  = localStorage.getItem('wv_worker_token');
+  const worker = (() => { try { return JSON.parse(localStorage.getItem('wv_worker')); } catch { return null; } })();
+
+  if (!token || !worker) { window.location.href = 'index.html'; }
+
+  function getWorkerHeaders(isFormData = false) {
+    const h = { 'Authorization': `Bearer ${token}` };
+    if (!isFormData) h['Content-Type'] = 'application/json';
+    return h;
+  }
+
+  async function workerFetch(path, opts = {}) {
+    const isFormData = opts.body instanceof FormData;
+    const res  = await fetch(CONFIG.API_URL + path, {
+      ...opts,
+      headers: { ...getWorkerHeaders(isFormData), ...(opts.headers || {}) }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function workerLogout() {
+    localStorage.removeItem('wv_worker_token');
+    localStorage.removeItem('wv_worker');
+    window.location.href = 'index.html';
+  }
+
+  // ── Device fingerprint ────────────────────────────────────────────────────
+  function getDeviceFingerprint() {
+    const parts = [
+      navigator.userAgent,
+      `${screen.width}x${screen.height}x${screen.colorDepth}`,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      navigator.language,
+      navigator.hardwareConcurrency || 0,
+      navigator.platform || ''
+    ].join('|');
+    let h = 0;
+    for (let i = 0; i < parts.length; i++) {
+      h = Math.imul(31, h) + parts.charCodeAt(i) | 0;
+    }
+    return Math.abs(h).toString(36);
+  }
+
+  const deviceFingerprint = getDeviceFingerprint();
+  const deviceInfo = navigator.userAgent.slice(0, 250);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  document.getElementById('workerName').textContent   = worker.fullName || '—';
+  document.getElementById('workerBranch').textContent = worker.branch?.name || '';
+  document.getElementById('workerShift').textContent  =
+    worker.shift && worker.shift !== 'unassigned' ? `Shift ${worker.shift}` : '';
+
+  startClock();
+  loadDashboard();
+
+  function startClock() {
+    function tick() {
+      const n = new Date();
+      document.getElementById('clockDate').textContent = n.toLocaleDateString('en-NG', { weekday:'long', month:'long', day:'numeric' });
+      document.getElementById('clockTime').textContent = n.toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  async function loadDashboard() {
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year  = now.getFullYear();
+      const [attRes, recentRes, prRes] = await Promise.all([
+        workerFetch(`/attendance/my-history?month=${month}&year=${year}&limit=31`),
+        workerFetch('/attendance/my-history?limit=10'),
+        workerFetch('/payroll/my-payroll?limit=3')
+      ]);
+      renderTodayStatus(recentRes);
+      renderMonthlySummary(attRes.summary || {});
+      renderRecentAttendance(recentRes.attendance || []);
+      renderLatestPayroll(prRes.payrolls || []);
+    } catch (err) {
+      showToast('Failed to load: ' + err.message, 'error');
+    }
+  }
+
+  function localDate(d = new Date()) {
+    return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+  }
+
+  function renderTodayStatus(attRes) {
+    const todayStr = localDate();
+    const today = (attRes.attendance || []).find(a => localDate(new Date(a.date)) === todayStr);
+
+    const actionEl = document.getElementById('clockAction');
+    const badgeEl  = document.getElementById('todayStatusBadge');
+
+    if (!today) {
+      badgeEl.innerHTML = '<span class="att-badge not_clocked" style="font-size:.75rem;padding:3px 9px;">Not Clocked In</span>';
+      actionEl.innerHTML = `
+        <p style="font-size:.8rem;color:var(--gray-500);margin-bottom:12px;">
+          A live selfie + GPS location is required to clock in.
+        </p>
+        <button class="clock-btn clock-in"
+                style="font-size:.95rem;padding:14px 36px;border-radius:12px;width:100%;max-width:260px;"
+                onclick="startClockIn()">
+          📸 Clock In with Selfie
+        </button>`;
+    } else if (today.status === 'absent') {
+      badgeEl.innerHTML = '<span class="att-badge absent">Absent</span>';
+      actionEl.innerHTML = `<div style="color:var(--gray-500);font-size:.88rem;">You were marked absent today</div>`;
+    } else if (!today.clockOutTime) {
+      badgeEl.innerHTML = `<span class="att-badge ${today.status}">${today.status}</span>`;
+      const inTime = new Date(today.clockInTime).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' });
+      actionEl.innerHTML = `
+        <div style="font-size:.82rem;color:var(--gray-500);margin-bottom:8px;">Clocked in at ${inTime}</div>
+        ${today.latenessMinutes > 0 ? `<div style="font-size:.8rem;color:var(--danger);margin-bottom:8px;">⚠ ${today.latenessMinutes} min late</div>` : ''}
+        <button class="clock-btn clock-out"
+                style="font-size:.95rem;padding:14px 36px;border-radius:12px;width:100%;max-width:260px;"
+                onclick="doClockOut()">
+          🔴 Clock Out
+        </button>`;
+    } else {
+      badgeEl.innerHTML = `<span class="att-badge ${today.status}">${today.status}</span>`;
+      const inTime  = new Date(today.clockInTime).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' });
+      const outTime = new Date(today.clockOutTime).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' });
+      actionEl.innerHTML = `
+        <div style="font-size:.85rem;color:var(--gray-600);">
+          In: <strong>${inTime}</strong> &nbsp;·&nbsp; Out: <strong>${outTime}</strong>
+        </div>
+        <div style="font-size:.8rem;color:var(--success);margin-top:6px;">✓ Day complete</div>`;
+    }
+  }
+
+  function renderMonthlySummary(s) {
+    document.getElementById('mPresent').textContent = (s.present || 0) + (s.late || 0);
+    document.getElementById('mLate').textContent    = s.late   || 0;
+    document.getElementById('mAbsent').textContent  = s.absent || 0;
+  }
+
+  function renderRecentAttendance(records) {
+    const el = document.getElementById('recentAttList');
+    if (!records.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:.85rem;padding:8px;">No records yet</div>';
+      return;
+    }
+    el.innerHTML = records.slice(0, 7).map(a => `
+      <div class="att-mini-row">
+        <div class="att-mini-date">${new Date(a.date).toLocaleDateString('en-NG', { month:'short', day:'numeric' })}</div>
+        <div class="att-mini-info">
+          <span class="att-badge ${a.status}" style="font-size:.7rem;padding:2px 7px;">${a.status.replace('_',' ')}</span>
+          ${a.latenessMinutes > 0 ? `<span class="lateness-pill" style="font-size:.7rem;padding:2px 6px;">${a.latenessMinutes}m</span>` : ''}
+        </div>
+        <div class="att-mini-time">
+          ${a.clockInTime ? new Date(a.clockInTime).toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}) : '—'}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderLatestPayroll(payrolls) {
+    const el = document.getElementById('latestPayrollBody');
+    if (!payrolls.length) { el.innerHTML = '<div style="color:var(--gray-400);font-size:.85rem;">No payroll records yet</div>'; return; }
+    const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const p = payrolls[0];
+    el.innerHTML = `
+      <div class="salary-breakdown" style="font-size:.85rem;">
+        <div class="salary-row">
+          <span style="color:var(--gray-500);">${MONTHS[p.month]} ${p.year}</span>
+          <span class="payroll-status-badge ${p.status}">${p.status}</span>
+        </div>
+        <div class="salary-row"><span>Base Salary</span><span>₦${(p.baseSalary||0).toLocaleString()}</span></div>
+        ${p.totalDeductions > 0 ? `<div class="salary-row deduction"><span>Deductions</span><span>-₦${p.totalDeductions.toLocaleString()}</span></div>` : ''}
+        <div class="salary-row net"><span>Net Salary</span><span>₦${(p.netSalary||0).toLocaleString()}</span></div>
+      </div>`;
+  }
+
+  // ── Camera + Clock-in flow ────────────────────────────────────────────────
+
+  let cameraStream    = null;
+  let capturedBlob    = null;
+  let clockInGPS      = null;
+  let clockInAction   = 'in'; // 'in' only uses camera
+
+  async function startClockIn() {
+    clockInGPS    = null;
+    capturedBlob  = null;
+    clockInAction = 'in';
+
+    // Request GPS in parallel with camera start (non-blocking)
+    getGPS().then(pos => {
+      clockInGPS = pos;
+      const gpsEl = document.getElementById('gpsStatusOverlay');
+      if (gpsEl) gpsEl.textContent = `📍 GPS acquired (${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)})`;
+    }).catch(() => {
+      const gpsEl = document.getElementById('gpsStatusOverlay');
+      if (gpsEl) gpsEl.textContent = '⚠ GPS unavailable — may be required by your branch';
+    });
+
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false
+      });
+      const video = document.getElementById('cameraVideo');
+      video.srcObject = cameraStream;
+
+      document.getElementById('cameraTitle').textContent = 'Take Selfie to Clock In';
+      document.getElementById('cameraLiveView').style.display    = '';
+      document.getElementById('cameraConfirmView').style.display = 'none';
+      document.getElementById('gpsStatusOverlay').textContent    = '📍 Getting GPS location…';
+      document.getElementById('cameraOverlay').style.display     = 'flex';
+    } catch (err) {
+      // Camera unavailable — offer GPS-only clock-in
+      clockInWithoutSelfie();
+    }
+  }
+
+  async function clockInWithoutSelfie() {
+    const btn = document.querySelector('.clock-btn.clock-in');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Getting GPS…'; }
+
+    try {
+      clockInGPS = await getGPS().catch(() => null);
+
+      const body = { deviceFingerprint, deviceInfo };
+      if (clockInGPS) { body.lat = clockInGPS.lat; body.lng = clockInGPS.lng; }
+
+      const res = await workerFetch('/attendance/clock-in', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+
+      const msg = res.isLate
+        ? `⚠ Clocked in — ${res.latenessMinutes} min late (no selfie)`
+        : '✓ Clocked in (no camera available)';
+      showToast(msg, res.isLate ? 'info' : 'success');
+      setTimeout(loadDashboard, 600);
+    } catch (err) {
+      showToast(err.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '📸 Clock In with Selfie'; }
+    }
+  }
+
+  function captureSelfie() {
+    const video  = document.getElementById('cameraVideo');
+    const canvas = document.createElement('canvas');
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 640;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(blob => {
+      capturedBlob = blob;
+      const url = URL.createObjectURL(blob);
+      document.getElementById('selfiePreview').src = url;
+      document.getElementById('cameraLiveView').style.display    = 'none';
+      document.getElementById('cameraConfirmView').style.display = '';
+
+      // Stop camera stream to save battery
+      stopCamera();
+    }, 'image/jpeg', 0.88);
+  }
+
+  function retakeSelfie() {
+    capturedBlob = null;
+    // Restart camera
+    startClockIn();
+  }
+
+  function cancelCamera() {
+    stopCamera();
+    document.getElementById('cameraOverlay').style.display = 'none';
+    capturedBlob = null;
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+  }
+
+  async function submitClockIn() {
+    if (!capturedBlob) { showToast('Please take a selfie first', 'error'); return; }
+
+    const btn = document.getElementById('confirmClockBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Uploading…';
+
+    const fd = new FormData();
+    fd.append('selfie', capturedBlob, 'selfie.jpg');
+    fd.append('deviceFingerprint', deviceFingerprint);
+    fd.append('deviceInfo', deviceInfo);
+    if (clockInGPS) {
+      fd.append('lat', clockInGPS.lat);
+      fd.append('lng', clockInGPS.lng);
+    }
+
+    try {
+      const res = await workerFetch('/attendance/clock-in', { method: 'POST', body: fd });
+      stopCamera();
+      document.getElementById('cameraOverlay').style.display = 'none';
+      capturedBlob = null;
+
+      let msg = res.isLate
+        ? `⚠ Clocked in — ${res.latenessMinutes} min late`
+        : '✓ Clocked in successfully!';
+      showToast(msg, res.isLate ? 'info' : 'success');
+      setTimeout(loadDashboard, 600);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '✓ Confirm Clock In';
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function doClockOut() {
+    const btn = document.querySelector('.clock-btn.clock-out');
+    if (btn) { btn.disabled = true; btn.textContent = 'Clocking out…'; }
+
+    const fd = new FormData();
+    fd.append('deviceFingerprint', deviceFingerprint);
+
+    // Optionally grab GPS for clock-out too
+    getGPS().then(async pos => {
+      fd.append('lat', pos.lat);
+      fd.append('lng', pos.lng);
+      await sendClockOut(fd);
+    }).catch(async () => {
+      await sendClockOut(fd);
+    });
+  }
+
+  async function sendClockOut(fd) {
+    try {
+      // Clock-out doesn't need selfie, send as JSON
+      const body = { deviceFingerprint };
+      const pos = fd.get('lat') ? { lat: parseFloat(fd.get('lat')), lng: parseFloat(fd.get('lng')) } : null;
+      if (pos) { body.lat = pos.lat; body.lng = pos.lng; }
+      await workerFetch('/attendance/clock-out', { method: 'POST', body: JSON.stringify(body) });
+      showToast('Clocked out. Have a great day!', 'success');
+      setTimeout(loadDashboard, 600);
+    } catch (err) {
+      showToast(err.message, 'error');
+      const btn = document.querySelector('.clock-btn.clock-out');
+      if (btn) { btn.disabled = false; btn.textContent = '🔴 Clock Out'; }
+    }
+  }
+
+  function getGPS() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error('No GPS')); return; }
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        e => reject(e),
+        { timeout: 12000, enableHighAccuracy: true }
+      );
+    });
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(message, type = 'info') {
+    let c = document.getElementById('toastContainer');
+    if (!c) { c = document.createElement('div'); c.id = 'toastContainer'; c.className = 'toast-container'; document.body.appendChild(c); }
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = `<span class="toast-icon">${type==='success'?'✓':type==='error'?'✕':'ℹ'}</span><span>${message}</span>`;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('toast-show'), 10);
+    setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 300); }, 4000);
+  }
+</script>
+</body>
+</html>

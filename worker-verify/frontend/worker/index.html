@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Worker Login – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body class="worker-portal-bg">
+
+<div class="worker-login-card">
+
+  <div class="worker-login-logo">
+    <div class="brand-icon" style="font-size:2rem;">⚡</div>
+    <div style="font-size:1.25rem;font-weight:700;color:var(--gray-800);">Sage Energy</div>
+    <div style="font-size:0.8rem;color:var(--gray-500);margin-top:2px;">Worker Self-Service</div>
+  </div>
+
+  <!-- Step 1: Phone -->
+  <div id="stepPhone">
+    <h2 style="text-align:center;font-size:1.1rem;margin-bottom:4px;">Sign In</h2>
+    <p style="text-align:center;color:var(--gray-500);font-size:0.85rem;margin-bottom:20px;">Enter your registered phone number</p>
+    <div class="form-group">
+      <label class="form-label">Phone Number</label>
+      <input type="tel" id="phoneInput" class="form-control" placeholder="08012345678"
+             style="text-align:center;font-size:1.1rem;letter-spacing:2px;" />
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="goToPin()">Continue →</button>
+  </div>
+
+  <!-- Step 2: PIN -->
+  <div id="stepPin" style="display:none;">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:0.85rem;color:var(--gray-500);">Enter PIN for</div>
+      <div style="font-weight:700;font-size:1rem;" id="phoneDisplay"></div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:20px;" id="pinDigits"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto 16px;">
+      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k => `
+        <button class="pin-key" onclick="pinPress('${k}')"
+          style="padding:14px 0;font-size:1.1rem;font-weight:600;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);cursor:pointer;${k===''?'visibility:hidden;':''}"
+        >${k}</button>`).join('')}
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="submitLogin()">Sign In</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:0.85rem;color:var(--gray-500);" onclick="backToPhone()">← Change number</button>
+  </div>
+
+  <div id="loginError" style="display:none;margin-top:12px;padding:10px;background:var(--danger-light);color:var(--danger);border-radius:8px;font-size:0.85rem;text-align:center;"></div>
+
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  // Redirect if already logged in
+  if (localStorage.getItem('wv_worker_token')) {
+    window.location.href = 'dashboard.html';
+  }
+
+  let pinValue = '';
+  const MAX_PIN = 6;
+
+  function buildPinDigits(len = 4) {
+    const container = document.getElementById('pinDigits');
+    container.innerHTML = '';
+    for (let i = 0; i < len; i++) {
+      const d = document.createElement('div');
+      d.className = 'pin-digit';
+      d.id = `pin-${i}`;
+      container.appendChild(d);
+    }
+  }
+
+  function goToPin() {
+    const phone = document.getElementById('phoneInput').value.trim();
+    if (!phone) { showError('Please enter your phone number'); return; }
+    pinValue = '';
+    buildPinDigits(6);
+    document.getElementById('phoneDisplay').textContent = phone;
+    document.getElementById('stepPhone').style.display = 'none';
+    document.getElementById('stepPin').style.display   = '';
+    hideError();
+  }
+
+  function backToPhone() {
+    pinValue = '';
+    document.getElementById('stepPin').style.display   = 'none';
+    document.getElementById('stepPhone').style.display = '';
+    hideError();
+  }
+
+  function pinPress(key) {
+    if (key === '⌫') {
+      pinValue = pinValue.slice(0, -1);
+    } else if (key !== '' && pinValue.length < MAX_PIN) {
+      pinValue += String(key);
+    }
+    renderPinDots();
+  }
+
+  function renderPinDots() {
+    const digits = document.querySelectorAll('.pin-digit');
+    digits.forEach((d, i) => {
+      d.classList.toggle('filled', i < pinValue.length);
+    });
+  }
+
+  async function submitLogin() {
+    const phone = document.getElementById('phoneInput').value.trim();
+    if (!phone || pinValue.length < 4) { showError('Enter your full PIN'); return; }
+    try {
+      const res = await API.workerLogin({ phone, pin: pinValue });
+      localStorage.setItem('wv_worker_token', res.token);
+      localStorage.setItem('wv_worker', JSON.stringify(res.worker));
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      showError(err.message || 'Invalid phone or PIN');
+      pinValue = '';
+      renderPinDots();
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.style.display = '';
+  }
+
+  function hideError() {
+    document.getElementById('loginError').style.display = 'none';
+  }
+
+  // Keyboard support on phone step
+  document.getElementById('phoneInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') goToPin();
+  });
+</script>
+</body>
+</html>

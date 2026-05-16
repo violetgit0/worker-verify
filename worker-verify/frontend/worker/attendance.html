@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Attendance & Payroll – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body style="background:var(--gray-50);">
+
+<div class="worker-page">
+
+  <!-- Header -->
+  <div class="worker-page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:0.82rem;opacity:0.7;">Your records</div>
+        <div style="font-size:1.1rem;font-weight:700;" id="workerName">—</div>
+      </div>
+      <button style="background:rgba(255,255,255,0.15);border:none;color:white;padding:6px 12px;border-radius:8px;font-size:0.8rem;cursor:pointer;" onclick="workerLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="worker-page-body">
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:16px;background:white;border-radius:10px;padding:4px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+      <button class="tab-btn active" id="tabAtt" onclick="switchTab('att')" style="flex:1;border-radius:8px;">Attendance</button>
+      <button class="tab-btn"        id="tabDed" onclick="switchTab('ded')" style="flex:1;border-radius:8px;">Deductions</button>
+      <button class="tab-btn"        id="tabPay" onclick="switchTab('pay')" style="flex:1;border-radius:8px;">Payroll</button>
+    </div>
+
+    <!-- ── Attendance Tab ── -->
+    <div id="panelAtt">
+      <!-- Month filter -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <select id="attMonth" class="filter-select" style="flex:1;" onchange="loadAttendance()">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+        <input type="number" id="attYear" class="filter-select" style="width:80px;" onchange="loadAttendance()" />
+      </div>
+
+      <!-- Summary -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:white;border-radius:10px;padding:10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--success);" id="sumPresent">—</div>
+          <div style="font-size:0.72rem;color:var(--gray-500);">Present</div>
+        </div>
+        <div style="background:white;border-radius:10px;padding:10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--warning);" id="sumLate">—</div>
+          <div style="font-size:0.72rem;color:var(--gray-500);">Late</div>
+        </div>
+        <div style="background:white;border-radius:10px;padding:10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--danger);" id="sumAbsent">—</div>
+          <div style="font-size:0.72rem;color:var(--gray-500);">Absent</div>
+        </div>
+      </div>
+
+      <!-- Records list -->
+      <div id="attList" style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ── Deductions Tab ── -->
+    <div id="panelDed" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <select id="dedMonth" class="filter-select" style="flex:1;" onchange="loadDeductions()">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+        <input type="number" id="dedYear" class="filter-select" style="width:80px;" onchange="loadDeductions()" />
+      </div>
+
+      <div style="background:white;border-radius:12px;padding:12px 16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.85rem;color:var(--gray-600);">Total Deductions</span>
+          <span style="font-size:1.1rem;font-weight:700;color:var(--danger);" id="dedTotal">—</span>
+        </div>
+      </div>
+
+      <div id="dedList" style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ── Payroll Tab ── -->
+    <div id="panelPay" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="number" id="payYear" class="filter-select" style="flex:1;" onchange="loadPayroll()" />
+      </div>
+
+      <div id="payList" style="margin-bottom:80px;">
+        <div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>
+      </div>
+    </div>
+
+    <div style="height:80px;"></div>
+
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="worker-nav">
+    <a href="dashboard.html" class="worker-nav-item">
+      <span>🏠</span><span>Home</span>
+    </a>
+    <a href="attendance.html" class="worker-nav-item active">
+      <span>🕐</span><span>Attendance</span>
+    </a>
+    <a href="attendance.html#payroll" class="worker-nav-item" id="navPayrollLink">
+      <span>💰</span><span>Payroll</span>
+    </a>
+  </nav>
+
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const token  = localStorage.getItem('wv_worker_token');
+  const worker = (() => { try { return JSON.parse(localStorage.getItem('wv_worker')); } catch { return null; } })();
+
+  function getWorkerHeaders() {
+    return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  async function workerFetch(path, opts = {}) {
+    const res  = await fetch(CONFIG.API_URL + path, { ...opts, headers: getWorkerHeaders() });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function workerLogout() {
+    localStorage.removeItem('wv_worker_token');
+    localStorage.removeItem('wv_worker');
+    window.location.href = 'index.html';
+  }
+
+  if (!token || !worker) { window.location.href = 'index.html'; }
+
+  document.getElementById('workerName').textContent = worker.fullName || '—';
+
+  const now = new Date();
+  ['attMonth','dedMonth'].forEach(id => document.getElementById(id).value = now.getMonth() + 1);
+  ['attYear','dedYear','payYear'].forEach(id => document.getElementById(id).value = now.getFullYear());
+
+  // Jump to payroll tab if hash
+  if (window.location.hash === '#payroll') {
+    switchTab('pay');
+    document.getElementById('navPayrollLink').classList.add('active');
+    document.getElementById('navPayrollLink').closest('a')?.previousElementSibling?.classList.remove('active');
+  } else {
+    loadAttendance();
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+
+  function switchTab(tab) {
+    ['att','ded','pay'].forEach(t => {
+      document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+      document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'att') loadAttendance();
+    if (tab === 'ded') loadDeductions();
+    if (tab === 'pay') loadPayroll();
+  }
+
+  // ── Attendance ────────────────────────────────────────────────────────────
+
+  async function loadAttendance() {
+    const month = document.getElementById('attMonth').value;
+    const year  = document.getElementById('attYear').value;
+    document.getElementById('attList').innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>';
+    try {
+      const res = await workerFetch(`/attendance/my-history?month=${month}&year=${year}`);
+      const s   = res.summary || {};
+      document.getElementById('sumPresent').textContent = (s.present || 0) + (s.late || 0);
+      document.getElementById('sumLate').textContent    = s.late   || 0;
+      document.getElementById('sumAbsent').textContent  = s.absent || 0;
+      renderAttList(res.attendance || []);
+    } catch (err) {
+      showToast('Failed: ' + err.message);
+    }
+  }
+
+  function renderAttList(records) {
+    const el = document.getElementById('attList');
+    if (!records.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">No records for this month</div>';
+      return;
+    }
+    el.innerHTML = records.map((a, i) => `
+      <div class="att-mini-row" style="${i < records.length-1 ? 'border-bottom:1px solid var(--gray-100);' : ''}padding:12px 14px;">
+        <div>
+          <div style="font-weight:600;font-size:0.85rem;">${new Date(a.date).toLocaleDateString('en-NG',{weekday:'short',month:'short',day:'numeric'})}</div>
+          <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;">
+            <span class="att-badge ${a.status}" style="font-size:0.7rem;padding:2px 7px;">${a.status.replace('_',' ')}</span>
+            ${a.latenessMinutes > 0 ? `<span class="lateness-pill" style="font-size:0.7rem;padding:2px 6px;">${a.latenessMinutes} min late</span>` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.8rem;color:var(--gray-600);">
+            ${a.clockInTime  ? new Date(a.clockInTime).toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}) : '—'}
+            ${a.clockOutTime ? ' – ' + new Date(a.clockOutTime).toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}) : ''}
+          </div>
+          ${a.deductionAmount > 0
+            ? `<div style="font-size:0.78rem;color:var(--danger);font-weight:600;margin-top:2px;">-₦${a.deductionAmount.toLocaleString()}</div>`
+            : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Deductions ────────────────────────────────────────────────────────────
+
+  async function loadDeductions() {
+    const month = document.getElementById('dedMonth').value;
+    const year  = document.getElementById('dedYear').value;
+    document.getElementById('dedList').innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>';
+    document.getElementById('dedTotal').textContent = '—';
+    try {
+      const res = await workerFetch(`/deductions/my-deductions?month=${month}&year=${year}`);
+      const deductions = res.deductions || [];
+      const total = deductions.reduce((s, d) => s + (d.amount || 0), 0);
+      document.getElementById('dedTotal').textContent = `₦${total.toLocaleString()}`;
+      renderDedList(deductions);
+    } catch (err) {
+      showToast('Failed: ' + err.message);
+    }
+  }
+
+  function renderDedList(deductions) {
+    const el = document.getElementById('dedList');
+    if (!deductions.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">No deductions this month 🎉</div>';
+      return;
+    }
+    el.innerHTML = deductions.map((d, i) => `
+      <div class="deduction-item" style="${i < deductions.length-1 ? 'border-bottom:1px solid var(--gray-100);' : ''}">
+        <div>
+          <div class="deduction-type">${d.type.replace('_',' ')}</div>
+          <div class="deduction-desc">${d.description || '—'}</div>
+          <div style="font-size:0.72rem;color:var(--gray-400);">${new Date(d.createdAt).toLocaleDateString('en-NG',{month:'short',day:'numeric'})}</div>
+        </div>
+        <div class="deduction-amount">-₦${(d.amount||0).toLocaleString()}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Payroll ───────────────────────────────────────────────────────────────
+
+  async function loadPayroll() {
+    const year = document.getElementById('payYear').value;
+    document.getElementById('payList').innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:0.85rem;padding:24px;">Loading…</div>';
+    try {
+      const res = await workerFetch(`/payroll/my-payroll?year=${year}`);
+      renderPayrollList(res.payrolls || []);
+    } catch (err) {
+      showToast('Failed: ' + err.message);
+    }
+  }
+
+  const MONTHS = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function renderPayrollList(payrolls) {
+    const el = document.getElementById('payList');
+    if (!payrolls.length) {
+      el.innerHTML = '<div style="background:white;border-radius:12px;text-align:center;color:var(--gray-400);font-size:0.85rem;padding:30px;box-shadow:0 1px 4px rgba(0,0,0,.06);">No payroll records for this year</div>';
+      return;
+    }
+    el.innerHTML = payrolls.map(p => `
+      <div style="background:white;border-radius:12px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-weight:700;font-size:0.95rem;">${MONTHS[p.month]} ${p.year}</div>
+          <span class="payroll-status-badge ${p.status}">${p.status}</span>
+        </div>
+        <div class="salary-breakdown" style="font-size:0.82rem;">
+          <div class="salary-row"><span>Base Salary</span><span>₦${(p.baseSalary||0).toLocaleString()}</span></div>
+          <div class="salary-row"><span>Days: ${p.daysPresent}P / ${p.daysAbsent}A / ${p.daysLate}L</span><span></span></div>
+          ${p.overtimeAmount > 0 ? `<div class="salary-row"><span>Overtime</span><span style="color:var(--info);">+₦${p.overtimeAmount.toLocaleString()}</span></div>` : ''}
+          ${p.totalDeductions > 0 ? `<div class="salary-row deduction"><span>Deductions</span><span>-₦${p.totalDeductions.toLocaleString()}</span></div>` : ''}
+          <div class="salary-row net"><span>Net Salary</span><span>₦${(p.netSalary||0).toLocaleString()}</span></div>
+        </div>
+        ${p.paymentRef ? `<div style="font-size:0.75rem;color:var(--gray-400);margin-top:6px;">Ref: ${p.paymentRef}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+
+  function showToast(message, type = 'error') {
+    let c = document.getElementById('toastContainer');
+    if (!c) {
+      c = document.createElement('div');
+      c.id = 'toastContainer';
+      c.className = 'toast-container';
+      document.body.appendChild(c);
+    }
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = `<span class="toast-icon">${type==='success'?'✓':'✕'}</span><span>${message}</span>`;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('toast-show'), 10);
+    setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 300); }, 3500);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Branch Management – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole">Super Admin</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"   class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link active"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">Branch Management</h1>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openBranchModal()">+ Add Branch</button>
+    </header>
+
+    <main class="page-body">
+      <div id="branchGrid" class="branch-grid">
+        <div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+          <div class="empty-icon">🏢</div>
+          <p class="empty-text">Loading branches…</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Branch Modal (Create / Edit) -->
+<div class="modal-overlay" id="branchModal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="branchModalTitle">Add Branch</h2>
+      <button class="btn-icon" onclick="closeModal('branchModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="branchId" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Branch Name <span class="required">*</span></label>
+          <input type="text" id="branchName" class="form-control" placeholder="e.g. Lagos Island Branch" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Branch Code <span class="required">*</span></label>
+          <input type="text" id="branchCode" class="form-control" placeholder="e.g. LGI" maxlength="10" style="text-transform:uppercase;" />
+          <div class="form-hint">Short unique code, auto-uppercased</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Branch Address</label>
+        <textarea id="branchAddress" class="form-control" rows="2" placeholder="Full branch address"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Branch Manager Name</label>
+          <input type="text" id="branchManager" class="form-control" placeholder="Manager's full name" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" id="branchPhone" class="form-control" placeholder="08012345678" />
+        </div>
+      </div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--gray-200);" />
+      <div class="form-label" style="font-weight:600;margin-bottom:10px;">📅 Attendance Schedule</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Shift A Resumption Time</label>
+          <input type="time" id="branchTimeA" class="form-control" value="08:00" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shift B Resumption Time</label>
+          <input type="time" id="branchTimeB" class="form-control" value="08:00" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Attendance Radius (metres)</label>
+        <input type="number" id="branchRadius" class="form-control" placeholder="500" min="50" max="5000" />
+        <div class="form-hint">Workers must clock in within this distance of the branch location</div>
+      </div>
+
+      <div class="form-label" style="font-weight:600;margin:10px 0 8px;">📍 Branch Location</div>
+      <button type="button" class="btn btn-outline btn-sm mb-2" onclick="openLocationPicker('branch','Branch Location')">📍 Add / Change Location</button>
+      <div id="branchLocationDisplay" class="location-display" style="margin-top:6px;"></div>
+      <!-- Hidden fields populated by maps.js -->
+      <input type="hidden" id="branchLocationLat" />
+      <input type="hidden" id="branchLocationLng" />
+      <input type="hidden" id="branchLocationAddress" />
+      <input type="hidden" id="branchLocationPlusCode" />
+      <input type="hidden" id="branchLocationMapsLink" />
+      <input type="hidden" id="branchLocationMethod" />
+      <div class="form-hint" style="margin-top:4px;">Leave blank to disable GPS check-in verification for this branch.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('branchModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveBranchBtn" onclick="saveBranch()">Save Branch</button>
+    </div>
+  </div>
+</div>
+
+<!-- Branch Workers Modal -->
+<div class="modal-overlay" id="workersModal">
+  <div class="modal-box" style="max-width:780px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="workersModalTitle">Branch Workers</h2>
+      <button class="btn-icon" onclick="closeModal('workersModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div style="padding:12px 20px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);display:flex;gap:10px;flex-wrap:wrap;">
+        <select id="branchWorkerShift" class="filter-select" onchange="loadBranchWorkers()">
+          <option value="all">All Shifts</option>
+          <option value="A">Shift A</option>
+          <option value="B">Shift B</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
+        <select id="branchWorkerStatus" class="filter-select" onchange="loadBranchWorkers()">
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="on_leave">On Leave</option>
+          <option value="resigned">Resigned</option>
+          <option value="sacked">Sacked</option>
+        </select>
+      </div>
+      <div class="table-wrapper" style="margin:0;max-height:420px;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Worker</th>
+              <th>Shift</th>
+              <th>Verification</th>
+              <th>Employment</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="branchWorkersTable">
+            <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--gray-400);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span id="branchWorkerCount" class="text-sm text-muted"></span>
+      <button class="btn btn-secondary" onclick="closeModal('workersModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Deactivate Branch</h2>
+      <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm">Are you sure you want to deactivate <strong id="deleteBranchName"></strong>?</p>
+      <p class="text-sm text-muted mt-2">Branches with assigned workers cannot be deactivated. Reassign all workers first.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Deactivate</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.js"></script>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/maps.js?v=3"></script>
+<script>
+  const user = requireAuth(['super_admin']);
+  if (user) {
+    populateSidebarUser();
+    loadBranches();
+  }
+
+  let branches = [];
+  let activeBranchId = null;
+
+  async function loadBranches() {
+    try {
+      const res = await API.getBranches();
+      branches = res.branches;
+      renderBranches(branches);
+    } catch (err) {
+      showToast('Failed to load branches: ' + err.message, 'error');
+    }
+  }
+
+  function renderBranches(list) {
+    const grid = document.getElementById('branchGrid');
+    if (!list.length) {
+      grid.innerHTML = `
+        <div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+          <div class="empty-icon">🏢</div>
+          <p class="empty-text">No branches yet. Create your first branch.</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(b => `
+      <div class="branch-card ${!b.isActive ? 'branch-inactive' : ''}">
+        <div class="branch-card-header">
+          <div>
+            <div class="branch-card-title">${b.name}</div>
+            <span class="branch-card-code">${b.code}</span>
+            ${!b.isActive ? '<span class="emp-badge resigned" style="margin-left:6px;">Inactive</span>' : ''}
+          </div>
+          <div class="branch-card-icon">🏢</div>
+        </div>
+
+        <div class="branch-card-stats">
+          <div class="branch-stat">
+            <div class="branch-stat-value">${b.workerCount}</div>
+            <div class="branch-stat-label">Total Workers</div>
+          </div>
+          <div class="branch-stat">
+            <div class="branch-stat-value" style="color:var(--success);">${b.activeCount}</div>
+            <div class="branch-stat-label">Active</div>
+          </div>
+        </div>
+
+        <div class="branch-card-meta">
+          ${b.managerName ? `<span>👤 ${b.managerName}</span>` : ''}
+          ${b.phone       ? `<span>📞 ${b.phone}</span>` : ''}
+          ${b.address     ? `<span>📍 ${b.address}</span>` : ''}
+          ${b.resumptionTimeA ? `<span>🕐 A: ${b.resumptionTimeA} / B: ${b.resumptionTimeB || b.resumptionTimeA}</span>` : ''}
+          ${b.location?.lat
+              ? `<span title="Open in Maps" style="cursor:pointer;" onclick="window.open('https://www.google.com/maps?q=${b.location.lat},${b.location.lng}','_blank')">🛰️ ${b.location.address ? b.location.address.split(',')[0] : Number(b.location.lat).toFixed(4)+', '+Number(b.location.lng).toFixed(4)}</span>`
+              : '<span style="color:var(--gray-400);font-size:0.75rem;">No location set</span>'}
+          <span>📅 Created ${formatDate(b.createdAt)}</span>
+        </div>
+
+        <div class="branch-card-actions">
+          <button class="btn btn-sm btn-outline" onclick="viewBranchWorkers('${b._id}','${b.name}')">👷 Workers</button>
+          <button class="btn btn-sm btn-secondary" onclick="openBranchModal('${b._id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="promptDelete('${b._id}','${b.name}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openBranchModal(id = null) {
+    document.getElementById('branchId').value     = id || '';
+    document.getElementById('branchName').value    = '';
+    document.getElementById('branchCode').value    = '';
+    document.getElementById('branchAddress').value  = '';
+    document.getElementById('branchManager').value  = '';
+    document.getElementById('branchPhone').value   = '';
+    document.getElementById('branchTimeA').value   = '08:00';
+    document.getElementById('branchTimeB').value   = '08:00';
+    document.getElementById('branchRadius').value  = '500';
+    document.getElementById('branchLocationLat').value     = '';
+    document.getElementById('branchLocationLng').value     = '';
+    document.getElementById('branchLocationAddress').value  = '';
+    document.getElementById('branchLocationPlusCode').value = '';
+    document.getElementById('branchLocationMapsLink').value = '';
+    document.getElementById('branchLocationMethod').value   = '';
+    const dispEl = document.getElementById('branchLocationDisplay');
+    if (dispEl) dispEl.innerHTML = '';
+
+    if (id) {
+      const b = branches.find(x => x._id === id);
+      if (b) {
+        document.getElementById('branchName').value    = b.name;
+        document.getElementById('branchCode').value    = b.code;
+        document.getElementById('branchAddress').value  = b.address || '';
+        document.getElementById('branchManager').value  = b.managerName || '';
+        document.getElementById('branchPhone').value   = b.phone || '';
+        document.getElementById('branchTimeA').value   = b.resumptionTimeA || '08:00';
+        document.getElementById('branchTimeB').value   = b.resumptionTimeB || '08:00';
+        document.getElementById('branchRadius').value  = b.attendanceRadiusM || 500;
+        document.getElementById('branchLocationLat').value     = b.location?.lat || '';
+        document.getElementById('branchLocationLng').value     = b.location?.lng || '';
+        document.getElementById('branchLocationAddress').value  = b.location?.address || '';
+        document.getElementById('branchLocationPlusCode').value = b.location?.plusCode || '';
+        document.getElementById('branchLocationMapsLink').value = b.location?.mapsLink || '';
+        document.getElementById('branchLocationMethod').value   = b.location?.inputMethod || '';
+        if (b.location?.lat) confirmLocation('branch');
+      }
+      document.getElementById('branchModalTitle').textContent = 'Edit Branch';
+    } else {
+      document.getElementById('branchModalTitle').textContent = 'Add Branch';
+    }
+    document.getElementById('branchModal').classList.add('open');
+  }
+
+  async function saveBranch() {
+    const id      = document.getElementById('branchId').value;
+    const name    = document.getElementById('branchName').value.trim();
+    const code    = document.getElementById('branchCode').value.trim().toUpperCase();
+    const address = document.getElementById('branchAddress').value.trim();
+    const managerName = document.getElementById('branchManager').value.trim();
+    const phone   = document.getElementById('branchPhone').value.trim();
+    const resumptionTimeA  = document.getElementById('branchTimeA').value   || '08:00';
+    const resumptionTimeB  = document.getElementById('branchTimeB').value   || '08:00';
+    const attendanceRadiusM = parseInt(document.getElementById('branchRadius').value) || 500;
+    const lat        = parseFloat(document.getElementById('branchLocationLat').value);
+    const lng        = parseFloat(document.getElementById('branchLocationLng').value);
+    const locAddress = document.getElementById('branchLocationAddress').value;
+    const plusCode   = document.getElementById('branchLocationPlusCode').value;
+    const mapsLink   = document.getElementById('branchLocationMapsLink').value;
+    const method     = document.getElementById('branchLocationMethod').value;
+
+    if (!name || !code) { showToast('Name and code are required', 'error'); return; }
+
+    const body = { name, code, address, managerName, phone, resumptionTimeA, resumptionTimeB, attendanceRadiusM };
+    if (!isNaN(lat) && !isNaN(lng)) {
+      body.locationLat     = lat;
+      body.locationLng     = lng;
+      body.locationAddress = locAddress;
+      body.locationPlusCode = plusCode;
+      body.locationMapsLink = mapsLink;
+      body.locationMethod   = method || 'map';
+    }
+
+    const btn = document.getElementById('saveBranchBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (id) {
+        await API.updateBranch(id, body);
+        showToast('Branch updated', 'success');
+      } else {
+        await API.createBranch(body);
+        showToast('Branch created', 'success');
+      }
+      closeModal('branchModal');
+      loadBranches();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Branch';
+    }
+  }
+
+  function promptDelete(id, name) {
+    activeBranchId = id;
+    document.getElementById('deleteBranchName').textContent = name;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+
+  async function confirmDelete() {
+    try {
+      await API.deleteBranch(activeBranchId);
+      showToast('Branch deactivated', 'success');
+      closeModal('deleteModal');
+      loadBranches();
+    } catch (err) {
+      showToast(err.message, 'error');
+      closeModal('deleteModal');
+    }
+  }
+
+  async function viewBranchWorkers(id, name) {
+    activeBranchId = id;
+    document.getElementById('workersModalTitle').textContent = `${name} — Workers`;
+    document.getElementById('branchWorkerShift').value  = 'all';
+    document.getElementById('branchWorkerStatus').value = 'all';
+    document.getElementById('workersModal').classList.add('open');
+    loadBranchWorkers();
+  }
+
+  async function loadBranchWorkers() {
+    const shift  = document.getElementById('branchWorkerShift').value;
+    const empStatus = document.getElementById('branchWorkerStatus').value;
+    let qs = '?limit=100';
+    if (shift !== 'all')     qs += `&shift=${shift}`;
+    if (empStatus !== 'all') qs += `&employmentStatus=${empStatus}`;
+
+    document.getElementById('branchWorkersTable').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-400);">Loading…</td></tr>';
+    try {
+      const res = await API.getBranchWorkers(activeBranchId, qs);
+      renderBranchWorkers(res.workers, res.total);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function renderBranchWorkers(workers, total) {
+    document.getElementById('branchWorkerCount').textContent = `${total} worker(s)`;
+    const tbody = document.getElementById('branchWorkersTable');
+    if (!workers.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--gray-400);">No workers found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = workers.map(w => `
+      <tr>
+        <td>
+          <div class="flex items-center gap-2">
+            ${w.passportPhoto ? `<img src="${w.passportPhoto}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" />` : '<div style="width:30px;height:30px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>'}
+            <div><div class="font-semibold text-sm">${w.fullName}</div><div class="text-xs text-muted">${w.phone}</div></div>
+          </div>
+        </td>
+        <td>${shiftBadge(w.shift)}</td>
+        <td>${statusBadge(w.verificationStatus)}</td>
+        <td>${empBadge(w.employmentStatus)}</td>
+        <td><a href="worker-detail.html?id=${w._id}" class="btn btn-sm btn-outline">View</a></td>
+      </tr>
+    `).join('');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  // ── Helpers ──
+  function shiftBadge(shift) {
+    const label = shift === 'unassigned' ? '—' : `Shift ${shift}`;
+    return `<span class="shift-badge ${shift}">${label}</span>`;
+  }
+  function empBadge(s) {
+    const labels = { active:'Active', suspended:'Suspended', on_leave:'On Leave', resigned:'Resigned', sacked:'Sacked' };
+    return `<span class="emp-badge ${s}">${labels[s] || s}</span>`;
+  }
+</script>
+</body>
+</html>

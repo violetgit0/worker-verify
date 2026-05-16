@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Worker Detail – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole"></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"    class="nav-link active"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <a href="workers.html" class="btn btn-sm btn-outline">← Back</a>
+        <h1 class="header-title" id="pageTitle">Worker Detail</h1>
+      </div>
+      <div id="verifyActions" class="flex gap-2 hidden">
+        <button class="btn btn-success btn-sm" onclick="openVerifyModal('verified')">✅ Approve</button>
+        <button class="btn btn-danger btn-sm"  onclick="openVerifyModal('rejected')">❌ Reject</button>
+      </div>
+    </header>
+
+    <main class="page-body">
+
+      <!-- Tab bar -->
+      <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--gray-200);">
+        <button class="tab-btn active" id="tabInfo"       onclick="switchTab('info')">Profile</button>
+        <button class="tab-btn"        id="tabAttendance" onclick="switchTab('attendance')">Attendance</button>
+        <button class="tab-btn"        id="tabPayroll"    onclick="switchTab('payroll')">Payroll</button>
+      </div>
+
+      <!-- Info panel -->
+      <div id="panelInfo">
+        <div class="empty-state"><div class="empty-icon">⏳</div><p class="empty-text">Loading worker details…</p></div>
+      </div>
+
+      <!-- Attendance panel -->
+      <div id="panelAttendance" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <label class="form-label">Month</label>
+              <select id="attMonth" class="filter-select" onchange="loadWorkerAttendance()">
+                <option value="1">January</option><option value="2">February</option>
+                <option value="3">March</option><option value="4">April</option>
+                <option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option>
+                <option value="9">September</option><option value="10">October</option>
+                <option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Year</label>
+              <input type="number" id="attYear" class="filter-select" style="width:90px;" onchange="loadWorkerAttendance()" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly summary -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;" id="attSummaryCards">
+          <div class="branch-stat" style="text-align:center;"><div class="branch-stat-value" style="color:var(--success);" id="attPresent">—</div><div class="branch-stat-label">Present</div></div>
+          <div class="branch-stat" style="text-align:center;"><div class="branch-stat-value" style="color:var(--warning);" id="attLate">—</div><div class="branch-stat-label">Late</div></div>
+          <div class="branch-stat" style="text-align:center;"><div class="branch-stat-value" style="color:var(--danger);" id="attAbsent">—</div><div class="branch-stat-label">Absent</div></div>
+          <div class="branch-stat" style="text-align:center;"><div class="branch-stat-value" style="color:var(--danger);" id="attDeductions">—</div><div class="branch-stat-label">Deductions</div></div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Late (min)</th><th>Deduction</th><th>GPS</th></tr>
+              </thead>
+              <tbody id="attTable">
+                <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-400);">Select month to load</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payroll panel -->
+      <div id="panelPayroll" style="display:none;">
+
+        <!-- Salary config (super_admin only) -->
+        <div class="card" style="margin-bottom:16px;" id="salaryConfigCard">
+          <div class="card-header">
+            <h2 class="card-title">Salary Settings</h2>
+            <button class="btn btn-sm btn-primary" onclick="openSalaryModal()">Edit Salary</button>
+          </div>
+          <div class="salary-breakdown" id="salaryDisplay">
+            <div class="salary-row"><span>Monthly Salary</span><span id="dispMonthlySalary">—</span></div>
+            <div class="salary-row"><span>Daily Rate</span><span id="dispDailyRate">—</span></div>
+          </div>
+        </div>
+
+        <!-- Payroll history filter -->
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <label class="form-label">Year</label>
+              <input type="number" id="prYear" class="filter-select" style="width:90px;" />
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <button class="btn btn-primary btn-sm" onclick="loadWorkerPayroll()">Load</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Payroll History</h2></div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Month</th><th>Base</th><th>Deductions</th><th>Overtime</th><th>Net</th><th>Days P/A/L</th><th>Status</th></tr>
+              </thead>
+              <tbody id="prTable">
+                <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-400);">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Workforce Management Modal -->
+<div class="modal-overlay" id="workforceModal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="workforceModalTitle">Manage Assignment</h2>
+      <button class="btn-icon" onclick="closeModal('workforceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Branch panel -->
+      <div id="wf_branchPanel">
+        <div class="form-group">
+          <label class="form-label">Assign Branch</label>
+          <select id="wf_branch" class="form-control">
+            <option value="">— Unassigned —</option>
+          </select>
+        </div>
+      </div>
+      <!-- Shift panel -->
+      <div id="wf_shiftPanel" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Assign Shift</label>
+          <select id="wf_shift" class="form-control">
+            <option value="unassigned">— Unassigned —</option>
+            <option value="A">Shift A</option>
+            <option value="B">Shift B</option>
+          </select>
+        </div>
+      </div>
+      <!-- Status panel -->
+      <div id="wf_statusPanel" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Employment Status</label>
+          <select id="wf_empStatus" class="form-control">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="on_leave">On Leave</option>
+            <option value="resigned">Resigned</option>
+            <option value="sacked">Sacked</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" id="wf_notes" class="form-control" placeholder="Reason or notes…" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('workforceModal')">Cancel</button>
+      <button class="btn btn-primary" id="wf_saveBtn" onclick="saveWorkforce()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Set Salary Modal -->
+<div class="modal-overlay" id="salaryModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Set Salary</h2>
+      <button class="btn-icon" onclick="closeModal('salaryModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Monthly Salary (₦)</label>
+        <input type="number" id="salMonthly" class="form-control" placeholder="e.g. 50000" min="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Daily Rate (₦) — leave blank to auto-calculate (salary ÷ 26)</label>
+        <input type="number" id="salDaily" class="form-control" placeholder="Auto" min="0" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('salaryModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSalary()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Verify/Reject Modal -->
+<div class="modal-overlay" id="verifyModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title" id="verifyModalTitle">Confirm Action</h2>
+      <button class="btn-icon" onclick="closeModal('verifyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rejectionReasonGroup" class="form-group hidden">
+        <label class="form-label">Rejection Reason <span class="required">*</span></label>
+        <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Explain why this worker is being rejected…"></textarea>
+      </div>
+      <p id="verifyConfirmText" class="text-sm text-muted">Are you sure you want to verify this worker?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('verifyModal')">Cancel</button>
+      <button class="btn" id="confirmVerifyBtn" onclick="submitVerification()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.js"></script>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/maps.js?v=3"></script>
+<script>
+  const currentUser = requireAuth(['super_admin', 'staff']);
+  const workerId = new URLSearchParams(window.location.search).get('id');
+  let workerData = null;
+  let pendingAction = null;
+
+  if (currentUser && workerId) {
+    populateSidebarUser();
+    const now = new Date();
+    document.getElementById('attMonth').value = now.getMonth() + 1;
+    document.getElementById('attYear').value  = now.getFullYear();
+    document.getElementById('prYear').value   = now.getFullYear();
+    loadWorkerDetail();
+  } else if (!workerId) {
+    window.location.href = 'workers.html';
+  }
+
+  async function loadWorkerDetail() {
+    try {
+      const res = await API.getWorker(workerId);
+      workerData = res.worker;
+      document.getElementById('pageTitle').textContent = workerData.fullName;
+      renderDetail(workerData, res.logs, res.transferLogs || []);
+
+      if (currentUser.role === 'super_admin' && workerData.verificationStatus === 'pending') {
+        document.getElementById('verifyActions').classList.remove('hidden');
+      }
+
+      // Populate salary display
+      if (currentUser.role === 'super_admin') {
+        document.getElementById('dispMonthlySalary').textContent =
+          workerData.monthlySalary > 0 ? `₦${workerData.monthlySalary.toLocaleString()}` : '—';
+        document.getElementById('dispDailyRate').textContent =
+          workerData.dailyRate > 0 ? `₦${workerData.dailyRate.toLocaleString()}` : '—';
+      } else {
+        const sc = document.getElementById('salaryConfigCard');
+        if (sc) sc.style.display = 'none';
+      }
+    } catch (err) {
+      document.getElementById('panelInfo').innerHTML =
+        `<div class="empty-state"><div class="empty-icon">❌</div><p class="empty-text">${err.message}</p></div>`;
+    }
+  }
+
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+
+  function switchTab(tab) {
+    ['info','attendance','payroll'].forEach(t => {
+      document.getElementById('tab' + cap(t)).classList.toggle('active', t === tab);
+      document.getElementById('panel' + cap(t)).style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'attendance') loadWorkerAttendance();
+    if (tab === 'payroll')    loadWorkerPayroll();
+  }
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // ── Attendance tab ─────────────────────────────────────────────────────────
+
+  async function loadWorkerAttendance() {
+    const month = document.getElementById('attMonth').value;
+    const year  = document.getElementById('attYear').value;
+    document.getElementById('attTable').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gray-400);">Loading…</td></tr>`;
+    try {
+      const res = await API.getWorkerAttendance(workerId, `?month=${month}&year=${year}`);
+      renderAttTable(res.attendance || []);
+      const s = res.summary || {};
+      document.getElementById('attPresent').textContent    = (s.present || 0) + (s.late || 0);
+      document.getElementById('attLate').textContent       = s.late    || 0;
+      document.getElementById('attAbsent').textContent     = s.absent  || 0;
+      document.getElementById('attDeductions').textContent = s.totalDeductions > 0
+        ? `₦${s.totalDeductions.toLocaleString()}` : '₦0';
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'error');
+    }
+  }
+
+  function renderAttTable(records) {
+    const tbody = document.getElementById('attTable');
+    if (!records.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;"><div class="empty-icon">🕐</div><p class="text-muted">No attendance records</p></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = records.map(a => `
+      <tr>
+        <td class="text-sm font-semibold">${formatDate(a.date)}</td>
+        <td><span class="att-badge ${a.status}">${a.status.replace('_',' ')}</span></td>
+        <td class="text-sm">${a.clockInTime  ? formatTime(a.clockInTime)  : '—'}</td>
+        <td class="text-sm">${a.clockOutTime ? formatTime(a.clockOutTime) : '—'}</td>
+        <td>${a.latenessMinutes > 0 ? `<span class="lateness-pill">${a.latenessMinutes} min</span>` : '—'}</td>
+        <td class="text-sm">${a.deductionAmount > 0 ? `<span style="color:var(--danger);font-weight:600;">₦${a.deductionAmount.toLocaleString()}</span>` : '—'}</td>
+        <td><span class="gps-dot ${a.isManual ? 'manual' : a.isLocationVerified ? 'verified' : 'unverified'}"
+            title="${a.isManual ? 'Manual' : a.isLocationVerified ? 'GPS verified' : 'GPS unverified'}"></span></td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Payroll tab ────────────────────────────────────────────────────────────
+
+  async function loadWorkerPayroll() {
+    const year = document.getElementById('prYear').value;
+    document.getElementById('prTable').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gray-400);">Loading…</td></tr>`;
+    try {
+      const res = await API.getWorkerPayroll(workerId, `?year=${year}`);
+      renderPayrollTable(res.payrolls || []);
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'error');
+    }
+  }
+
+  const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function renderPayrollTable(records) {
+    const tbody = document.getElementById('prTable');
+    if (!records.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;"><div class="empty-icon">💰</div><p class="text-muted">No payroll records</p></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = records.map(p => `
+      <tr>
+        <td class="font-semibold text-sm">${MONTH_NAMES[p.month]} ${p.year}</td>
+        <td class="text-sm">₦${(p.baseSalary || 0).toLocaleString()}</td>
+        <td class="text-sm" style="color:var(--danger);">
+          ${p.totalDeductions > 0 ? `₦${p.totalDeductions.toLocaleString()}` : '—'}
+        </td>
+        <td class="text-sm" style="color:var(--info);">
+          ${p.overtimeAmount > 0 ? `₦${p.overtimeAmount.toLocaleString()}` : '—'}
+        </td>
+        <td class="font-semibold" style="color:var(--success);">₦${(p.netSalary || 0).toLocaleString()}</td>
+        <td class="text-xs">${p.daysPresent}P / ${p.daysAbsent}A / ${p.daysLate}L</td>
+        <td><span class="payroll-status-badge ${p.status}">${p.status}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Salary modal ───────────────────────────────────────────────────────────
+
+  function openSalaryModal() {
+    document.getElementById('salMonthly').value = workerData?.monthlySalary || '';
+    document.getElementById('salDaily').value   = workerData?.dailyRate > 0 ? workerData.dailyRate : '';
+    document.getElementById('salaryModal').classList.add('open');
+  }
+
+  async function saveSalary() {
+    const monthlySalary = document.getElementById('salMonthly').value;
+    const dailyRate     = document.getElementById('salDaily').value;
+    try {
+      const res = await API.setSalary(workerId, { monthlySalary, dailyRate });
+      showToast('Salary updated', 'success');
+      closeModal('salaryModal');
+      if (workerData) {
+        workerData.monthlySalary = res.monthlySalary;
+        workerData.dailyRate     = res.dailyRate;
+        document.getElementById('dispMonthlySalary').textContent = `₦${res.monthlySalary.toLocaleString()}`;
+        document.getElementById('dispDailyRate').textContent     = `₦${res.dailyRate.toLocaleString()}`;
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const DOC_TYPE_LABEL = {
+    nin_slip: 'NIN Slip', voter_card: 'Voter Card',
+    drivers_license: "Driver's License",
+    international_passport: 'International Passport', national_id: 'National ID'
+  };
+
+  function docReviewCard(doc, target) {
+    if (!doc || (!doc.fileUrl && !doc.docNumber)) return '';
+    const isPdf   = doc.fileType === 'pdf';
+    const typeLabel = DOC_TYPE_LABEL[doc.docType] || doc.docType || '—';
+    const status  = doc.docStatus || 'pending';
+    const isAdmin = currentUser.role === 'super_admin';
+
+    const previewHtml = doc.fileUrl
+      ? isPdf
+        ? `<a href="${doc.fileUrl}" target="_blank" rel="noopener" class="doc-review-pdf"><span>📄</span>View PDF</a>`
+        : `<img class="doc-review-img" src="${doc.fileUrl}" alt="ID document" onclick="zoomImage('${doc.fileUrl}')" />`
+      : `<div class="doc-review-pdf" style="color:var(--gray-500);"><span>📋</span>No file</div>`;
+
+    const actionsHtml = isAdmin ? `
+      <div class="doc-review-actions">
+        <select id="flagSel_${target}" class="form-control doc-flag-select">
+          <option value="approved" ${status==='approved'?'selected':''}>Approve</option>
+          <option value="flagged"  ${status==='flagged'?'selected':''}>Flag for Review</option>
+          <option value="rejected" ${status==='rejected'?'selected':''}>Reject</option>
+          <option value="pending"  ${status==='pending'?'selected':''}>Reset to Pending</option>
+        </select>
+        <input type="text" id="flagNote_${target}" class="form-control" placeholder="Review notes (optional)"
+               value="${doc.reviewNotes || ''}" style="flex:2;min-width:0;" />
+        <button class="btn btn-primary btn-sm" onclick="submitFlagDoc('${target}')">Save</button>
+      </div>` : '';
+
+    return `
+      <div class="doc-review-card" style="margin-top:12px;">
+        <div class="doc-review-header">
+          <h4>Identity Document</h4>
+          <span class="doc-status-badge ${status}">${status}</span>
+        </div>
+        <div class="doc-review-body">
+          <div class="doc-review-preview">${previewHtml}</div>
+          <div class="doc-review-info">
+            <dl>
+              <dt>Type</dt><dd>${typeLabel}</dd>
+              <dt>Number</dt><dd>${doc.docNumber || '—'}</dd>
+            </dl>
+            ${doc.reviewNotes ? `<div class="doc-review-notes">${doc.reviewNotes}</div>` : ''}
+          </div>
+        </div>
+        ${actionsHtml}
+      </div>`;
+  }
+
+  const isAdmin = currentUser?.role === 'super_admin';
+
+  function shiftBadge(shift) {
+    const label = shift === 'unassigned' ? 'Unassigned' : `Shift ${shift}`;
+    return `<span class="shift-badge ${shift}">${label}</span>`;
+  }
+  function empBadge(s) {
+    const labels = { active:'Active', suspended:'Suspended', on_leave:'On Leave', resigned:'Resigned', sacked:'Sacked' };
+    return `<span class="emp-badge ${s}">${labels[s] || s}</span>`;
+  }
+
+  function renderDetail(w, logs, transferLogs = []) {
+    const photo = (url, fallback='👤') => url
+      ? `<img src="${url}" class="detail-photo" style="cursor:pointer;" onclick="zoomImage('${url}')" />`
+      : `<div class="detail-photo" style="background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:40px;">${fallback}</div>`;
+
+    const field = (label, value) => `
+      <div class="detail-field">
+        <label>${label}</label>
+        <p>${value || '—'}</p>
+      </div>`;
+
+    const photoGallery = (photos, fallbackUrl, fallbackIcon = '🏠', label = '') => {
+      const all = [...(photos && photos.length ? photos : (fallbackUrl ? [fallbackUrl] : []))];
+      if (!all.length) return `<div class="loc-no-location" style="height:80px;"><span>${fallbackIcon} No photos</span></div>`;
+      return `<div class="photo-gallery-strip">
+        ${all.map((url, i) => `<div class="photo-gallery-thumb" onclick="zoomImage('${url}')">
+          <img src="${url}" alt="${label || 'Photo'} ${i+1}" />
+          <div class="photo-gallery-num">${i+1}</div>
+        </div>`).join('')}
+      </div>`;
+    };
+
+    const guarantorHTML = (w.guarantors || []).map((g, i) => {
+      const gKey = `g${i+1}`;
+      return `
+        <div class="card mt-3">
+          <div class="card-header"><h3 class="card-title">Guarantor ${i+1}: ${g.fullName}</h3></div>
+          <div class="detail-grid">
+            <div>
+              ${field('Full Name', g.fullName)}
+              ${field('Phone', g.phone)}
+              ${field('NIN', g.nin)}
+              ${field('Relationship', g.relationship)}
+              ${field('Home Address', g.homeAddress)}
+              ${g.landmark ? field('Landmark', g.landmark) : ''}
+              ${docReviewCard(g.identityDoc, gKey)}
+            </div>
+            <div>
+              <div class="section-subtitle">Passport Photo</div>
+              <div class="flex gap-3 mb-3">
+                ${photo(g.passportPhoto, '👤')}
+              </div>
+              <div class="section-subtitle">House Photos</div>
+              ${photoGallery(g.housePhotos, g.housePhoto, '🏠', 'House')}
+              <div class="section-subtitle" style="margin-top:12px;">Street Photos</div>
+              ${photoGallery(g.streetPhotos, null, '🏘', 'Street')}
+              <div class="section-subtitle" style="margin-top:12px;">Location</div>
+              <div class="map-container" id="g${i}Map">${g.location?.lat ? '📍 Loading map…' : '<div class=\\"loc-no-location\\"><div class=\\"loc-pin-icon\\">📍</div>No location pinned</div>'}</div>
+              <div id="g${i}MapCtrl"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('panelInfo').innerHTML = `
+      <!-- Status Banner -->
+      <div class="card mb-4" style="margin-bottom:16px;background:${w.verificationStatus==='verified'?'var(--success-light)':w.verificationStatus==='rejected'?'var(--danger-light)':'var(--warning-light)'};">
+        <div class="flex items-center justify-between">
+          <div>
+            <span style="font-size:14px;font-weight:600;">Verification Status: ${statusBadge(w.verificationStatus)}</span>
+            ${w.verificationStatus==='rejected'&&w.rejectionReason ? `<div class="text-sm text-muted mt-1">Reason: ${w.rejectionReason}</div>` : ''}
+            ${w.verifiedBy ? `<div class="text-xs text-muted mt-1">By ${w.verifiedBy.fullName} on ${formatDate(w.verifiedAt)}</div>` : ''}
+          </div>
+          ${w.verificationStatus==='pending'&&currentUser.role==='super_admin' ? `
+            <div class="flex gap-2">
+              <button class="btn btn-success btn-sm" onclick="openVerifyModal('verified')">✅ Approve</button>
+              <button class="btn btn-danger btn-sm"  onclick="openVerifyModal('rejected')">❌ Reject</button>
+            </div>` : ''}
+        </div>
+      </div>
+
+      <!-- Worker Info -->
+      <div class="card mb-4" style="margin-bottom:16px;">
+        <div class="card-header"><h2 class="card-title">Worker Information</h2>
+          <div class="text-xs text-muted">Registered by ${w.registeredBy?.fullName || '—'} &bull; ${formatDate(w.createdAt)}</div>
+        </div>
+        <div class="detail-grid">
+          <div>
+            ${field('Full Name', w.fullName)}
+            ${field('Phone', w.phone)}
+            ${field('Gender', w.gender)}
+            ${field('Date of Birth', formatDate(w.dateOfBirth))}
+            ${field('NIN', `<code>${w.nin}</code>`)}
+            ${field('Occupation', w.occupation)}
+            ${field('Home Address', w.homeAddress)}
+            ${w.landmark ? field('Landmark', w.landmark) : ''}
+            ${w.location?.plusCode ? field('Google Plus Code', `<span class="loc-plus-code-tag">${w.location.plusCode}</span>`) : ''}
+            ${w.location?.lat ? field('GPS Coordinates', `<span style="font-family:monospace;font-size:.82rem;">${w.location.lat.toFixed(6)}, ${w.location.lng.toFixed(6)}</span>`) : ''}
+            ${docReviewCard(w.identityDoc, 'worker')}
+          </div>
+          <div>
+            <div class="section-subtitle">Passport Photo</div>
+            <div class="flex gap-3 mb-3">
+              <div>${photo(w.passportPhoto)} <p class="text-xs text-muted mt-1 text-center">Passport</p></div>
+            </div>
+            <div class="section-subtitle">House Photos</div>
+            ${photoGallery(w.housePhotos, w.housePhoto, '🏠', 'House')}
+            <div class="section-subtitle" style="margin-top:12px;">Street Photos</div>
+            ${photoGallery(w.streetPhotos, null, '🏘', 'Street')}
+            <div class="section-subtitle" style="margin-top:12px;">Location</div>
+            <div class="map-container" id="workerMap">${w.location?.lat ? '📍 Loading map…' : '<div class="loc-no-location"><div class="loc-pin-icon">📍</div>No location pinned</div>'}</div>
+            <div id="workerMapCtrl"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guarantors -->
+      ${guarantorHTML}
+
+      <!-- Workforce Management Panel -->
+      <div class="card mt-3" style="margin-top:16px;">
+        <div class="card-header">
+          <h2 class="card-title">Workforce Assignment</h2>
+          ${isAdmin ? '<span class="text-xs text-muted">Click Edit to change</span>' : ''}
+        </div>
+        <div class="workforce-panel">
+          <div class="workforce-row">
+            <span class="workforce-row-label">Branch</span>
+            <span class="workforce-row-value">
+              ${w.branch ? `${w.branch.name} <span class="branch-card-code">${w.branch.code}</span>` : '<span class="text-muted">Unassigned</span>'}
+            </span>
+            ${isAdmin ? `<button class="workforce-edit-btn" onclick="openWorkforceModal('branch')">Edit</button>` : ''}
+          </div>
+          <div class="workforce-row">
+            <span class="workforce-row-label">Shift</span>
+            <span class="workforce-row-value">${shiftBadge(w.shift)}</span>
+            ${isAdmin ? `<button class="workforce-edit-btn" onclick="openWorkforceModal('shift')">Edit</button>` : ''}
+          </div>
+          <div class="workforce-row">
+            <span class="workforce-row-label">Employment Status</span>
+            <span class="workforce-row-value">${empBadge(w.employmentStatus)}</span>
+            ${isAdmin ? `<button class="workforce-edit-btn" onclick="openWorkforceModal('status')">Edit</button>` : ''}
+          </div>
+          <div class="workforce-row">
+            <span class="workforce-row-label">Date Employed</span>
+            <span class="workforce-row-value">${formatDate(w.dateEmployed)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer / Change History -->
+      ${transferLogs.length ? `
+      <div class="card mt-3" style="margin-top:16px;">
+        <div class="card-header"><h2 class="card-title">Change History</h2></div>
+        ${transferLogs.map(t => `
+          <div class="transfer-entry">
+            <div class="transfer-icon ${t.changeType}">
+              ${t.changeType === 'branch_assignment' ? '🏢' : t.changeType === 'shift_change' ? '🔄' : '📋'}
+            </div>
+            <div class="transfer-content">
+              <div class="transfer-title">
+                ${t.changeType.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}:
+                <span style="color:var(--gray-400);">${t.oldValue || '—'}</span>
+                <span class="transfer-arrow">→</span>
+                <span style="color:var(--primary);">${t.newValue}</span>
+              </div>
+              <div class="transfer-meta">By ${t.performedBy?.fullName||'—'} &bull; ${formatDate(t.createdAt)}</div>
+              ${t.notes ? `<div class="transfer-notes">${t.notes}</div>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>` : ''}
+
+      <!-- Audit Log -->
+      <div class="card mt-3" style="margin-top:16px;">
+        <div class="card-header"><h2 class="card-title">Audit Trail</h2></div>
+        <div id="auditLog">
+          ${logs.length ? logs.map(l => `
+            <div class="audit-entry">
+              <div class="audit-dot"></div>
+              <div>
+                <div class="text-sm font-semibold">${l.action.charAt(0).toUpperCase()+l.action.slice(1).replace(/_/g,' ')}</div>
+                <div class="audit-meta">By ${l.performedBy?.fullName||'—'} (${l.performedBy?.role||''}) &bull; ${formatDate(l.createdAt)}</div>
+                ${l.notes ? `<div class="text-xs text-muted mt-1">${l.notes}</div>` : ''}
+              </div>
+            </div>
+          `).join('') : '<p class="text-muted text-sm">No activity recorded</p>'}
+        </div>
+      </div>
+    `;
+
+    // Render maps after DOM is painted
+    setTimeout(() => {
+      showStaticMap('workerMap', w.location?.lat, w.location?.lng, {
+        interactive:  true,
+        address:      w.location?.address,
+        plusCode:     w.location?.plusCode,
+        mapsLink:     w.location?.mapsLink,
+        inputMethod:  w.location?.inputMethod,
+        ctrlContainer: 'workerMapCtrl'
+      });
+      (w.guarantors || []).forEach((g, i) => {
+        showStaticMap(`g${i}Map`, g.location?.lat, g.location?.lng, {
+          interactive:  true,
+          address:      g.location?.address,
+          plusCode:     g.location?.plusCode,
+          mapsLink:     g.location?.mapsLink,
+          inputMethod:  g.location?.inputMethod,
+          ctrlContainer: `g${i}MapCtrl`
+        });
+      });
+    }, 0);
+  }
+
+  function openVerifyModal(action) {
+    pendingAction = action;
+    const isReject = action === 'rejected';
+    document.getElementById('verifyModalTitle').textContent = isReject ? 'Reject Worker' : 'Approve Worker';
+    document.getElementById('verifyConfirmText').textContent = isReject
+      ? 'Please provide a reason for rejection.'
+      : 'Are you sure you want to verify this worker? This will mark them as verified.';
+    document.getElementById('rejectionReasonGroup').classList.toggle('hidden', !isReject);
+    const btn = document.getElementById('confirmVerifyBtn');
+    btn.className = `btn ${isReject ? 'btn-danger' : 'btn-success'}`;
+    btn.textContent = isReject ? 'Reject' : 'Approve';
+    document.getElementById('verifyModal').classList.add('open');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  async function submitVerification() {
+    const body = { status: pendingAction };
+    if (pendingAction === 'rejected') {
+      const reason = document.getElementById('rejectionReason').value.trim();
+      if (!reason) { showToast('Please provide a rejection reason', 'error'); return; }
+      body.rejectionReason = reason;
+    }
+    try {
+      await API.updateStatus(workerId, body);
+      showToast(`Worker ${pendingAction} successfully`, 'success');
+      closeModal('verifyModal');
+      setTimeout(loadWorkerDetail, 500);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ── Workforce Modal ─────────────────────────────────────────────────────────
+
+  let wfMode = null; // 'branch' | 'shift' | 'status'
+
+  async function openWorkforceModal(mode) {
+    wfMode = mode;
+    document.getElementById('wf_branchPanel').style.display  = mode === 'branch' ? '' : 'none';
+    document.getElementById('wf_shiftPanel').style.display   = mode === 'shift'  ? '' : 'none';
+    document.getElementById('wf_statusPanel').style.display  = mode === 'status' ? '' : 'none';
+    document.getElementById('wf_notes').value = '';
+
+    const titles = { branch: 'Assign Branch', shift: 'Assign Shift', status: 'Update Employment Status' };
+    document.getElementById('workforceModalTitle').textContent = titles[mode];
+
+    if (mode === 'branch') {
+      const sel = document.getElementById('wf_branch');
+      sel.innerHTML = '<option value="">— Unassigned —</option>';
+      try {
+        const res = await API.getBranches();
+        res.branches.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b._id;
+          opt.textContent = `${b.name} (${b.code})`;
+          if (workerData.branch && workerData.branch._id === b._id) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      } catch(_) {}
+    } else if (mode === 'shift') {
+      document.getElementById('wf_shift').value = workerData.shift || 'unassigned';
+    } else if (mode === 'status') {
+      document.getElementById('wf_empStatus').value = workerData.employmentStatus || 'active';
+    }
+
+    document.getElementById('workforceModal').classList.add('open');
+  }
+
+  async function saveWorkforce() {
+    const notes = document.getElementById('wf_notes').value.trim();
+    const btn = document.getElementById('wf_saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (wfMode === 'branch') {
+        const branchId = document.getElementById('wf_branch').value;
+        await API.assignBranch(workerId, { branchId: branchId || null, notes });
+      } else if (wfMode === 'shift') {
+        const shift = document.getElementById('wf_shift').value;
+        await API.assignShift(workerId, { shift, notes });
+      } else if (wfMode === 'status') {
+        const employmentStatus = document.getElementById('wf_empStatus').value;
+        await API.updateEmploymentStatus(workerId, { employmentStatus, notes });
+      }
+      showToast('Updated successfully', 'success');
+      closeModal('workforceModal');
+      loadWorkerDetail();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  }
+
+  async function submitFlagDoc(target) {
+    const docStatus  = document.getElementById(`flagSel_${target}`).value;
+    const reviewNotes = document.getElementById(`flagNote_${target}`).value.trim();
+    try {
+      await API.flagDocument(workerId, { target, docStatus, reviewNotes });
+      showToast('Document status updated', 'success');
+      loadWorkerDetail();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function zoomImage(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'zoom-modal-overlay';
+    overlay.innerHTML = `<img class="zoom-modal-img" src="${src}" alt="zoom" />`;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+  }
+</script>
+</body>
+</html>

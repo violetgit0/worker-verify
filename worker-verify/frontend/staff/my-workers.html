@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Workers – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole">Staff</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"       class="nav-link"><span class="nav-icon">📊</span> My Dashboard</a>
+      <a href="register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+      <a href="my-workers.html"      class="nav-link active"><span class="nav-icon">👷</span> My Workers</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">My Workers</h1>
+      </div>
+      <a href="register-worker.html" class="btn btn-primary btn-sm">➕ Register Worker</a>
+    </header>
+
+    <main class="page-body">
+      <div class="card">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="searchInput" type="text" class="form-control" placeholder="Search by name, phone, or NIN…" />
+          </div>
+          <select id="statusFilter" class="filter-select">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="loadWorkers()">Search</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Worker</th>
+                <th>Phone</th>
+                <th>NIN</th>
+                <th>Occupation</th>
+                <th>Date Registered</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="workersTable">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="pagination" class="pagination"></div>
+        <div id="tableSummary" class="text-xs text-muted mt-2"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const user = requireAuth(['staff']);
+  let currentPage = 1;
+  const pageSize = 20;
+
+  if (user) {
+    populateSidebarUser();
+    loadWorkers();
+  }
+
+  let searchTimer;
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { currentPage = 1; loadWorkers(); }, 400);
+  });
+  document.getElementById('statusFilter').addEventListener('change', () => { currentPage = 1; loadWorkers(); });
+
+  async function loadWorkers(page = currentPage) {
+    currentPage = page;
+    const search = document.getElementById('searchInput').value.trim();
+    const status = document.getElementById('statusFilter').value;
+
+    let qs = `?page=${page}&limit=${pageSize}`;
+    if (search) qs += `&search=${encodeURIComponent(search)}`;
+    if (status && status !== 'all') qs += `&status=${status}`;
+
+    try {
+      const res = await API.getWorkers(qs);
+      renderTable(res.workers);
+      renderPagination(res.pagination);
+    } catch (err) {
+      showToast('Failed to load workers: ' + err.message, 'error');
+    }
+  }
+
+  function renderTable(workers) {
+    const tbody = document.getElementById('workersTable');
+    if (!workers.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:48px;">
+        <div class="empty-icon">👷</div>
+        <p class="text-muted">No workers found.</p>
+        <a href="register-worker.html" class="btn btn-primary mt-3" style="margin-top:12px;">Register First Worker</a>
+      </td></tr>`;
+      return;
+    }
+    tbody.innerHTML = workers.map((w, i) => `
+      <tr>
+        <td>${((currentPage-1)*pageSize)+i+1}</td>
+        <td>
+          <div class="flex items-center gap-2">
+            ${w.passportPhoto ? `<img src="${w.passportPhoto}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" />` : '<div style="width:34px;height:34px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>'}
+            <div class="font-semibold">${w.fullName}</div>
+          </div>
+        </td>
+        <td>${w.phone}</td>
+        <td><code>${w.nin}</code></td>
+        <td>${w.occupation}</td>
+        <td>${formatDate(w.createdAt)}</td>
+        <td>${statusBadge(w.verificationStatus)}</td>
+        <td>
+          <a href="../admin/worker-detail.html?id=${w._id}" class="btn btn-sm btn-outline">View</a>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderPagination({ total, page, pages, limit }) {
+    const el = document.getElementById('pagination');
+    document.getElementById('tableSummary').textContent =
+      `Showing ${Math.min((page-1)*limit+1, total)}–${Math.min(page*limit, total)} of ${total} workers`;
+
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = `<button class="page-btn" onclick="loadWorkers(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+    for (let p = Math.max(1, page-2); p <= Math.min(pages, page+2); p++) {
+      html += `<button class="page-btn ${p===page?'active':''}" onclick="loadWorkers(${p})">${p}</button>`;
+    }
+    html += `<button class="page-btn" onclick="loadWorkers(${page+1})" ${page===pages?'disabled':''}>›</button>`;
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>

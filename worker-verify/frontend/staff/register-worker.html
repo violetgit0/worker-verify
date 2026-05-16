@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register Worker – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole"></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"          class="nav-link"><span class="nav-icon">📊</span> My Dashboard</a>
+      <a href="register-worker.html"    class="nav-link active"><span class="nav-icon">➕</span> Register Worker</a>
+      <a href="my-workers.html"         class="nav-link"><span class="nav-icon">👷</span> My Workers</a>
+      <a href="../admin/branches.html"  class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">Register New Worker</h1>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <div class="card" style="max-width:900px;margin:0 auto;">
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+          <div class="step active" id="stepDot1"><div class="step-circle">1</div><div class="step-label">Worker Info</div></div>
+          <div class="step"        id="stepDot2"><div class="step-circle">2</div><div class="step-label">Address & Location</div></div>
+          <div class="step"        id="stepDot3"><div class="step-circle">3</div><div class="step-label">Guarantor 1</div></div>
+          <div class="step"        id="stepDot4"><div class="step-circle">4</div><div class="step-label">Guarantor 2</div></div>
+          <div class="step"        id="stepDot5"><div class="step-circle">5</div><div class="step-label">Review</div></div>
+        </div>
+
+        <form id="workerForm" enctype="multipart/form-data" onsubmit="return false;">
+
+          <!-- ── STEP 1: Worker Basic Information ── -->
+          <div class="step-panel active" id="step1">
+            <div class="step-title">👷 Worker Basic Information</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Name <span class="required">*</span></label>
+                <input type="text" id="w_fullName" class="form-control" placeholder="e.g. Emeka Okonkwo" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone Number <span class="required">*</span></label>
+                <input type="tel" id="w_phone" class="form-control" placeholder="08012345678" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Gender <span class="required">*</span></label>
+                <select id="w_gender" class="form-control" required>
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Date of Birth <span class="required">*</span></label>
+                <input type="date" id="w_dob" class="form-control" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">NIN Number <span class="required">*</span></label>
+                <input type="text" id="w_nin" class="form-control" placeholder="11-digit NIN" maxlength="11" required />
+                <div class="form-hint">National Identification Number (11 digits)</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Occupation <span class="required">*</span></label>
+                <input type="text" id="w_occupation" class="form-control" placeholder="e.g. Pump Attendant" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Passport Photograph <span class="required">*</span></label>
+              <div class="file-upload-area" onclick="document.getElementById('w_passport').click()">
+                <div class="file-upload-icon">📸</div>
+                <div class="file-upload-text">Click to upload passport photo (JPG, PNG – max 5MB)</div>
+                <img id="w_passportPreview" class="file-preview hidden" />
+                <input type="file" id="w_passport" name="passportPhoto" accept="image/*" onchange="previewFile(this,'w_passportPreview')" />
+              </div>
+            </div>
+
+            <!-- Branch & Shift -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Branch Assignment</label>
+                <select id="w_branch" class="form-control">
+                  <option value="">— Select Branch —</option>
+                </select>
+                <div class="form-hint">Optional — can be assigned later</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Shift</label>
+                <select id="w_shift" class="form-control">
+                  <option value="unassigned">— Unassigned —</option>
+                  <option value="A">Shift A</option>
+                  <option value="B">Shift B</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date Employed</label>
+              <input type="date" id="w_dateEmployed" class="form-control" />
+              <div class="form-hint">Leave blank to use today's date</div>
+            </div>
+
+            <!-- Identity Document -->
+            <div class="doc-section">
+              <div class="doc-section-title">Identity Document</div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Document Type</label>
+                  <select id="w_idDocType" class="form-control">
+                    <option value="nin_slip">NIN Slip</option>
+                    <option value="voter_card">Voter Card</option>
+                    <option value="drivers_license">Driver's License</option>
+                    <option value="international_passport">International Passport</option>
+                    <option value="national_id">National ID Card</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Document Number</label>
+                  <input type="text" id="w_idDocNumber" class="form-control" placeholder="e.g. 12345678901" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Upload Document <span class="text-muted" style="font-weight:400;">(image or PDF)</span></label>
+                <div class="doc-upload-area" id="wDocUploadArea" ondragover="docDragOver(event,'wDocUploadArea')" ondragleave="docDragLeave('wDocUploadArea')" ondrop="docDrop(event,'w_idDoc','wDocUploadArea','wDocPreview')">
+                  <div class="doc-upload-icon">📄</div>
+                  <p>Drag & drop here or <strong>click to browse</strong></p>
+                  <p>JPG, PNG, WebP or PDF &mdash; max 10 MB</p>
+                  <input type="file" id="w_idDoc" name="workerIdDoc" accept="image/*,application/pdf" onchange="handleDocFile(this,'wDocUploadArea','wDocPreview')" />
+                </div>
+                <div id="wDocPreview" class="doc-preview" style="display:none;"></div>
+              </div>
+            </div>
+
+            <div class="step-nav">
+              <div></div>
+              <button type="button" class="btn btn-primary" onclick="goStep(2)">Next: Address & Location →</button>
+            </div>
+          </div>
+
+          <!-- ── STEP 2: Address & Location ── -->
+          <div class="step-panel" id="step2">
+            <div class="step-title">📍 Worker Address & Location</div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Home Address <span class="required">*</span></label>
+                <textarea id="w_homeAddress" class="form-control" rows="3"
+                  placeholder="House No., Street, Area, City, State. e.g. 14 Broad Street, Marina, Lagos Island, Lagos State" required></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Landmark / Nearest Notable Place</label>
+                <input type="text" id="w_landmark" class="form-control"
+                  placeholder="e.g. Beside GTBank, Near LUTH, Opposite Total Filling Station" />
+                <div class="form-hint">Church, school, bank, market or named building closest to the house</div>
+              </div>
+            </div>
+
+            <!-- Location Intelligence card -->
+            <div class="loc-intel-card">
+              <div class="loc-intel-header">
+                <div class="loc-intel-title">🌍 GPS Coordinates & Map Pin</div>
+                <div class="form-hint" style="margin:0;">Pinning location helps verify the address and enables field visit routing</div>
+              </div>
+              <div class="loc-intel-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openMapPicker('worker')">🗺 Open Map Picker</button>
+                <button type="button" class="btn-gps" id="workerGpsBtn" onclick="useCurrentGPS('worker')">🎯 Use My Current Location</button>
+              </div>
+              <div id="workerLocationDisplay" class="loc-display-area">
+                <div class="loc-no-location"><div class="loc-pin-icon">📍</div><span>No location pinned — tap a button above to add</span></div>
+              </div>
+              <input type="hidden" id="workerLocationLat" />
+              <input type="hidden" id="workerLocationLng" />
+              <input type="hidden" id="workerLocationAddress" />
+              <input type="hidden" id="workerLocationPlusCode" />
+              <input type="hidden" id="workerLocationMapsLink" />
+              <input type="hidden" id="workerLocationMethod" />
+            </div>
+
+            <!-- House photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏠 House / Building Photographs</div>
+                  <div class="form-hint">Up to 4 photos — front view, entrance gate, house number</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="w_housePhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'housePhotos','w_houseGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="w_houseGrid"></div>
+            </div>
+
+            <!-- Street/environment photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏘 Street / Environment Photos</div>
+                  <div class="form-hint">Up to 4 photos of the street, road, or surrounding area</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="w_streetPhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'streetPhotos','w_streetGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="w_streetGrid"></div>
+            </div>
+
+            <div class="step-nav">
+              <button type="button" class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+              <button type="button" class="btn btn-primary" onclick="goStep(3)">Next: Guarantor 1 →</button>
+            </div>
+          </div>
+
+          <!-- ── STEP 3: Guarantor 1 ── -->
+          <div class="step-panel" id="step3">
+            <div class="step-title">👤 Guarantor 1</div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Name <span class="required">*</span></label>
+                <input type="text" id="g1_fullName" class="form-control" placeholder="Guarantor's full name" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone Number <span class="required">*</span></label>
+                <input type="tel" id="g1_phone" class="form-control" placeholder="08012345678" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">NIN Number <span class="required">*</span></label>
+                <input type="text" id="g1_nin" class="form-control" placeholder="11-digit NIN" maxlength="11" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Relationship to Worker <span class="required">*</span></label>
+                <input type="text" id="g1_relationship" class="form-control" placeholder="e.g. Uncle, Neighbour, Employer" required />
+              </div>
+            </div>
+
+            <!-- Passport photo -->
+            <div class="form-group">
+              <label class="form-label">Passport Photograph</label>
+              <div class="file-upload-area" onclick="document.getElementById('g1_passport').click()">
+                <div class="file-upload-icon">📸</div>
+                <div class="file-upload-text">Click to upload guarantor passport photo</div>
+                <img id="g1_passportPreview" class="file-preview hidden" />
+                <input type="file" id="g1_passport" name="g1PassportPhoto" accept="image/*" onchange="previewFile(this,'g1_passportPreview')" />
+              </div>
+            </div>
+
+            <!-- Address & Location -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Home Address <span class="required">*</span></label>
+                <textarea id="g1_homeAddress" class="form-control" rows="3"
+                  placeholder="House No., Street, Area, City, State" required></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Landmark / Nearest Notable Place</label>
+                <input type="text" id="g1_landmark" class="form-control"
+                  placeholder="e.g. Behind St. Paul's Church, Near Oshodi Market" />
+                <div class="form-hint">Closest church, school, bank or known building</div>
+              </div>
+            </div>
+
+            <div class="loc-intel-card">
+              <div class="loc-intel-header">
+                <div class="loc-intel-title">🌍 GPS Coordinates & Map Pin</div>
+              </div>
+              <div class="loc-intel-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openMapPicker('g1')">🗺 Open Map Picker</button>
+                <button type="button" class="btn-gps" id="g1GpsBtn" onclick="useCurrentGPS('g1')">🎯 Use My Current Location</button>
+              </div>
+              <div id="g1LocationDisplay" class="loc-display-area">
+                <div class="loc-no-location"><div class="loc-pin-icon">📍</div><span>No location pinned yet</span></div>
+              </div>
+              <input type="hidden" id="g1LocationLat" />
+              <input type="hidden" id="g1LocationLng" />
+              <input type="hidden" id="g1LocationAddress" />
+              <input type="hidden" id="g1LocationPlusCode" />
+              <input type="hidden" id="g1LocationMapsLink" />
+              <input type="hidden" id="g1LocationMethod" />
+            </div>
+
+            <!-- House photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏠 House / Building Photographs</div>
+                  <div class="form-hint">Up to 4 photos — front view, entrance, gate</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="g1_housePhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'g1HousePhotos','g1_houseGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="g1_houseGrid"></div>
+            </div>
+
+            <!-- Street photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏘 Street / Environment Photos</div>
+                  <div class="form-hint">Up to 4 photos of the street or surrounding area</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="g1_streetPhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'g1StreetPhotos','g1_streetGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="g1_streetGrid"></div>
+            </div>
+
+            <!-- Identity Document -->
+            <div class="doc-section">
+              <div class="doc-section-title">Guarantor 1 Identity Document</div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Document Type</label>
+                  <select id="g1_idDocType" class="form-control">
+                    <option value="nin_slip">NIN Slip</option>
+                    <option value="voter_card">Voter Card</option>
+                    <option value="drivers_license">Driver's License</option>
+                    <option value="international_passport">International Passport</option>
+                    <option value="national_id">National ID Card</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Document Number</label>
+                  <input type="text" id="g1_idDocNumber" class="form-control" placeholder="e.g. 12345678901" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Upload Document <span class="text-muted" style="font-weight:400;">(image or PDF)</span></label>
+                <div class="doc-upload-area" id="g1DocUploadArea" ondragover="docDragOver(event,'g1DocUploadArea')" ondragleave="docDragLeave('g1DocUploadArea')" ondrop="docDrop(event,'g1_idDoc','g1DocUploadArea','g1DocPreview')">
+                  <div class="doc-upload-icon">📄</div>
+                  <p>Drag & drop here or <strong>click to browse</strong></p>
+                  <p>JPG, PNG, WebP or PDF &mdash; max 10 MB</p>
+                  <input type="file" id="g1_idDoc" name="g1IdDoc" accept="image/*,application/pdf" onchange="handleDocFile(this,'g1DocUploadArea','g1DocPreview')" />
+                </div>
+                <div id="g1DocPreview" class="doc-preview" style="display:none;"></div>
+              </div>
+            </div>
+
+            <div class="step-nav">
+              <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+              <button type="button" class="btn btn-primary" onclick="goStep(4)">Next: Guarantor 2 →</button>
+            </div>
+          </div>
+
+          <!-- ── STEP 4: Guarantor 2 ── -->
+          <div class="step-panel" id="step4">
+            <div class="step-title">👤 Guarantor 2</div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Name <span class="required">*</span></label>
+                <input type="text" id="g2_fullName" class="form-control" placeholder="Guarantor's full name" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone Number <span class="required">*</span></label>
+                <input type="tel" id="g2_phone" class="form-control" placeholder="08012345678" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">NIN Number <span class="required">*</span></label>
+                <input type="text" id="g2_nin" class="form-control" placeholder="11-digit NIN" maxlength="11" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Relationship to Worker <span class="required">*</span></label>
+                <input type="text" id="g2_relationship" class="form-control" placeholder="e.g. Landlord, Pastor, Teacher" required />
+              </div>
+            </div>
+
+            <!-- Passport photo -->
+            <div class="form-group">
+              <label class="form-label">Passport Photograph</label>
+              <div class="file-upload-area" onclick="document.getElementById('g2_passport').click()">
+                <div class="file-upload-icon">📸</div>
+                <div class="file-upload-text">Click to upload guarantor passport photo</div>
+                <img id="g2_passportPreview" class="file-preview hidden" />
+                <input type="file" id="g2_passport" name="g2PassportPhoto" accept="image/*" onchange="previewFile(this,'g2_passportPreview')" />
+              </div>
+            </div>
+
+            <!-- Address & Location -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Home Address <span class="required">*</span></label>
+                <textarea id="g2_homeAddress" class="form-control" rows="3"
+                  placeholder="House No., Street, Area, City, State" required></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Landmark / Nearest Notable Place</label>
+                <input type="text" id="g2_landmark" class="form-control"
+                  placeholder="e.g. Opposite Police Barracks, Near Palace Hotel" />
+                <div class="form-hint">Closest church, school, bank or known building</div>
+              </div>
+            </div>
+
+            <div class="loc-intel-card">
+              <div class="loc-intel-header">
+                <div class="loc-intel-title">🌍 GPS Coordinates & Map Pin</div>
+              </div>
+              <div class="loc-intel-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick="openMapPicker('g2')">🗺 Open Map Picker</button>
+                <button type="button" class="btn-gps" id="g2GpsBtn" onclick="useCurrentGPS('g2')">🎯 Use My Current Location</button>
+              </div>
+              <div id="g2LocationDisplay" class="loc-display-area">
+                <div class="loc-no-location"><div class="loc-pin-icon">📍</div><span>No location pinned yet</span></div>
+              </div>
+              <input type="hidden" id="g2LocationLat" />
+              <input type="hidden" id="g2LocationLng" />
+              <input type="hidden" id="g2LocationAddress" />
+              <input type="hidden" id="g2LocationPlusCode" />
+              <input type="hidden" id="g2LocationMapsLink" />
+              <input type="hidden" id="g2LocationMethod" />
+            </div>
+
+            <!-- House photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏠 House / Building Photographs</div>
+                  <div class="form-hint">Up to 4 photos — front view, entrance, gate</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="g2_housePhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'g2HousePhotos','g2_houseGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="g2_houseGrid"></div>
+            </div>
+
+            <!-- Street photographs -->
+            <div class="multi-upload-section">
+              <div class="multi-upload-header">
+                <div>
+                  <div class="multi-upload-title">🏘 Street / Environment Photos</div>
+                  <div class="form-hint">Up to 4 photos of the street or surrounding area</div>
+                </div>
+                <label class="btn btn-outline btn-sm multi-add-btn">
+                  + Add Photos
+                  <input type="file" id="g2_streetPhotos" multiple accept="image/*"
+                    onchange="handleMultiPhoto(this,'g2StreetPhotos','g2_streetGrid')" />
+                </label>
+              </div>
+              <div class="multi-photo-grid" id="g2_streetGrid"></div>
+            </div>
+
+            <!-- Identity Document -->
+            <div class="doc-section">
+              <div class="doc-section-title">Guarantor 2 Identity Document</div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Document Type</label>
+                  <select id="g2_idDocType" class="form-control">
+                    <option value="nin_slip">NIN Slip</option>
+                    <option value="voter_card">Voter Card</option>
+                    <option value="drivers_license">Driver's License</option>
+                    <option value="international_passport">International Passport</option>
+                    <option value="national_id">National ID Card</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Document Number</label>
+                  <input type="text" id="g2_idDocNumber" class="form-control" placeholder="e.g. 12345678901" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Upload Document <span class="text-muted" style="font-weight:400;">(image or PDF)</span></label>
+                <div class="doc-upload-area" id="g2DocUploadArea" ondragover="docDragOver(event,'g2DocUploadArea')" ondragleave="docDragLeave('g2DocUploadArea')" ondrop="docDrop(event,'g2_idDoc','g2DocUploadArea','g2DocPreview')">
+                  <div class="doc-upload-icon">📄</div>
+                  <p>Drag & drop here or <strong>click to browse</strong></p>
+                  <p>JPG, PNG, WebP or PDF &mdash; max 10 MB</p>
+                  <input type="file" id="g2_idDoc" name="g2IdDoc" accept="image/*,application/pdf" onchange="handleDocFile(this,'g2DocUploadArea','g2DocPreview')" />
+                </div>
+                <div id="g2DocPreview" class="doc-preview" style="display:none;"></div>
+              </div>
+            </div>
+
+            <div class="step-nav">
+              <button type="button" class="btn btn-secondary" onclick="goStep(3)">← Back</button>
+              <button type="button" class="btn btn-primary" onclick="goStep(5)">Review & Submit →</button>
+            </div>
+          </div>
+
+          <!-- ── STEP 5: Review ── -->
+          <div class="step-panel" id="step5">
+            <div class="step-title">📋 Review & Submit</div>
+            <div id="reviewContent"></div>
+            <div class="step-nav">
+              <button type="button" class="btn btn-secondary" onclick="goStep(4)">← Back</button>
+              <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="submitWorker()">
+                ✅ Submit Registration
+              </button>
+            </div>
+          </div>
+
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.js"></script>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/maps.js?v=3"></script>
+<script>
+  const user = requireAuth(['staff', 'super_admin']);
+  let currentStep = 1;
+
+  if (user) {
+    populateSidebarUser();
+    loadBranchOptions();
+  }
+
+  async function loadBranchOptions() {
+    try {
+      const res = await API.getBranches();
+      const sel = document.getElementById('w_branch');
+      res.branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b._id;
+        opt.textContent = `${b.name} (${b.code})`;
+        sel.appendChild(opt);
+      });
+    } catch(_) {}
+  }
+
+  // Step navigation
+  function goStep(n) {
+    if (n > currentStep && !validateStep(currentStep)) return;
+
+    document.getElementById(`step${currentStep}`).classList.remove('active');
+    document.getElementById(`stepDot${currentStep}`).classList.remove('active');
+    document.getElementById(`stepDot${currentStep}`).classList.add('complete');
+
+    currentStep = n;
+    document.getElementById(`step${currentStep}`).classList.add('active');
+    document.getElementById(`stepDot${currentStep}`).classList.add('active');
+
+    if (n === 5) buildReview();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function validateStep(step) {
+    const required = {
+      1: ['w_fullName','w_phone','w_gender','w_dob','w_nin','w_occupation'],
+      2: ['w_homeAddress'],
+      3: ['g1_fullName','g1_phone','g1_nin','g1_relationship','g1_homeAddress'],
+      4: ['g2_fullName','g2_phone','g2_nin','g2_relationship','g2_homeAddress']
+    };
+    const fields = required[step] || [];
+    let valid = true;
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!el.value.trim()) {
+        el.classList.add('error');
+        valid = false;
+        el.addEventListener('input', () => el.classList.remove('error'), { once: true });
+      }
+    });
+    if (!valid) showToast('Please fill in all required fields', 'error');
+    return valid;
+  }
+
+  function buildReview() {
+    const row = (label, value) => value
+      ? `<div class="flex justify-between" style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+           <span class="text-sm text-muted">${label}</span>
+           <span class="text-sm font-semibold" style="max-width:60%;text-align:right;">${value}</span>
+         </div>`
+      : '';
+
+    const photoSrc = (id) => {
+      const file = document.getElementById(id)?.files[0];
+      return file ? URL.createObjectURL(file) : null;
+    };
+    const photoEl = (src, label) => src
+      ? `<div style="text-align:center;"><img src="${src}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;"><div class="text-xs text-muted mt-1">${label}</div></div>`
+      : '';
+
+    const multiThumb = (key) => {
+      const files = multiPhotos[key] || [];
+      if (!files.length) return '<span class="text-xs text-muted">None added</span>';
+      return `<div class="review-photo-strip">${files.map((f,i) =>
+        `<img src="${URL.createObjectURL(f)}" class="review-thumb" title="Photo ${i+1}" />`
+      ).join('')}</div>`;
+    };
+
+    const locSummary = (prefix) => {
+      const addr = document.getElementById(`${prefix}LocationAddress`)?.value;
+      const plus = document.getElementById(`${prefix}LocationPlusCode`)?.value;
+      const lat  = document.getElementById(`${prefix}LocationLat`)?.value;
+      const lng  = document.getElementById(`${prefix}LocationLng`)?.value;
+      if (!lat) return '<span class="text-xs" style="color:var(--gray-400);">Not pinned</span>';
+      return `<div style="margin-top:4px;">
+        ${addr ? `<div class="text-xs" style="margin-bottom:3px;">${addr}</div>` : ''}
+        <div class="flex gap-2 flex-wrap">
+          ${plus ? `<span class="loc-plus-code-tag">${plus}</span>` : ''}
+          ${lat  ? `<span class="text-xs" style="color:var(--gray-500);font-family:monospace;">${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}</span>` : ''}
+        </div>
+      </div>`;
+    };
+
+    document.getElementById('reviewContent').innerHTML = `
+      <div class="card mb-3" style="background:var(--gray-50);margin-bottom:12px;">
+        <div class="section-subtitle">Worker</div>
+        ${row('Full Name',    document.getElementById('w_fullName').value)}
+        ${row('Phone',        document.getElementById('w_phone').value)}
+        ${row('Gender',       document.getElementById('w_gender').value)}
+        ${row('Date of Birth',document.getElementById('w_dob').value)}
+        ${row('NIN',          document.getElementById('w_nin').value)}
+        ${row('Occupation',   document.getElementById('w_occupation').value)}
+        ${row('Home Address', document.getElementById('w_homeAddress').value)}
+        ${row('Landmark',     document.getElementById('w_landmark').value)}
+        <div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+          <span class="text-sm text-muted">Pinned Location</span>
+          ${locSummary('worker')}
+        </div>
+        <div style="margin-top:10px;">
+          <div class="text-xs text-muted mb-1">House Photos (${(multiPhotos.housePhotos||[]).length})</div>
+          ${multiThumb('housePhotos')}
+          <div class="text-xs text-muted mt-2 mb-1">Street Photos (${(multiPhotos.streetPhotos||[]).length})</div>
+          ${multiThumb('streetPhotos')}
+        </div>
+        <div class="flex gap-3 mt-2">${photoEl(photoSrc('w_passport'),'Passport')}</div>
+      </div>
+
+      <div class="card mb-3" style="background:var(--gray-50);margin-bottom:12px;">
+        <div class="section-subtitle">Guarantor 1</div>
+        ${row('Full Name',     document.getElementById('g1_fullName').value)}
+        ${row('Phone',         document.getElementById('g1_phone').value)}
+        ${row('NIN',           document.getElementById('g1_nin').value)}
+        ${row('Relationship',  document.getElementById('g1_relationship').value)}
+        ${row('Home Address',  document.getElementById('g1_homeAddress').value)}
+        ${row('Landmark',      document.getElementById('g1_landmark').value)}
+        <div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+          <span class="text-sm text-muted">Pinned Location</span>
+          ${locSummary('g1')}
+        </div>
+        <div style="margin-top:10px;">
+          <div class="text-xs text-muted mb-1">House Photos (${(multiPhotos.g1HousePhotos||[]).length})</div>
+          ${multiThumb('g1HousePhotos')}
+          <div class="text-xs text-muted mt-2 mb-1">Street Photos (${(multiPhotos.g1StreetPhotos||[]).length})</div>
+          ${multiThumb('g1StreetPhotos')}
+        </div>
+        <div class="flex gap-3 mt-2">${photoEl(photoSrc('g1_passport'),'Passport')}</div>
+      </div>
+
+      <div class="card" style="background:var(--gray-50);">
+        <div class="section-subtitle">Guarantor 2</div>
+        ${row('Full Name',     document.getElementById('g2_fullName').value)}
+        ${row('Phone',         document.getElementById('g2_phone').value)}
+        ${row('NIN',           document.getElementById('g2_nin').value)}
+        ${row('Relationship',  document.getElementById('g2_relationship').value)}
+        ${row('Home Address',  document.getElementById('g2_homeAddress').value)}
+        ${row('Landmark',      document.getElementById('g2_landmark').value)}
+        <div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+          <span class="text-sm text-muted">Pinned Location</span>
+          ${locSummary('g2')}
+        </div>
+        <div style="margin-top:10px;">
+          <div class="text-xs text-muted mb-1">House Photos (${(multiPhotos.g2HousePhotos||[]).length})</div>
+          ${multiThumb('g2HousePhotos')}
+          <div class="text-xs text-muted mt-2 mb-1">Street Photos (${(multiPhotos.g2StreetPhotos||[]).length})</div>
+          ${multiThumb('g2StreetPhotos')}
+        </div>
+        <div class="flex gap-3 mt-2">${photoEl(photoSrc('g2_passport'),'Passport')}</div>
+      </div>
+    `;
+  }
+
+  async function submitWorker() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Submitting…';
+
+    const fd = new FormData();
+
+    // Worker fields
+    fd.append('fullName',        document.getElementById('w_fullName').value.trim());
+    fd.append('phone',           document.getElementById('w_phone').value.trim());
+    fd.append('gender',          document.getElementById('w_gender').value);
+    fd.append('dateOfBirth',     document.getElementById('w_dob').value);
+    fd.append('nin',             document.getElementById('w_nin').value.trim());
+    fd.append('occupation',      document.getElementById('w_occupation').value.trim());
+    fd.append('homeAddress',     document.getElementById('w_homeAddress').value.trim());
+    fd.append('landmark',        document.getElementById('w_landmark').value.trim());
+    fd.append('locationLat',      document.getElementById('workerLocationLat').value);
+    fd.append('locationLng',      document.getElementById('workerLocationLng').value);
+    fd.append('locationAddress',  document.getElementById('workerLocationAddress').value);
+    fd.append('locationPlusCode', document.getElementById('workerLocationPlusCode').value);
+    fd.append('locationMapsLink', document.getElementById('workerLocationMapsLink').value);
+    fd.append('locationMethod',   document.getElementById('workerLocationMethod').value);
+
+    // Guarantor 1
+    fd.append('g1FullName',     document.getElementById('g1_fullName').value.trim());
+    fd.append('g1Phone',        document.getElementById('g1_phone').value.trim());
+    fd.append('g1Nin',          document.getElementById('g1_nin').value.trim());
+    fd.append('g1Relationship', document.getElementById('g1_relationship').value.trim());
+    fd.append('g1HomeAddress',  document.getElementById('g1_homeAddress').value.trim());
+    fd.append('g1Landmark',     document.getElementById('g1_landmark').value.trim());
+    fd.append('g1LocationLat',      document.getElementById('g1LocationLat').value);
+    fd.append('g1LocationLng',      document.getElementById('g1LocationLng').value);
+    fd.append('g1LocationAddress',  document.getElementById('g1LocationAddress').value);
+    fd.append('g1LocationPlusCode', document.getElementById('g1LocationPlusCode').value);
+    fd.append('g1LocationMapsLink', document.getElementById('g1LocationMapsLink').value);
+    fd.append('g1LocationMethod',   document.getElementById('g1LocationMethod').value);
+
+    // Guarantor 2
+    fd.append('g2FullName',     document.getElementById('g2_fullName').value.trim());
+    fd.append('g2Phone',        document.getElementById('g2_phone').value.trim());
+    fd.append('g2Nin',          document.getElementById('g2_nin').value.trim());
+    fd.append('g2Relationship', document.getElementById('g2_relationship').value.trim());
+    fd.append('g2HomeAddress',  document.getElementById('g2_homeAddress').value.trim());
+    fd.append('g2Landmark',     document.getElementById('g2_landmark').value.trim());
+    fd.append('g2LocationLat',      document.getElementById('g2LocationLat').value);
+    fd.append('g2LocationLng',      document.getElementById('g2LocationLng').value);
+    fd.append('g2LocationAddress',  document.getElementById('g2LocationAddress').value);
+    fd.append('g2LocationPlusCode', document.getElementById('g2LocationPlusCode').value);
+    fd.append('g2LocationMapsLink', document.getElementById('g2LocationMapsLink').value);
+    fd.append('g2LocationMethod',   document.getElementById('g2LocationMethod').value);
+
+    // Branch, shift, date employed
+    const branch = document.getElementById('w_branch').value;
+    const shift  = document.getElementById('w_shift').value;
+    const dateEmployed = document.getElementById('w_dateEmployed').value;
+    if (branch)       fd.append('branch', branch);
+    if (shift)        fd.append('shift', shift);
+    if (dateEmployed) fd.append('dateEmployed', dateEmployed);
+
+    // Identity doc fields
+    fd.append('workerIdDocType',   document.getElementById('w_idDocType').value);
+    fd.append('workerIdDocNumber', document.getElementById('w_idDocNumber').value.trim());
+    fd.append('g1IdDocType',       document.getElementById('g1_idDocType').value);
+    fd.append('g1IdDocNumber',     document.getElementById('g1_idDocNumber').value.trim());
+    fd.append('g2IdDocType',       document.getElementById('g2_idDocType').value);
+    fd.append('g2IdDocNumber',     document.getElementById('g2_idDocNumber').value.trim());
+
+    // Single-file photo + document uploads
+    const singleFiles = [
+      ['w_passport','passportPhoto'],
+      ['w_idDoc','workerIdDoc'],
+      ['g1_passport','g1PassportPhoto'],
+      ['g1_idDoc','g1IdDoc'],
+      ['g2_passport','g2PassportPhoto'],
+      ['g2_idDoc','g2IdDoc']
+    ];
+    singleFiles.forEach(([inputId, fieldName]) => {
+      const file = document.getElementById(inputId)?.files[0];
+      if (file) fd.append(fieldName, file);
+    });
+
+    // Multi-photo uploads
+    const multiKeys = [
+      ['housePhotos','housePhotos'], ['streetPhotos','streetPhotos'],
+      ['g1HousePhotos','g1HousePhotos'], ['g1StreetPhotos','g1StreetPhotos'],
+      ['g2HousePhotos','g2HousePhotos'], ['g2StreetPhotos','g2StreetPhotos']
+    ];
+    multiKeys.forEach(([storeKey, fieldName]) => {
+      (multiPhotos[storeKey] || []).forEach(file => fd.append(fieldName, file));
+    });
+
+    try {
+      const res = await API.registerWorker(fd);
+      showToast('Worker registered successfully!', 'success');
+      setTimeout(() => {
+        window.location.href = `../admin/worker-detail.html?id=${res.workerId}`;
+      }, 1000);
+    } catch (err) {
+      showToast(err.message || 'Registration failed. Please try again.', 'error');
+      btn.disabled = false;
+      btn.textContent = '✅ Submit Registration';
+    }
+  }
+
+  function openMapPicker(prefix) {
+    const labels = { worker: 'Worker Home', g1: 'Guarantor 1 Home', g2: 'Guarantor 2 Home' };
+    openLocationPicker(prefix, `📍 Pin ${labels[prefix] || prefix} Location`);
+  }
+
+  // ── Multi-photo management ──────────────────────────────────────────────────
+  const multiPhotos = {
+    housePhotos: [], streetPhotos: [],
+    g1HousePhotos: [], g1StreetPhotos: [],
+    g2HousePhotos: [], g2StreetPhotos: []
+  };
+  const MAX_PHOTOS = 4;
+
+  function handleMultiPhoto(input, key, gridId) {
+    const incoming = Array.from(input.files);
+    const current  = multiPhotos[key] || [];
+    const slots    = MAX_PHOTOS - current.length;
+    if (slots <= 0) { showToast(`Maximum ${MAX_PHOTOS} photos allowed`, 'error'); input.value = ''; return; }
+    const toAdd = incoming.slice(0, slots);
+    if (incoming.length > slots) showToast(`Only ${slots} slot(s) remaining — added ${slots} photo(s)`, 'warning');
+    multiPhotos[key] = [...current, ...toAdd];
+    renderPhotoGrid(gridId, key);
+    input.value = '';
+  }
+
+  function renderPhotoGrid(gridId, key) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    const files = multiPhotos[key] || [];
+    if (!files.length) { grid.innerHTML = ''; return; }
+    grid.innerHTML = files.map((file, i) => `
+      <div class="multi-photo-thumb">
+        <img src="${URL.createObjectURL(file)}" alt="Photo ${i+1}" />
+        <button type="button" class="multi-photo-remove" onclick="removeMultiPhoto('${key}',${i},'${gridId}')" title="Remove">✕</button>
+        <div class="multi-photo-label">Photo ${i+1}</div>
+      </div>
+    `).join('');
+  }
+
+  function removeMultiPhoto(key, idx, gridId) {
+    multiPhotos[key].splice(idx, 1);
+    renderPhotoGrid(gridId, key);
+  }
+
+  // ── GPS current location ────────────────────────────────────────────────────
+  async function useCurrentGPS(prefix) {
+    const btn = document.getElementById(`${prefix}GpsBtn`);
+    if (!navigator.geolocation) {
+      showToast('Geolocation is not supported by this browser', 'error'); return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Getting location…'; }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+        set(`${prefix}LocationLat`,    lat);
+        set(`${prefix}LocationLng`,    lng);
+        set(`${prefix}LocationMethod`, 'gps');
+        set(`${prefix}LocationMapsLink`, `https://www.google.com/maps?q=${lat},${lng}`);
+
+        // Reverse geocode via Nominatim
+        let address = '';
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en', 'User-Agent': 'SageEnergyWorkerVerify/1.0' } }
+          );
+          if (r.ok) { const d = await r.json(); address = d.display_name || ''; }
+        } catch (_) {}
+        set(`${prefix}LocationAddress`, address);
+
+        // Plus Code via OLC library
+        try {
+          if (window.OpenLocationCode) {
+            set(`${prefix}LocationPlusCode`, OpenLocationCode.encode(lat, lng, 11));
+          }
+        } catch (_) {}
+
+        confirmLocation(prefix);
+        showToast('GPS location captured successfully!', 'success');
+        if (btn) { btn.disabled = false; btn.textContent = '🎯 Use My Current Location'; }
+      },
+      (err) => {
+        if (btn) { btn.disabled = false; btn.textContent = '🎯 Use My Current Location'; }
+        const msgs = {
+          1: 'Location access denied — please allow location in browser settings',
+          2: 'Location unavailable — try the map picker instead',
+          3: 'Location request timed out — try again'
+        };
+        showToast(msgs[err.code] || 'Could not get location', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
+  function previewFile(input, previewId) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById(previewId);
+      img.src = e.target.result;
+      img.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Document drag-drop helpers ──────────────────────────────────────────────
+
+  function docDragOver(e, areaId) {
+    e.preventDefault();
+    document.getElementById(areaId).classList.add('drag-over');
+  }
+  function docDragLeave(areaId) {
+    document.getElementById(areaId).classList.remove('drag-over');
+  }
+  function docDrop(e, inputId, areaId, previewId) {
+    e.preventDefault();
+    document.getElementById(areaId).classList.remove('drag-over');
+    const file = e.dataTransfer?.files[0];
+    if (!file) return;
+    const input = document.getElementById(inputId);
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    handleDocFile(input, areaId, previewId);
+  }
+
+  const DOC_LABEL = {
+    nin_slip: 'NIN Slip', voter_card: 'Voter Card',
+    drivers_license: "Driver's License",
+    international_passport: 'International Passport', national_id: 'National ID'
+  };
+
+  function handleDocFile(input, areaId, previewId) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    const allowed = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf'];
+    if (!allowed.includes(file.type)) {
+      showToast('Only JPG, PNG, WebP or PDF files are allowed', 'error');
+      input.value = '';
+      return;
+    }
+    if (file.size > maxSize) {
+      showToast('File must be 10 MB or smaller', 'error');
+      input.value = '';
+      return;
+    }
+
+    const sizeMB = (file.size / 1048576).toFixed(1);
+    const previewEl = document.getElementById(previewId);
+    const isPdf = file.type === 'application/pdf';
+
+    const thumbHtml = isPdf
+      ? `<div class="doc-preview-pdf-icon">📄</div>`
+      : `<img class="doc-preview-thumb" src="${URL.createObjectURL(file)}" alt="preview" onclick="zoomImage(this.src)" />`;
+
+    previewEl.innerHTML = `
+      ${thumbHtml}
+      <div class="doc-preview-info">
+        <div class="doc-preview-name">${file.name}</div>
+        <div class="doc-preview-size">${sizeMB} MB &bull; ${isPdf ? 'PDF' : 'Image'}</div>
+      </div>
+      <button type="button" class="doc-preview-remove" onclick="removeDocFile('${input.id}','${areaId}','${previewId}')">Remove</button>
+    `;
+    previewEl.style.display = 'flex';
+    document.getElementById(areaId).style.display = 'none';
+  }
+
+  function removeDocFile(inputId, areaId, previewId) {
+    document.getElementById(inputId).value = '';
+    document.getElementById(previewId).style.display = 'none';
+    document.getElementById(previewId).innerHTML = '';
+    document.getElementById(areaId).style.display = '';
+  }
+
+  function zoomImage(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'zoom-modal-overlay';
+    overlay.innerHTML = `<img class="zoom-modal-img" src="${src}" alt="zoom" />`;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+  }
+</script>
+</body>
+</html>

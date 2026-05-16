@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.outerHTML='<div class=\'sidebar-avatar\' style=\'font-size:16px;\'>👤</div>'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole">Super Admin</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html" class="nav-link active"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"   class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"  class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">Dashboard</h1>
+      </div>
+      <div class="header-right">
+        <span class="header-user">👋 <span id="headerGreet">Admin</span></span>
+        <div class="header-avatar">👤</div>
+      </div>
+    </header>
+
+    <main class="page-body">
+
+      <!-- Greeting Banner -->
+      <div class="dash-greeting">
+        <div class="dash-greeting-content">
+          <div class="dash-greeting-eyebrow">Dashboard Overview</div>
+          <h1>Welcome Back, <span id="greetName">Admin</span> 👋</h1>
+          <p>Here's what's happening with your workforce today.</p>
+          <div class="dash-greeting-actions">
+            <a href="../staff/register-worker.html" class="btn-white btn">➕ Register Worker</a>
+            <a href="attendance.html" class="btn-ghost btn">🕐 Manage Attendance</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Stats Row -->
+      <div class="stats-grid stats-grid-lg" style="margin-bottom:20px;">
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Total Workers</span><div class="stat-icon yellow">👷</div></div>
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-footer">All registered</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Active</span><div class="stat-icon green">✅</div></div>
+          <div class="stat-value" id="statActive">—</div>
+          <div class="stat-footer">Currently employed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Pending</span><div class="stat-icon yellow">⏳</div></div>
+          <div class="stat-value" id="statPending">—</div>
+          <div class="stat-footer"><a href="workers.html?status=pending" style="color:var(--primary-dark);">Review →</a></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Verified</span><div class="stat-icon green">🛡️</div></div>
+          <div class="stat-value" id="statVerified">—</div>
+          <div class="stat-footer">Background cleared</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Branches</span><div class="stat-icon purple">🏢</div></div>
+          <div class="stat-value" id="statBranches">—</div>
+          <div class="stat-footer"><a href="branches.html" style="color:var(--primary-dark);">Manage →</a></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Staff</span><div class="stat-icon info">👤</div></div>
+          <div class="stat-value" id="statStaff">—</div>
+          <div class="stat-footer">Field agents</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Suspended</span><div class="stat-icon yellow">⚠️</div></div>
+          <div class="stat-value" id="statSuspended">—</div>
+          <div class="stat-footer"><a href="workers.html?emp=suspended" style="color:var(--primary-dark);">View →</a></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><span class="stat-label">Alerts</span><div class="stat-icon red">🚨</div></div>
+          <div class="stat-value" id="dashAlerts" style="color:var(--danger);">—</div>
+          <div class="stat-footer"><a href="attendance.html#alerts" style="color:var(--danger);">Resolve →</a></div>
+        </div>
+      </div>
+
+      <!-- Charts Row: Bar Chart + Donut + Calendar -->
+      <div class="dash-three-col">
+
+        <!-- Left: Payroll / Attendance Bar Chart -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Workforce Overview</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-500);font-weight:600;">
+                <span style="width:10px;height:10px;border-radius:3px;background:var(--primary);display:inline-block;"></span> Shift A
+              </span>
+              <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-500);font-weight:600;">
+                <span style="width:10px;height:10px;border-radius:3px;background:var(--accent);display:inline-block;"></span> Shift B
+              </span>
+            </div>
+          </div>
+          <div class="chart-container" style="min-height:240px;">
+            <canvas id="overviewBarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Right: Attendance Donut + Calendar -->
+        <div style="display:flex;flex-direction:column;gap:20px;">
+
+          <!-- Attendance Donut -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Today's Attendance</h2>
+              <a href="attendance.html" class="btn btn-sm btn-outline">Manage →</a>
+            </div>
+            <div class="donut-chart-wrap" style="height:170px;">
+              <canvas id="attendanceDonut" width="170" height="170"></canvas>
+              <div class="donut-center-label">
+                <div class="donut-num" id="donutTotal">—</div>
+                <div class="donut-sub">Total</div>
+              </div>
+            </div>
+            <div class="chart-legend">
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#10b981;"></div><span id="legPresent">Present: —</span></div>
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#F59E0B;"></div><span id="legLate">Late: —</span></div>
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#ef4444;"></div><span id="legAbsent">Absent: —</span></div>
+            </div>
+            <!-- Payroll & Shift mini stats -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-100);">
+              <div style="text-align:center;">
+                <div style="font-size:1.1rem;font-weight:800;color:var(--accent);" id="dashShiftA">—</div>
+                <div style="font-size:.68rem;color:var(--gray-500);margin-top:2px;">Shift A</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:1.1rem;font-weight:800;color:var(--purple);" id="dashShiftB">—</div>
+                <div style="font-size:.68rem;color:var(--gray-500);margin-top:2px;">Shift B</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:.95rem;font-weight:800;color:var(--primary-dark);" id="dashPayroll">—</div>
+                <div style="font-size:.68rem;color:var(--gray-500);margin-top:2px;">Month Payroll</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini Calendar -->
+          <div class="card" id="miniCalCard">
+            <div class="mini-cal">
+              <div class="mini-cal-header">
+                <button class="mini-cal-nav" id="calPrev">‹</button>
+                <span class="mini-cal-title" id="calMonthTitle">May 2026</span>
+                <button class="mini-cal-nav" id="calNext">›</button>
+              </div>
+              <div class="mini-cal-grid" id="calDayNames"></div>
+              <div class="mini-cal-grid" id="calDays" style="margin-top:4px;"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Mid Row: Branch Breakdown + Activity Log -->
+      <div class="dash-two-col">
+
+        <!-- Branch Breakdown -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Workers by Branch</h2>
+            <a href="branches.html" class="btn btn-sm btn-outline">All Branches</a>
+          </div>
+          <div id="branchBreakdownList">
+            <div class="empty-state"><div class="empty-icon">🏢</div><p class="empty-text">Loading…</p></div>
+          </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Recent Activity</h2>
+            <span style="font-size:12px;color:var(--gray-400);">Live</span>
+          </div>
+          <div id="activityLog">
+            <div class="empty-state"><div class="empty-icon">📝</div><p class="empty-text">Loading…</p></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recent Registrations -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <h2 class="card-title">Recent Registrations</h2>
+          <a href="workers.html" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div id="recentWorkersList">
+          <div class="empty-state"><div class="empty-icon">📋</div><p class="empty-text">Loading…</p></div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-header" style="margin-bottom:0;"><h2 class="card-title">Quick Actions</h2></div>
+        <div style="height:12px;"></div>
+        <div class="quick-actions">
+          <a href="../staff/register-worker.html" class="btn btn-primary">➕ Register Worker</a>
+          <a href="workers.html?status=pending"   class="btn btn-warning">⏳ Review Pending</a>
+          <a href="branches.html"                 class="btn btn-secondary">🏢 Manage Branches</a>
+          <a href="attendance.html#alerts"        class="btn btn-danger">🚨 Security Alerts</a>
+          <a href="payroll.html"                  class="btn btn-accent">💰 Run Payroll</a>
+          <a href="staff.html"                    class="btn btn-outline">👤 Manage Staff</a>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const user = requireAuth(['super_admin']);
+  let donutChart = null;
+  let barChart   = null;
+
+  if (user) {
+    populateSidebarUser();
+    const firstName = user.fullName.split(' ')[0];
+    document.getElementById('headerGreet').textContent = firstName;
+    document.getElementById('greetName').textContent   = firstName;
+    loadDashboard();
+    buildMiniCalendar(new Date());
+  }
+
+  // ── DASHBOARD LOAD ──────────────────────────────────────────────────────────
+  async function loadDashboard() {
+    try {
+      const [res, alertRes] = await Promise.all([
+        API.adminStats(),
+        API.getAlertStats().catch(() => null)
+      ]);
+
+      if (alertRes) {
+        document.getElementById('dashAlerts').textContent = alertRes.unresolved || 0;
+      }
+
+      const { stats, recentWorkers, recentLogs, branchBreakdown } = res;
+
+      document.getElementById('statTotal').textContent      = stats.totalWorkers;
+      document.getElementById('statActive').textContent     = stats.activeWorkers;
+      document.getElementById('statPending').textContent    = stats.pendingWorkers;
+      document.getElementById('statVerified').textContent   = stats.verifiedWorkers;
+      document.getElementById('statSuspended').textContent  = stats.suspendedWorkers;
+      document.getElementById('statBranches').textContent   = stats.totalBranches;
+      document.getElementById('statStaff').textContent      = stats.totalStaff;
+
+      // Shift stats
+      document.getElementById('dashShiftA').textContent = stats.shiftA || 0;
+      document.getElementById('dashShiftB').textContent = stats.shiftB || 0;
+
+      // Payroll
+      document.getElementById('dashPayroll').textContent =
+        stats.monthPayrollTotal > 0 ? `₦${Math.round(stats.monthPayrollTotal).toLocaleString()}` : '—';
+
+      // Attendance
+      const present = (stats.todayPresent || 0) - (stats.todayLate || 0);
+      const late    = stats.todayLate   || 0;
+      const absent  = stats.todayAbsent || 0;
+      const total   = present + late + absent;
+
+      document.getElementById('donutTotal').textContent    = total || '—';
+      document.getElementById('legPresent').textContent    = `Present: ${present}`;
+      document.getElementById('legLate').textContent       = `Late: ${late}`;
+      document.getElementById('legAbsent').textContent     = `Absent: ${absent}`;
+
+      renderAttendanceDonut(present, late, absent);
+      renderOverviewBar(stats, branchBreakdown);
+      renderBranchBreakdown(branchBreakdown, stats.totalWorkers);
+      renderRecentWorkers(recentWorkers);
+      renderActivityLog(recentLogs);
+
+    } catch (err) {
+      showToast('Failed to load dashboard: ' + err.message, 'error');
+    }
+  }
+
+  // ── DONUT CHART ─────────────────────────────────────────────────────────────
+  function renderAttendanceDonut(present, late, absent) {
+    const ctx = document.getElementById('attendanceDonut').getContext('2d');
+    const total = present + late + absent;
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Present', 'Late', 'Absent'],
+        datasets: [{
+          data: total > 0 ? [present, late, absent] : [1, 0, 0],
+          backgroundColor: total > 0
+            ? ['#10b981', '#F59E0B', '#ef4444']
+            : ['#E5E7EB', '#E5E7EB', '#E5E7EB'],
+          borderWidth: 3,
+          borderColor: '#fff',
+          hoverBorderWidth: 4,
+        }]
+      },
+      options: {
+        cutout: '72%',
+        plugins: { legend: { display: false }, tooltip: { enabled: total > 0 } },
+        animation: { animateRotate: true, duration: 700 }
+      }
+    });
+  }
+
+  // ── BAR CHART ───────────────────────────────────────────────────────────────
+  function renderOverviewBar(stats, branches) {
+    const ctx = document.getElementById('overviewBarChart').getContext('2d');
+    const labels = branches.length > 0
+      ? branches.slice(0, 6).map(b => b.name.length > 10 ? b.name.slice(0, 10) + '…' : b.name)
+      : ['Shift A', 'Shift B', 'Unassigned', 'Verified', 'Pending', 'Active'];
+
+    const dataA = branches.length > 0
+      ? branches.slice(0, 6).map(b => b.active || 0)
+      : [stats.shiftA || 0, stats.shiftB || 0, stats.unassignedShift || 0,
+         stats.verifiedWorkers || 0, stats.pendingWorkers || 0, stats.activeWorkers || 0];
+    const dataB = branches.length > 0
+      ? branches.slice(0, 6).map(b => (b.total || 0) - (b.active || 0))
+      : [0, 0, 0, 0, 0, 0];
+
+    if (barChart) barChart.destroy();
+    barChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Active / Shift A',
+            data: dataA,
+            backgroundColor: 'rgba(245,158,11,.85)',
+            borderRadius: 6,
+            borderSkipped: false,
+          },
+          ...(branches.length > 0 ? [{
+            label: 'Other',
+            data: dataB,
+            backgroundColor: 'rgba(59,130,246,.65)',
+            borderRadius: 6,
+            borderSkipped: false,
+          }] : [])
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11, family: 'Inter' }, color: '#9CA3AF' }
+          },
+          y: {
+            grid: { color: '#F3F4F6', drawBorder: false },
+            ticks: { font: { size: 11, family: 'Inter' }, color: '#9CA3AF', precision: 0 },
+            beginAtZero: true
+          }
+        },
+        animation: { duration: 600 }
+      }
+    });
+  }
+
+  // ── MINI CALENDAR ──────────────────────────────────────────────────────────
+  let calDate = new Date();
+  function buildMiniCalendar(d) {
+    calDate = new Date(d.getFullYear(), d.getMonth(), 1);
+    const today = new Date();
+    const year  = calDate.getFullYear();
+    const month = calDate.getMonth();
+    const title = calDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    document.getElementById('calMonthTitle').textContent = title;
+
+    const dayNames = document.getElementById('calDayNames');
+    dayNames.innerHTML = ['Su','Mo','Tu','We','Th','Fr','Sa']
+      .map(d => `<div class="mini-cal-dayname">${d}</div>`).join('');
+
+    const firstDay  = new Date(year, month, 1).getDay();
+    const daysInMon = new Date(year, month + 1, 0).getDate();
+    const daysInPrev= new Date(year, month, 0).getDate();
+
+    let cells = '';
+    for (let i = 0; i < firstDay; i++) {
+      cells += `<div class="mini-cal-day other-month">${daysInPrev - firstDay + i + 1}</div>`;
+    }
+    for (let i = 1; i <= daysInMon; i++) {
+      const isToday = i === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+      cells += `<div class="mini-cal-day${isToday ? ' today' : ''}">${i}</div>`;
+    }
+    const remaining = 42 - firstDay - daysInMon;
+    for (let i = 1; i <= remaining; i++) {
+      cells += `<div class="mini-cal-day other-month">${i}</div>`;
+    }
+    document.getElementById('calDays').innerHTML = cells;
+  }
+  document.getElementById('calPrev').onclick = () => buildMiniCalendar(new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1));
+  document.getElementById('calNext').onclick = () => buildMiniCalendar(new Date(calDate.getFullYear(), calDate.getMonth() + 1, 1));
+
+  // ── RENDER HELPERS ──────────────────────────────────────────────────────────
+  function renderBranchBreakdown(branches, total) {
+    const el = document.getElementById('branchBreakdownList');
+    if (!branches.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div><p class="empty-text">No branch assignments yet</p></div>';
+      return;
+    }
+    el.innerHTML = `
+      <table class="branch-breakdown">
+        <thead><tr><th>Branch</th><th>Active</th><th>Total</th><th class="bar-cell">Share</th></tr></thead>
+        <tbody>
+          ${branches.map(b => {
+            const pct = total > 0 ? Math.round((b.total / total) * 100) : 0;
+            return `
+              <tr>
+                <td>
+                  <div class="font-semibold text-sm">${b.name}</div>
+                  <span class="branch-card-code">${b.code}</span>
+                </td>
+                <td><span style="color:var(--success);font-weight:700;">${b.active}</span></td>
+                <td style="color:var(--gray-600);">${b.total}</td>
+                <td class="bar-cell">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="flex:1;height:6px;background:var(--gray-200);border-radius:3px;">
+                      <div class="branch-bar" style="width:${pct}%;"></div>
+                    </div>
+                    <span class="text-xs text-muted">${pct}%</span>
+                  </div>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function renderRecentWorkers(workers) {
+    const el = document.getElementById('recentWorkersList');
+    if (!workers.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">👷</div><p class="empty-text">No workers yet</p></div>';
+      return;
+    }
+    el.innerHTML = workers.map(w => `
+      <div class="flex items-center justify-between" style="padding:11px 0;border-bottom:1px solid var(--gray-100);">
+        <div class="flex items-center gap-2">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">👷</div>
+          <div>
+            <div class="font-semibold text-sm">${w.fullName}</div>
+            <div class="text-xs text-muted">
+              ${w.phone} &bull; ${formatDate(w.createdAt)}
+              ${w.branch ? `&bull; <span style="color:var(--primary-dark);font-weight:600;">${w.branch.name}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          ${statusBadge(w.verificationStatus)}
+          <a href="worker-detail.html?id=${w._id}" class="btn btn-sm btn-outline">View</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderActivityLog(logs) {
+    const el = document.getElementById('activityLog');
+    if (!logs.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p class="empty-text">No activity yet</p></div>';
+      return;
+    }
+    el.innerHTML = logs.map(log => `
+      <div class="audit-entry">
+        <div class="audit-dot"></div>
+        <div>
+          <div class="text-sm"><strong>${log.worker?.fullName || 'Worker'}</strong> — ${log.action.replace(/_/g,' ')}</div>
+          <div class="audit-meta">By ${log.performedBy?.fullName || '—'} &bull; ${formatDate(log.createdAt)}</div>
+          ${log.notes ? `<div class="text-xs text-muted mt-1">${log.notes}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>

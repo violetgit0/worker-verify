@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#F59E0B" />
+  <title>Login – Sage Energy Worker Verify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<div class="login-page">
+
+  <!-- Brand Panel -->
+  <div class="login-brand">
+    <div class="login-brand-logo">
+      <div class="login-brand-icon">⚡</div>
+      Sage Energy
+    </div>
+    <p class="login-tagline">Worker Verification & Staff Management System</p>
+
+    <div class="login-feature">
+      <div class="login-feature-icon">🛡️</div>
+      <div class="login-feature-text">Secure identity & NIN verification for every worker</div>
+    </div>
+    <div class="login-feature">
+      <div class="login-feature-icon">📍</div>
+      <div class="login-feature-text">Google Maps address pinning for workers & guarantors</div>
+    </div>
+    <div class="login-feature">
+      <div class="login-feature-icon">📸</div>
+      <div class="login-feature-text">Cloudinary-powered photo & document storage</div>
+    </div>
+    <div class="login-feature">
+      <div class="login-feature-icon">👥</div>
+      <div class="login-feature-text">Role-based access for Admin and Staff accounts</div>
+    </div>
+  </div>
+
+  <!-- Login Form -->
+  <div class="login-form-wrap">
+    <p class="login-form-eyebrow">Sage Energy Platform</p>
+    <h1 class="login-form-title">Welcome back</h1>
+    <p class="login-form-sub">Sign in to your account to continue</p>
+
+    <form id="loginForm" class="login-form" autocomplete="on">
+      <div class="form-group">
+        <label class="form-label" for="username">Username or Email</label>
+        <input id="username" name="username" type="text" class="form-control" placeholder="Enter username or email" required autocomplete="username" />
+        <div class="form-error" id="usernameError"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div style="position:relative;">
+          <input id="password" name="password" type="password" class="form-control" placeholder="Enter password" required autocomplete="current-password" />
+          <button type="button" id="togglePwd" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--gray-400);">👁</button>
+        </div>
+        <div class="form-error" id="passwordError"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">
+        Sign In
+      </button>
+    </form>
+
+    <div class="login-footer">
+      &copy; 2025 Sage Energy &amp; Natural Resources. All rights reserved.
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  // Redirect if already logged in
+  if (getToken() && getUser()) {
+    const u = getUser();
+    window.location.href = u.role === 'super_admin' ? 'admin/dashboard.html' : 'staff/dashboard.html';
+  }
+
+  // Toggle password visibility
+  document.getElementById('togglePwd').addEventListener('click', () => {
+    const pwd = document.getElementById('password');
+    pwd.type = pwd.type === 'password' ? 'text' : 'password';
+  });
+
+  // Login form submit
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    try {
+      const res = await API.login({ username, password });
+      saveSession(res.token, res.user);
+      showToast('Login successful! Redirecting…', 'success');
+      setTimeout(() => {
+        window.location.href = res.user.role === 'super_admin'
+          ? 'admin/dashboard.html'
+          : 'staff/dashboard.html';
+      }, 600);
+    } catch (err) {
+      showToast(err.message || 'Login failed', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  });
+</script>
+</body>
+</html>

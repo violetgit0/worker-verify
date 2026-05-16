@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Dashboard – Sage Energy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole">Staff</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"       class="nav-link active"><span class="nav-icon">📊</span> My Dashboard</a>
+      <a href="register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+      <a href="my-workers.html"      class="nav-link"><span class="nav-icon">👷</span> My Workers</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">My Dashboard</h1>
+      </div>
+      <a href="register-worker.html" class="btn btn-primary btn-sm">➕ Register Worker</a>
+    </header>
+
+    <main class="page-body">
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-label">My Registrations</span>
+            <div class="stat-icon blue">👷</div>
+          </div>
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-footer">Workers you registered</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-label">Verified</span>
+            <div class="stat-icon green">✅</div>
+          </div>
+          <div class="stat-value" id="statVerified">—</div>
+          <div class="stat-footer">Approved by admin</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-label">Pending</span>
+            <div class="stat-icon yellow">⏳</div>
+          </div>
+          <div class="stat-value" id="statPending">—</div>
+          <div class="stat-footer">Awaiting review</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-label">Rejected</span>
+            <div class="stat-icon red">❌</div>
+          </div>
+          <div class="stat-value" id="statRejected">—</div>
+          <div class="stat-footer">Needs re-submission</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Recent Registrations</h2>
+          <a href="my-workers.html" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div id="recentWorkers">
+          <div class="empty-state"><div class="empty-icon">⏳</div><p class="empty-text">Loading…</p></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const user = requireAuth(['staff']);
+  if (user) {
+    populateSidebarUser();
+    loadDashboard();
+  }
+
+  async function loadDashboard() {
+    try {
+      const res = await API.staffStats();
+      document.getElementById('statTotal').textContent    = res.stats.total;
+      document.getElementById('statVerified').textContent = res.stats.verified;
+      document.getElementById('statPending').textContent  = res.stats.pending;
+      document.getElementById('statRejected').textContent = res.stats.rejected;
+
+      const el = document.getElementById('recentWorkers');
+      if (!res.recentWorkers.length) {
+        el.innerHTML = `<div class="empty-state">
+          <div class="empty-icon">👷</div>
+          <p class="empty-text">No workers registered yet.</p>
+          <a href="register-worker.html" class="btn btn-primary mt-3" style="margin-top:12px;">Register First Worker</a>
+        </div>`;
+      } else {
+        el.innerHTML = res.recentWorkers.map(w => `
+          <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--gray-100);">
+            <div class="flex items-center gap-2">
+              ${w.passportPhoto ? `<img src="${w.passportPhoto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />` : '<div style="width:36px;height:36px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>'}
+              <div>
+                <div class="font-semibold text-sm">${w.fullName}</div>
+                <div class="text-xs text-muted">${w.phone} &bull; ${formatDate(w.createdAt)}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${statusBadge(w.verificationStatus)}
+              <a href="../admin/worker-detail.html?id=${w._id}" class="btn btn-sm btn-outline">View</a>
+            </div>
+          </div>
+        `).join('');
+      }
+    } catch (err) {
+      showToast('Failed to load dashboard: ' + err.message, 'error');
+    }
+  }
+</script>
+</body>
+</html>
