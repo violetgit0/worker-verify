@@ -38,6 +38,11 @@ const userSchema = new mongoose.Schema({
   suspendedAt:   { type: Date, default: null },
   suspendedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   suspendReason: { type: String, default: '' },
+  isDeleted:        { type: Boolean, default: false },
+  deletedAt:        { type: Date, default: null },
+  deletedBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  deletedUsername:  { type: String, default: '' },
+  deletedEmail:     { type: String, default: '' },
   permissions:   { type: permissionsSchema, default: () => ({}) },
   loginHistory:  [{
     timestamp: { type: Date, default: Date.now },

@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   createStaff, getAllStaff, getStaffById,
   updateStaff, suspendStaff, activateStaff,
-  deleteStaff, resetStaffPassword,
+  deleteStaff, restoreStaff, resetStaffPassword,
   getStaffLoginHistory, assignBranch
 } = require('../controllers/staffController');
 const { updatePermissions, applyPreset } = require('../controllers/permissionController');
@@ -20,6 +20,7 @@ router.put('/:id',                singleUpload,    updateStaff);
 router.delete('/:id',                              deleteStaff);
 router.put('/:id/suspend',                         suspendStaff);
 router.put('/:id/activate',                        activateStaff);
+router.put('/:id/restore',                         restoreStaff);
 router.put('/:id/reset-password',                  resetStaffPassword);
 router.get('/:id/login-history',                   getStaffLoginHistory);
 router.put('/:id/assign-branch',                   assignBranch);

@@ -21,6 +21,28 @@
     .login-history-item:last-child { border-bottom:none; }
     .login-meta { font-size:11px; color:var(--gray-400); margin-top:2px; }
     .suspend-note { font-size:11px; color:#b91c1c; margin-top:2px; }
+    /* Tab bar */
+    .staff-tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:16px; }
+    .staff-tab-btn {
+      padding:10px 20px; font-size:13px; font-weight:600; border:none;
+      background:none; color:var(--gray-500); cursor:pointer;
+      border-bottom:3px solid transparent; margin-bottom:-2px;
+      transition:color .2s, border-color .2s;
+    }
+    .staff-tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .staff-tab-btn:hover:not(.active) { color:var(--gray-700); }
+    .tab-count {
+      display:inline-block; margin-left:6px; padding:1px 7px;
+      border-radius:999px; font-size:11px; font-weight:700;
+      background:var(--gray-100); color:var(--gray-600);
+    }
+    .staff-tab-btn.active .tab-count { background:var(--primary-light); color:var(--primary-dark); }
+    /* Deleted row styling */
+    tr.row-deleted td { opacity:.6; }
+    tr.row-deleted { background:var(--gray-50); }
+    .deleted-info { font-size:11px; color:var(--danger); margin-top:2px; }
+    /* Restore confirm tip */
+    .restore-tip { background:var(--primary-light); border-radius:8px; padding:12px 14px; font-size:13px; color:var(--primary-dark); margin-bottom:12px; }
   </style>
 </head>
 <body>
@@ -64,7 +86,22 @@
     </header>
 
     <main class="page-body">
-      <div class="filter-bar">
+
+      <!-- Tab buttons -->
+      <div class="staff-tabs">
+        <button class="staff-tab-btn active" id="tabActive"    onclick="switchTab('active')">
+          Active <span class="tab-count" id="countActive">—</span>
+        </button>
+        <button class="staff-tab-btn"        id="tabSuspended" onclick="switchTab('suspended')">
+          Suspended <span class="tab-count" id="countSuspended">—</span>
+        </button>
+        <button class="staff-tab-btn"        id="tabDeleted"   onclick="switchTab('deleted')">
+          Archived <span class="tab-count" id="countDeleted">—</span>
+        </button>
+      </div>
+
+      <!-- Filters (hidden for deleted tab) -->
+      <div id="filterBar" class="filter-bar">
         <input type="text" id="searchInput" class="form-control" placeholder="Search name, username, email…" oninput="applyFilters()" />
         <select id="roleFilter" class="form-control" onchange="applyFilters()">
           <option value="">All Roles</option>
@@ -74,11 +111,11 @@
           <option value="verification_officer">Verification Officer</option>
           <option value="staff">Staff</option>
         </select>
-        <select id="statusFilter" class="form-control" onchange="applyFilters()">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-        </select>
+      </div>
+
+      <!-- Archived notice (shown only on deleted tab) -->
+      <div id="archiveNotice" style="display:none;" class="restore-tip" style="margin-bottom:16px;">
+        🗄️ These accounts have been archived (soft deleted). Their usernames and emails are freed — you can restore any account to reactivate it, or create a new account with the same credentials.
       </div>
 
       <div class="card">
@@ -91,7 +128,7 @@
                 <th>Role</th>
                 <th>Branch</th>
                 <th>Contact</th>
-                <th>Status</th>
+                <th id="statusColHead">Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -242,19 +279,64 @@
   </div>
 </div>
 
-<!-- Delete Confirm Modal -->
+<!-- Delete (Archive) Confirm Modal -->
 <div class="modal-overlay" id="deleteModal">
-  <div class="modal-box" style="max-width:400px;">
+  <div class="modal-box" style="max-width:440px;">
     <div class="modal-header">
-      <h2 class="modal-title">Delete Staff Account</h2>
+      <h2 class="modal-title">Archive Staff Account</h2>
       <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
     </div>
     <div class="modal-body">
-      <p class="text-sm">Are you sure you want to permanently delete <strong id="deleteStaffName"></strong>? This cannot be undone.</p>
+      <div class="restore-tip" style="margin-bottom:14px;">
+        <strong>This is a soft delete.</strong> The account will be archived, not permanently removed.
+        You can restore it at any time from the <em>Archived</em> tab, and the username / email will be
+        freed for reuse immediately.
+      </div>
+      <p class="text-sm">Archive <strong id="deleteStaffName"></strong>? They will lose all system access.</p>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Archive Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restore Confirm Modal -->
+<div class="modal-overlay" id="restoreModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Restore Staff Account</h2>
+      <button class="btn-icon" onclick="closeModal('restoreModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="margin-bottom:10px;">
+        Restore <strong id="restoreStaffName"></strong>? Their account will be reactivated with the original username and email.
+      </p>
+      <p class="text-xs text-muted">If their original credentials are taken by another account, the restore will fail and you will be notified.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('restoreModal')">Cancel</button>
+      <button class="btn btn-success" onclick="confirmRestore()">Restore Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restore Suggestion Modal (shown when create conflicts with deleted account) -->
+<div class="modal-overlay" id="restoreSuggestModal">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Archived Account Found</h2>
+      <button class="btn-icon" onclick="closeModal('restoreSuggestModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="restore-tip" style="margin-bottom:12px;">
+        A previously archived staff account (<strong id="suggestStaffName"></strong>) used the same username or email.
+      </div>
+      <p class="text-sm text-muted">You can restore that account instead of creating a new one, or choose a different username/email to proceed.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('restoreSuggestModal')">Use Different Credentials</button>
+      <button class="btn btn-success" onclick="confirmRestoreSuggested()">Restore Archived Account</button>
     </div>
   </div>
 </div>
@@ -264,8 +346,11 @@
 <script src="../assets/js/auth.js"></script>
 <script>
   const currentUser = requireAuth(['super_admin']);
-  let staffList = [];
-  let targetStaffId = null;
+  let staffList    = [];   // active + suspended
+  let deletedList  = [];   // archived
+  let targetStaffId     = null;
+  let suggestedRestoreId = null;
+  let currentTab   = 'active';
 
   const ROLE_LABELS = {
     branch_manager:       'Branch Manager',
@@ -280,14 +365,29 @@
     Promise.all([loadStaff(), loadBranches()]);
   }
 
+  // ── Data loading ───────────────────────────────────────────────────────────
+
   async function loadStaff() {
     try {
-      const res = await API.getAllStaff();
-      staffList = res.staff;
-      applyFilters();
+      const [activeRes, deletedRes] = await Promise.all([
+        API.getAllStaff(),
+        API.getDeletedStaff()
+      ]);
+      staffList   = activeRes.staff || [];
+      deletedList = deletedRes.staff || [];
+      updateCounts();
+      renderCurrentTab();
     } catch (err) {
       showToast('Failed to load staff: ' + err.message, 'error');
     }
+  }
+
+  function updateCounts() {
+    const active    = staffList.filter(s => s.isActive).length;
+    const suspended = staffList.filter(s => !s.isActive).length;
+    document.getElementById('countActive').textContent    = active;
+    document.getElementById('countSuspended').textContent = suspended;
+    document.getElementById('countDeleted').textContent   = deletedList.length;
   }
 
   async function loadBranches() {
@@ -304,16 +404,42 @@
     } catch (_) {}
   }
 
+  // ── Tab switching ──────────────────────────────────────────────────────────
+
+  function switchTab(tab) {
+    currentTab = tab;
+    ['active','suspended','deleted'].forEach(t => {
+      document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))
+        .classList.toggle('active', t === tab);
+    });
+    const isDeleted = tab === 'deleted';
+    document.getElementById('filterBar').style.display      = isDeleted ? 'none' : '';
+    document.getElementById('archiveNotice').style.display  = isDeleted ? '' : 'none';
+    document.getElementById('statusColHead').textContent    = isDeleted ? 'Archived On' : 'Status';
+    renderCurrentTab();
+  }
+
+  function renderCurrentTab() {
+    if (currentTab === 'deleted') {
+      renderDeleted(deletedList);
+    } else {
+      applyFilters();
+    }
+  }
+
+  // ── Filters (active / suspended) ──────────────────────────────────────────
+
   function applyFilters() {
-    const q      = document.getElementById('searchInput').value.toLowerCase();
-    const role   = document.getElementById('roleFilter').value;
-    const status = document.getElementById('statusFilter').value;
+    const q    = document.getElementById('searchInput').value.toLowerCase();
+    const role = document.getElementById('roleFilter').value;
 
     const filtered = staffList.filter(s => {
-      const matchQ      = !q || s.fullName.toLowerCase().includes(q) || s.username.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
-      const matchRole   = !role   || s.role === role;
-      const matchStatus = !status || (status === 'active' ? s.isActive : !s.isActive);
-      return matchQ && matchRole && matchStatus;
+      const matchQ    = !q || s.fullName.toLowerCase().includes(q)
+                           || s.username.toLowerCase().includes(q)
+                           || s.email.toLowerCase().includes(q);
+      const matchRole = !role || s.role === role;
+      const matchTab  = currentTab === 'active' ? s.isActive : !s.isActive;
+      return matchQ && matchRole && matchTab;
     });
 
     renderStaff(filtered);
@@ -323,11 +449,14 @@
     return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   }
 
+  // ── Render: active / suspended ─────────────────────────────────────────────
+
   function renderStaff(staff) {
     const tbody = document.getElementById('staffTable');
     if (!staff.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">
-        <div class="empty-icon">👤</div><p class="text-muted">No staff accounts found</p>
+        <div class="empty-icon">👤</div>
+        <p class="text-muted">${currentTab === 'suspended' ? 'No suspended staff' : 'No active staff accounts'}</p>
       </td></tr>`;
       return;
     }
@@ -351,7 +480,7 @@
         <td><div class="text-sm">${s.phone}</div></td>
         <td>
           <span class="badge ${s.isActive ? 'badge-success' : 'badge-danger'}">${s.isActive ? 'Active' : 'Suspended'}</span>
-          ${!s.isActive && s.suspendReason ? `<div class="suspend-note">${s.suspendReason.slice(0, 40)}${s.suspendReason.length > 40 ? '…' : ''}</div>` : ''}
+          ${!s.isActive && s.suspendReason ? `<div class="suspend-note">${s.suspendReason.slice(0,40)}${s.suspendReason.length>40?'…':''}</div>` : ''}
         </td>
         <td>
           <div class="table-actions" style="flex-wrap:wrap;gap:4px;">
@@ -362,16 +491,63 @@
               ? `<button class="btn btn-sm btn-danger" onclick="openSuspend('${s._id}','${esc(s.fullName)}')">Suspend</button>`
               : `<button class="btn btn-sm btn-primary" onclick="activateStaffAccount('${s._id}')">Activate</button>`}
             <button class="btn btn-sm btn-outline" onclick="openLoginHistory('${s._id}','${esc(s.fullName)}')">History</button>
-            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${esc(s.fullName)}')">Del</button>
+            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${esc(s.fullName)}')">Archive</button>
           </div>
         </td>
       </tr>
     `).join('');
   }
 
+  // ── Render: deleted / archived ─────────────────────────────────────────────
+
+  function renderDeleted(staff) {
+    const tbody = document.getElementById('staffTable');
+    if (!staff.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">
+        <div class="empty-icon">🗄️</div>
+        <p class="text-muted">No archived staff accounts</p>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = staff.map((s, i) => `
+      <tr class="row-deleted">
+        <td>${i + 1}</td>
+        <td>
+          <div class="flex items-center gap-2">
+            ${s.passportPhoto
+              ? `<img src="${s.passportPhoto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;filter:grayscale(60%);" />`
+              : '<div style="width:36px;height:36px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">👤</div>'}
+            <div>
+              <div class="font-semibold">${s.fullName}</div>
+              <div class="text-xs text-muted">Was: @${s.deletedUsername} · ${s.deletedEmail}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="role-badge role-${s.role}">${ROLE_LABELS[s.role] || s.role}</span></td>
+        <td>${s.branch ? `<span class="text-sm">${s.branch.name}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td><div class="text-sm">${s.phone}</div></td>
+        <td>
+          <span class="badge badge-danger" style="font-size:11px;">Archived</span>
+          <div class="deleted-info">
+            ${s.deletedAt ? formatDate(s.deletedAt) : '—'}
+            ${s.deletedBy ? `· by ${s.deletedBy.fullName}` : ''}
+          </div>
+        </td>
+        <td>
+          <div class="table-actions" style="gap:4px;">
+            <button class="btn btn-sm btn-success" onclick="openRestore('${s._id}','${esc(s.fullName)}')">♻️ Restore</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Create / Edit Staff ────────────────────────────────────────────────────
+
   function openStaffModal() {
     document.getElementById('staffModalTitle').textContent = 'Add Staff';
-    document.getElementById('staffSubmitBtn').textContent = 'Create Staff';
+    document.getElementById('staffSubmitBtn').textContent  = 'Create Staff';
     document.getElementById('editStaffId').value = '';
     document.getElementById('staffForm').reset();
     document.getElementById('passwordGroup').style.display = '';
@@ -383,16 +559,16 @@
     const s = staffList.find(x => x._id === id);
     if (!s) return;
     document.getElementById('staffModalTitle').textContent = 'Edit Staff';
-    document.getElementById('staffSubmitBtn').textContent = 'Save Changes';
-    document.getElementById('editStaffId').value = id;
-    document.getElementById('sf_fullName').value      = s.fullName;
-    document.getElementById('sf_phone').value         = s.phone;
-    document.getElementById('sf_username').value      = s.username;
-    document.getElementById('sf_email').value         = s.email;
-    document.getElementById('sf_role').value          = s.role;
-    document.getElementById('sf_branch').value        = s.branch ? s.branch._id : '';
-    document.getElementById('sf_accountNumber').value = s.accountNumber || '';
-    document.getElementById('sf_bankName').value      = s.bankName || '';
+    document.getElementById('staffSubmitBtn').textContent  = 'Save Changes';
+    document.getElementById('editStaffId').value           = id;
+    document.getElementById('sf_fullName').value           = s.fullName;
+    document.getElementById('sf_phone').value              = s.phone;
+    document.getElementById('sf_username').value           = s.username;
+    document.getElementById('sf_email').value              = s.email;
+    document.getElementById('sf_role').value               = s.role;
+    document.getElementById('sf_branch').value             = s.branch ? s.branch._id : '';
+    document.getElementById('sf_accountNumber').value      = s.accountNumber || '';
+    document.getElementById('sf_bankName').value           = s.bankName || '';
     document.getElementById('passwordGroup').style.display = 'none';
     if (s.passportPhoto) {
       const preview = document.getElementById('sf_photoPreview');
@@ -403,8 +579,9 @@
   }
 
   async function submitStaff() {
-    const id = document.getElementById('editStaffId').value;
-    const fd = new FormData();
+    const id  = document.getElementById('editStaffId').value;
+    const btn = document.getElementById('staffSubmitBtn');
+    const fd  = new FormData();
     fd.append('fullName',      document.getElementById('sf_fullName').value.trim());
     fd.append('phone',         document.getElementById('sf_phone').value.trim());
     fd.append('username',      document.getElementById('sf_username').value.trim());
@@ -423,6 +600,7 @@
     const photoFile = document.getElementById('sf_photo').files[0];
     if (photoFile) fd.append('passportPhoto', photoFile);
 
+    btn.disabled = true; btn.textContent = 'Saving…';
     try {
       if (id) {
         await API.updateStaff(id, fd);
@@ -434,9 +612,22 @@
       closeModal('staffModal');
       loadStaff();
     } catch (err) {
-      showToast(err.message, 'error');
+      // 409 = archived account conflict — offer restore
+      if (err.status === 409 && err.data?.canRestore) {
+        suggestedRestoreId = err.data.deletedStaffId;
+        document.getElementById('suggestStaffName').textContent = err.data.deletedStaffName || 'Unknown';
+        closeModal('staffModal');
+        document.getElementById('restoreSuggestModal').classList.add('open');
+      } else {
+        showToast(err.message, 'error');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = id ? 'Save Changes' : 'Create Staff';
     }
   }
+
+  // ── Password Reset ─────────────────────────────────────────────────────────
 
   function openResetPwd(id) {
     targetStaffId = id;
@@ -455,6 +646,8 @@
       showToast(err.message, 'error');
     }
   }
+
+  // ── Suspend / Activate ─────────────────────────────────────────────────────
 
   function openSuspend(id, name) {
     targetStaffId = id;
@@ -486,6 +679,60 @@
     }
   }
 
+  // ── Archive (soft delete) ──────────────────────────────────────────────────
+
+  function openDelete(id, name) {
+    targetStaffId = id;
+    document.getElementById('deleteStaffName').textContent = name;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+
+  async function confirmDelete() {
+    try {
+      await API.deleteStaff(targetStaffId);
+      showToast('Staff account archived', 'success');
+      closeModal('deleteModal');
+      loadStaff();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ── Restore ────────────────────────────────────────────────────────────────
+
+  function openRestore(id, name) {
+    targetStaffId = id;
+    document.getElementById('restoreStaffName').textContent = name;
+    document.getElementById('restoreModal').classList.add('open');
+  }
+
+  async function confirmRestore() {
+    try {
+      await API.restoreStaff(targetStaffId);
+      showToast('Staff account restored and reactivated', 'success');
+      closeModal('restoreModal');
+      loadStaff();
+      switchTab('active');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function confirmRestoreSuggested() {
+    if (!suggestedRestoreId) return;
+    try {
+      await API.restoreStaff(suggestedRestoreId);
+      showToast('Archived account restored and reactivated', 'success');
+      closeModal('restoreSuggestModal');
+      loadStaff();
+      switchTab('active');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ── Login History ──────────────────────────────────────────────────────────
+
   async function openLoginHistory(id, name) {
     document.getElementById('loginHistoryName').textContent = name;
     document.getElementById('loginHistoryList').innerHTML = '<p class="text-muted">Loading…</p>';
@@ -508,22 +755,7 @@
     }
   }
 
-  function openDelete(id, name) {
-    targetStaffId = id;
-    document.getElementById('deleteStaffName').textContent = name;
-    document.getElementById('deleteModal').classList.add('open');
-  }
-
-  async function confirmDelete() {
-    try {
-      await API.deleteStaff(targetStaffId);
-      showToast('Staff account deleted', 'success');
-      closeModal('deleteModal');
-      loadStaff();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
+  // ── Utilities ──────────────────────────────────────────────────────────────
 
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 

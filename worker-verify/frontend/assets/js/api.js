@@ -24,7 +24,10 @@ async function apiFetch(path, options = {}) {
       localStorage.removeItem('wv_user');
       window.location.href = '/index.html';
     }
-    throw new Error(data.message || `HTTP ${res.status}`);
+    const err = new Error(data.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.data   = data;  // attach full response body for structured error handling
+    throw err;
   }
   return data;
 }
@@ -101,12 +104,14 @@ const API = {
   deleteBranch:  (id)     => apiFetch(`/branches/${id}`, { method: 'DELETE' }),
 
   // Staff (super_admin only)
-  getAllStaff:         ()        => apiFetch('/staff'),
+  getAllStaff:         (qs='')   => apiFetch(`/staff${qs}`),
+  getDeletedStaff:    ()        => apiFetch('/staff?deleted=true'),
   getStaff:           (id)      => apiFetch(`/staff/${id}`),
   createStaff:        (fd)      => apiFetch('/staff', { method: 'POST', body: fd }),
   updateStaff:        (id, fd)  => apiFetch(`/staff/${id}`, { method: 'PUT', body: fd }),
   deleteStaff:        (id)      => apiFetch(`/staff/${id}`, { method: 'DELETE' }),
-  resetStaffPassword: (id, b)   => apiFetch(`/staff/${id}/reset-password`,  { method: 'PUT', body: JSON.stringify(b) }),
+  restoreStaff:       (id)      => apiFetch(`/staff/${id}/restore`,          { method: 'PUT' }),
+  resetStaffPassword: (id, b)   => apiFetch(`/staff/${id}/reset-password`,   { method: 'PUT', body: JSON.stringify(b) }),
   suspendStaff:       (id, b)   => apiFetch(`/staff/${id}/suspend`,          { method: 'PUT', body: JSON.stringify(b) }),
   activateStaff:      (id)      => apiFetch(`/staff/${id}/activate`,         { method: 'PUT' }),
   getStaffLoginHistory:(id)     => apiFetch(`/staff/${id}/login-history`),
