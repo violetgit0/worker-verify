@@ -43,8 +43,15 @@ const workerSchema = new mongoose.Schema({
   housePhotos:        [{ type: String }],              // multiple house/building photos
   streetPhotos:       [{ type: String }],              // street / environment photos
   identityDoc:        { type: identityDocSchema, default: () => ({}) },
-  verificationStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'rejected', 'incomplete', 'legacy', 'temporary'],
+    default: 'pending'
+  },
   rejectionReason:    { type: String, default: '' },
+  // Restriction flags — admin can block unverified workers from clocking in / appearing in payroll
+  allowClockIn:       { type: Boolean, default: true },
+  allowPayroll:       { type: Boolean, default: true },
   guarantors:         [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guarantor' }],
   registeredBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   verifiedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

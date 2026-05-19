@@ -110,6 +110,28 @@
         </div>
       </div>
 
+      <!-- Unverified Records Row -->
+      <div id="unverifiedRow" style="display:none;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--warning-light);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);flex-wrap:wrap;gap:16px;">
+          <span style="font-size:15px;font-weight:600;color:var(--warning-dark);flex:1;min-width:160px;">⚠️ Unverified Worker Records</span>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:var(--warning-dark);" id="dashIncomplete">—</div>
+              <div style="font-size:11px;color:var(--warning-dark);opacity:.8;">Incomplete</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:var(--purple);" id="dashLegacy">—</div>
+              <div style="font-size:11px;color:var(--purple);opacity:.8;">Legacy</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:var(--info);" id="dashTemporary">—</div>
+              <div style="font-size:11px;color:var(--info);opacity:.8;">Temporary</div>
+            </div>
+          </div>
+          <a href="workers.html?status=unverified" class="btn btn-sm btn-outline" style="border-color:var(--warning);color:var(--warning-dark);">View All →</a>
+        </div>
+      </div>
+
       <!-- Charts Row: Bar Chart + Donut + Calendar -->
       <div class="dash-three-col">
 
@@ -280,6 +302,9 @@
       document.getElementById('statSuspended').textContent  = stats.suspendedWorkers;
       document.getElementById('statBranches').textContent   = stats.totalBranches;
       document.getElementById('statStaff').textContent      = stats.totalStaff;
+
+      // Load unverified breakdown (incomplete / legacy / temporary)
+      loadUnverifiedCounts();
 
       // Shift stats
       document.getElementById('dashShiftA').textContent = stats.shiftA || 0;
@@ -507,6 +532,25 @@
         </div>
       </div>
     `).join('');
+  }
+
+  async function loadUnverifiedCounts() {
+    try {
+      const [incRes, legRes, tmpRes] = await Promise.all([
+        API.getWorkers('?status=incomplete&limit=1').catch(() => null),
+        API.getWorkers('?status=legacy&limit=1').catch(() => null),
+        API.getWorkers('?status=temporary&limit=1').catch(() => null),
+      ]);
+      const inc = incRes?.pagination?.total || 0;
+      const leg = legRes?.pagination?.total || 0;
+      const tmp = tmpRes?.pagination?.total || 0;
+      document.getElementById('dashIncomplete').textContent = inc;
+      document.getElementById('dashLegacy').textContent     = leg;
+      document.getElementById('dashTemporary').textContent  = tmp;
+      if (inc + leg + tmp > 0) {
+        document.getElementById('unverifiedRow').style.display = '';
+      }
+    } catch(_) {}
   }
 </script>
 <script src="../assets/js/theme.js"></script>

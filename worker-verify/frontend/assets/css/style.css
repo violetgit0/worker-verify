@@ -165,7 +165,18 @@
 [data-theme="dark"] .loc-tab.active   { color: var(--primary-dark); border-bottom-color: var(--primary); }
 [data-theme="dark"] .detail-field label { color: var(--gray-400); }
 [data-theme="dark"] .detail-field p   { color: var(--gray-800); }
-[data-theme="dark"] .payroll-status-badge.draft { background: #334155; color: var(--gray-600); }
+[data-theme="dark"] .payroll-status-badge.draft    { background: #334155; color: var(--gray-600); }
+[data-theme="dark"] .badge-incomplete { background: rgba(245,158,11,.15); color: #FCD34D; border-color: rgba(245,158,11,.3); }
+[data-theme="dark"] .badge-legacy     { background: rgba(139,92,246,.15); color: #C4B5FD; }
+[data-theme="dark"] .badge-temporary  { background: rgba(14,165,233,.15); color: #7DD3FC; }
+[data-theme="dark"] .completion-step  { background: #1E293B; color: var(--gray-500); }
+[data-theme="dark"] .completion-step.done { background: rgba(16,185,129,.1); color: #6EE7B7; }
+[data-theme="dark"] .status-warn-banner.pending, [data-theme="dark"] .status-warn-banner.incomplete { background: rgba(245,158,11,.1); color: #FCD34D; }
+[data-theme="dark"] .status-warn-banner.legacy    { background: rgba(139,92,246,.1); color: #C4B5FD; }
+[data-theme="dark"] .status-warn-banner.temporary { background: rgba(14,165,233,.1);  color: #7DD3FC; }
+[data-theme="dark"] .status-warn-banner.rejected  { background: rgba(239,68,68,.1);   color: #FCA5A5; }
+[data-theme="dark"] .toggle-slider                { background: #475569; }
+[data-theme="dark"] .restriction-row              { border-color: #334155; }
 [data-theme="dark"] .worker-nav       { background: #1E293B; border-color: #334155; }
 [data-theme="dark"] .worker-page      { background: var(--bg); }
 [data-theme="dark"] .att-mini-row     { border-color: #334155; }
@@ -638,7 +649,103 @@ tbody tr:last-child { border-bottom: none; }
 .badge-success { background: var(--success-light); color: var(--success-dark); }
 .badge-danger  { background: var(--danger-light);  color: var(--danger-dark);  }
 .badge-warning { background: var(--warning-light); color: var(--warning-dark); }
-.badge-info    { background: var(--accent-light);  color: var(--accent-dark);  }
+.badge-info       { background: var(--accent-light);  color: var(--accent-dark);  }
+.badge-incomplete { background: var(--warning-light); color: var(--warning-dark); border: 1px solid rgba(245,158,11,.25); }
+.badge-legacy     { background: var(--purple-light);  color: var(--purple); }
+.badge-temporary  { background: var(--info-light);    color: var(--info); }
+
+/* ─── Verification Progress Bar ──────────────────────────────────────────────── */
+.verify-progress-wrap {
+  background: var(--gray-100);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.verify-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width .5s ease;
+}
+.verify-progress-bar.complete { background: var(--success); }
+.verify-progress-bar.low      { background: var(--danger); }
+
+.completion-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.completion-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--gray-600);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--gray-50);
+}
+.completion-step.done  { color: var(--success-dark); background: var(--success-light); }
+.completion-step.done::before  { content: '✓'; font-weight: 700; color: var(--success); }
+.completion-step.miss::before  { content: '○'; color: var(--gray-400); }
+
+/* ─── Restriction Toggles ─────────────────────────────────────────────────────── */
+.restriction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.restriction-row:last-child { border-bottom: none; }
+.restriction-label { font-size: 14px; font-weight: 500; }
+.restriction-hint  { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+.toggle-switch {
+  position: relative;
+  width: 44px; height: 24px;
+  flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--gray-300);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .25s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 3px; top: 3px;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .25s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--success); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+.toggle-switch input:disabled + .toggle-slider { opacity: .5; cursor: not-allowed; }
+
+/* ─── Warning Banner ──────────────────────────────────────────────────────────── */
+.status-warn-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 4px solid;
+}
+.status-warn-banner.pending    { background: var(--warning-light); color: var(--warning-dark); border-color: var(--warning); }
+.status-warn-banner.incomplete { background: var(--warning-light); color: var(--warning-dark); border-color: var(--warning); }
+.status-warn-banner.legacy     { background: var(--purple-light);  color: var(--purple);       border-color: var(--purple); }
+.status-warn-banner.temporary  { background: var(--info-light);    color: var(--info);         border-color: var(--info); }
+.status-warn-banner.rejected   { background: var(--danger-light);  color: var(--danger-dark);  border-color: var(--danger); }
 
 /* ─── Modals ──────────────────────────────────────────────────────────────────── */
 .modal-overlay {

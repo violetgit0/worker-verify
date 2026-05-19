@@ -100,6 +100,7 @@ const registerWorker = async (req, res) => {
   if (branchId)    workerData.branch = branchId;
   if (shift && ['A','B'].includes(shift)) workerData.shift = shift;
   if (dateEmployed) workerData.dateEmployed = dateEmployed;
+  if (req.body.verificationStatus === 'incomplete') workerData.verificationStatus = 'incomplete';
 
   const workerIdDoc = buildIdentityDoc(workerIdDocType, workerIdDocNumber, files.workerIdDoc?.[0]);
   if (workerIdDoc) workerData.identityDoc = workerIdDoc;
@@ -174,7 +175,7 @@ const registerWorker = async (req, res) => {
 };
 
 const getAllWorkers = async (req, res) => {
-  const { page = 1, limit = 20, status, search, branch, shift, employmentStatus } = req.query;
+  const { page = 1, limit = 20, status, search, branch, shift, employmentStatus, incomplete } = req.query;
   const query = {};
 
   // Branch restriction for branch_manager
@@ -187,6 +188,10 @@ const getAllWorkers = async (req, res) => {
   if (branch && branch !== 'all')           query.branch = branch;
   if (shift && shift !== 'all')             query.shift = shift;
   if (employmentStatus && employmentStatus !== 'all') query.employmentStatus = employmentStatus;
+  // incomplete=true → workers not fully verified
+  if (incomplete === 'true') {
+    query.verificationStatus = { $in: ['pending', 'incomplete', 'legacy', 'temporary'] };
+  }
 
   if (search) {
     const guarantorWorkerIds = await Guarantor.find({
@@ -248,11 +253,111 @@ const getWorkerById = async (req, res) => {
   res.json({ success: true, worker, logs, transferLogs });
 };
 
+// ── Quick register (minimal fields, no full verification required) ─────────────
+const quickRegisterWorker = async (req, res) => {
+  const {
+    fullName, phone, gender, nin, occupation,
+    branch: branchId, shift, monthlySalary, dailyRate, dateEmployed,
+    workerType   // 'temporary' | 'legacy' | 'incomplete' (default: 'incomplete')
+  } = req.body;
+
+  if (!fullName || !phone) {
+    return res.status(400).json({ success: false, message: 'Full name and phone number are required' });
+  }
+
+  if (nin) {
+    const existing = await Worker.findOne({ nin });
+    if (existing) return res.status(400).json({ success: false, message: 'A worker with this NIN already exists' });
+  }
+
+  const validTypes = ['incomplete', 'temporary', 'legacy'];
+  const verificationStatus = validTypes.includes(workerType) ? workerType : 'incomplete';
+
+  const workerData = {
+    fullName: fullName.trim(),
+    phone,
+    gender:      gender      || 'Male',
+    dateOfBirth: req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : new Date('2000-01-01'),
+    nin:         nin         || `QUICK-${Date.now()}`,
+    occupation:  occupation  || 'General',
+    homeAddress: req.body.homeAddress || 'Not Provided',
+    verificationStatus,
+    registeredBy: req.user._id
+  };
+
+  if (branchId)    workerData.branch = branchId;
+  if (shift && ['A', 'B'].includes(shift)) workerData.shift = shift;
+  if (dateEmployed) workerData.dateEmployed = dateEmployed;
+  if (monthlySalary) {
+    workerData.monthlySalary = parseFloat(monthlySalary) || 0;
+    workerData.dailyRate = parseFloat(dailyRate) || workerData.monthlySalary / 26;
+  }
+
+  const worker = await Worker.create(workerData);
+
+  await VerificationLog.create({
+    worker: worker._id, action: 'registered',
+    performedBy: req.user._id, newStatus: verificationStatus,
+    notes: `Quick-registered by ${req.user.fullName} (${verificationStatus})`
+  });
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+  logActivity('quick_register_worker', req.user, worker._id, worker.fullName,
+    { nin: worker.nin, workerType: verificationStatus }, ip);
+
+  res.status(201).json({ success: true, message: 'Worker quick-registered successfully', workerId: worker._id });
+};
+
+// ── Get verification completion for a worker ───────────────────────────────────
+const getWorkerCompletion = async (req, res) => {
+  const worker = await Worker.findById(req.params.id).populate('guarantors');
+  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
+
+  const steps = {
+    passportPhoto:    { done: !!worker.passportPhoto,          label: 'Passport Photo' },
+    homeAddress:      { done: !!(worker.homeAddress && worker.homeAddress !== 'Not Provided'), label: 'Home Address' },
+    locationPinned:   { done: !!(worker.location?.lat),        label: 'Location Pinned' },
+    identityDoc:      { done: !!(worker.identityDoc?.fileUrl), label: 'ID Document Uploaded' },
+    workerSignature:  { done: !!(worker.workerSignature?.url), label: 'Worker Signature' },
+    nin:              { done: !!(worker.nin && !worker.nin.startsWith('QUICK-')), label: 'NIN Provided' },
+    guarantor1:       { done: worker.guarantors?.length >= 1,  label: 'Guarantor 1 Added' },
+    guarantor2:       { done: worker.guarantors?.length >= 2,  label: 'Guarantor 2 Added' },
+    g1Photo:          { done: !!(worker.guarantors?.[0]?.passportPhoto), label: 'Guarantor 1 Photo' },
+    g1IdDoc:          { done: !!(worker.guarantors?.[0]?.identityDoc?.fileUrl), label: 'Guarantor 1 ID Doc' },
+    g2Photo:          { done: !!(worker.guarantors?.[1]?.passportPhoto), label: 'Guarantor 2 Photo' },
+    g2IdDoc:          { done: !!(worker.guarantors?.[1]?.identityDoc?.fileUrl), label: 'Guarantor 2 ID Doc' }
+  };
+
+  const total = Object.keys(steps).length;
+  const done  = Object.values(steps).filter(s => s.done).length;
+  const pct   = Math.round((done / total) * 100);
+
+  res.json({ success: true, completion: { pct, done, total, steps } });
+};
+
+// ── Update worker clock-in / payroll restrictions ─────────────────────────────
+const updateRestrictions = async (req, res) => {
+  const { allowClockIn, allowPayroll } = req.body;
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
+
+  if (allowClockIn !== undefined) worker.allowClockIn = Boolean(allowClockIn);
+  if (allowPayroll !== undefined) worker.allowPayroll = Boolean(allowPayroll);
+  await worker.save();
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+  logActivity('update_restrictions', req.user, worker._id, worker.fullName,
+    { allowClockIn: worker.allowClockIn, allowPayroll: worker.allowPayroll }, ip);
+
+  res.json({ success: true, message: 'Restrictions updated', allowClockIn: worker.allowClockIn, allowPayroll: worker.allowPayroll });
+};
+
 const updateVerificationStatus = async (req, res) => {
   const { status, rejectionReason } = req.body;
+  const validStatuses = ['verified', 'rejected', 'pending', 'incomplete', 'legacy', 'temporary'];
 
-  if (!['verified', 'rejected'].includes(status)) {
-    return res.status(400).json({ success: false, message: 'Status must be verified or rejected' });
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}` });
   }
 
   const worker = await Worker.findById(req.params.id);
@@ -436,7 +541,8 @@ const updateEmploymentStatus = async (req, res) => {
 };
 
 module.exports = {
-  registerWorker, getAllWorkers, getWorkerById,
+  registerWorker, quickRegisterWorker, getAllWorkers, getWorkerById,
   updateVerificationStatus, searchWorkers, flagDocument,
-  assignBranch, assignShift, updateEmploymentStatus, updateSalary
+  assignBranch, assignShift, updateEmploymentStatus, updateSalary,
+  getWorkerCompletion, updateRestrictions
 };

@@ -50,6 +50,7 @@
       <div id="verifyActions" class="flex gap-2 hidden">
         <button class="btn btn-success btn-sm" onclick="openVerifyModal('verified')">✅ Approve</button>
         <button class="btn btn-danger btn-sm"  onclick="openVerifyModal('rejected')">❌ Reject</button>
+        <button class="btn btn-outline btn-sm" onclick="openVerifyModal('incomplete')" id="markIncompleteBtn" style="display:none;">📋 Mark Incomplete</button>
       </div>
     </header>
 
@@ -279,15 +280,24 @@
     window.location.href = 'workers.html';
   }
 
+  let completionData = null;
+
   async function loadWorkerDetail() {
     try {
-      const res = await API.getWorker(workerId);
+      const [res, compRes] = await Promise.all([
+        API.getWorker(workerId),
+        API.getWorkerCompletion(workerId).catch(() => null)
+      ]);
       workerData = res.worker;
+      completionData = compRes;
       document.getElementById('pageTitle').textContent = workerData.fullName;
       renderDetail(workerData, res.logs, res.transferLogs || []);
 
-      if (currentUser.role === 'super_admin' && workerData.verificationStatus === 'pending') {
+      const nonVerified = ['pending','incomplete','legacy','temporary'];
+      if (currentUser.role === 'super_admin' && nonVerified.includes(workerData.verificationStatus)) {
         document.getElementById('verifyActions').classList.remove('hidden');
+        const miBtn = document.getElementById('markIncompleteBtn');
+        if (workerData.verificationStatus !== 'incomplete') miBtn.style.display = '';
       }
 
       // Populate salary display
@@ -565,22 +575,106 @@
       `;
     }).join('');
 
-    document.getElementById('panelInfo').innerHTML = `
-      <!-- Status Banner -->
-      <div class="card mb-4" style="margin-bottom:16px;background:${w.verificationStatus==='verified'?'var(--success-light)':w.verificationStatus==='rejected'?'var(--danger-light)':'var(--warning-light)'};">
-        <div class="flex items-center justify-between">
-          <div>
-            <span style="font-size:14px;font-weight:600;">Verification Status: ${statusBadge(w.verificationStatus)}</span>
-            ${w.verificationStatus==='rejected'&&w.rejectionReason ? `<div class="text-sm text-muted mt-1">Reason: ${w.rejectionReason}</div>` : ''}
-            ${w.verifiedBy ? `<div class="text-xs text-muted mt-1">By ${w.verifiedBy.fullName} on ${formatDate(w.verifiedAt)}</div>` : ''}
+    const nonVerifiedStatuses = ['pending','incomplete','legacy','temporary'];
+    const warnIcons = { pending:'⏳', incomplete:'📋', legacy:'🗂️', temporary:'⌛', rejected:'❌' };
+
+    const progressSection = completionData && w.verificationStatus !== 'verified' ? (() => {
+      const { pct, done, total, steps } = completionData;
+      const barCls = pct >= 100 ? 'complete' : pct < 40 ? 'low' : '';
+      const stepLabels = {
+        passportPhoto: 'Passport Photo', homeAddress: 'Home Address', locationPinned: 'Location Pinned',
+        identityDoc: 'Identity Document', workerSignature: 'Worker Signature', nin: 'NIN',
+        guarantor1: 'Guarantor 1', guarantor2: 'Guarantor 2', g1Photo: "G1 Photo",
+        g1IdDoc: 'G1 ID Doc', g2Photo: 'G2 Photo', g2IdDoc: 'G2 ID Doc'
+      };
+      const stepHtml = Object.entries(steps || {}).map(([key, isDone]) =>
+        `<div class="completion-step ${isDone?'done':'miss'}">${stepLabels[key]||key}</div>`
+      ).join('');
+      return `
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header" style="padding-bottom:8px;">
+            <h3 class="card-title" style="font-size:14px;">Verification Completion</h3>
+            <span style="font-size:18px;font-weight:700;color:${pct>=100?'var(--success)':pct<40?'var(--danger)':'var(--warning)'};">${pct}%</span>
           </div>
-          ${w.verificationStatus==='pending'&&currentUser.role==='super_admin' ? `
-            <div class="flex gap-2">
-              <button class="btn btn-success btn-sm" onclick="openVerifyModal('verified')">✅ Approve</button>
-              <button class="btn btn-danger btn-sm"  onclick="openVerifyModal('rejected')">❌ Reject</button>
-            </div>` : ''}
+          <div class="verify-progress-wrap"><div class="verify-progress-bar ${barCls}" style="width:${pct}%;"></div></div>
+          <div class="text-xs text-muted mt-2">${done} of ${total} steps completed</div>
+          <div class="completion-steps-grid mt-2">${stepHtml}</div>
+          ${isAdmin ? `
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="../staff/register-worker.html" class="btn btn-primary btn-sm">📝 Complete Full Registration</a>
+          </div>` : ''}
+        </div>`;
+    })() : '';
+
+    const restrictionSection = isAdmin ? `
+      <div class="card mt-3" style="margin-top:16px;">
+        <div class="card-header"><h2 class="card-title">Access Restrictions</h2>
+          <span class="text-xs text-muted">Controls worker system access</span>
         </div>
-      </div>
+        <div style="padding:0 4px;">
+          <div class="restriction-row">
+            <div>
+              <div class="restriction-label">Allow Clock-In</div>
+              <div class="restriction-hint">Worker can clock in / out via the portal</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggleClockIn" ${w.allowClockIn!==false?'checked':''}
+                onchange="saveRestriction('allowClockIn', this.checked)" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="restriction-row">
+            <div>
+              <div class="restriction-label">Include in Payroll</div>
+              <div class="restriction-hint">Worker appears in payroll generation</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="togglePayroll" ${w.allowPayroll!==false?'checked':''}
+                onchange="saveRestriction('allowPayroll', this.checked)" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>` : '';
+
+    document.getElementById('panelInfo').innerHTML = `
+      <!-- Warning Banner for non-verified -->
+      ${nonVerifiedStatuses.includes(w.verificationStatus) ? `
+      <div class="status-warn-banner ${w.verificationStatus}">
+        <span style="font-size:20px;">${warnIcons[w.verificationStatus]||'⚠️'}</span>
+        <div style="flex:1;">
+          <strong>${statusBadge(w.verificationStatus)}</strong>
+          ${w.verificationStatus==='incomplete'?'&nbsp;— Worker registration is incomplete. Complete all required fields to fully verify.':''}
+          ${w.verificationStatus==='legacy'?'&nbsp;— Legacy worker record. Verification documents may be missing.':''}
+          ${w.verificationStatus==='temporary'?'&nbsp;— Temporary staff member. Full verification required for permanent status.':''}
+          ${w.verificationStatus==='pending'?'&nbsp;— Awaiting verification review.':''}
+        </div>
+        ${isAdmin?`<button class="btn btn-sm btn-success" onclick="openVerifyModal('verified')">✅ Approve</button>`:''}
+      </div>` : ''}
+
+      <!-- Rejection Banner -->
+      ${w.verificationStatus==='rejected' ? `
+      <div class="status-warn-banner rejected">
+        <span style="font-size:20px;">❌</span>
+        <div>
+          <strong>Rejected</strong>
+          ${w.rejectionReason ? `<div class="text-sm" style="margin-top:4px;">${w.rejectionReason}</div>` : ''}
+          ${w.verifiedBy ? `<div class="text-xs" style="margin-top:2px;opacity:.7;">By ${w.verifiedBy.fullName} on ${formatDate(w.verifiedAt)}</div>` : ''}
+        </div>
+      </div>` : ''}
+
+      <!-- Verified confirmation -->
+      ${w.verificationStatus==='verified' ? `
+      <div style="background:var(--success-light);border-left:4px solid var(--success);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">✅</span>
+        <div>
+          <strong style="color:var(--success-dark);">Verified Worker</strong>
+          ${w.verifiedBy ? `<div class="text-xs text-muted mt-1">Approved by ${w.verifiedBy.fullName} on ${formatDate(w.verifiedAt)}</div>` : ''}
+        </div>
+      </div>` : ''}
+
+      <!-- Progress Bar (non-verified only) -->
+      ${progressSection}
 
       <!-- Worker Info -->
       <div class="card mb-4" style="margin-bottom:16px;">
@@ -653,6 +747,9 @@
         </div>
       </div>
 
+      <!-- Access Restrictions (admin only) -->
+      ${restrictionSection}
+
       <!-- Transfer / Change History -->
       ${transferLogs.length ? `
       <div class="card mt-3" style="margin-top:16px;">
@@ -719,15 +816,20 @@
 
   function openVerifyModal(action) {
     pendingAction = action;
-    const isReject = action === 'rejected';
-    document.getElementById('verifyModalTitle').textContent = isReject ? 'Reject Worker' : 'Approve Worker';
-    document.getElementById('verifyConfirmText').textContent = isReject
-      ? 'Please provide a reason for rejection.'
-      : 'Are you sure you want to verify this worker? This will mark them as verified.';
+    const isReject     = action === 'rejected';
+    const isIncomplete = action === 'incomplete';
+    const titles = { verified: 'Approve Worker', rejected: 'Reject Worker', incomplete: 'Mark as Incomplete' };
+    const texts  = {
+      verified:   'Are you sure you want to verify this worker? This will mark them as fully verified.',
+      rejected:   'Please provide a reason for rejection.',
+      incomplete: 'This will flag the worker as having incomplete verification records.'
+    };
+    document.getElementById('verifyModalTitle').textContent   = titles[action] || 'Confirm Action';
+    document.getElementById('verifyConfirmText').textContent  = texts[action]  || '';
     document.getElementById('rejectionReasonGroup').classList.toggle('hidden', !isReject);
     const btn = document.getElementById('confirmVerifyBtn');
-    btn.className = `btn ${isReject ? 'btn-danger' : 'btn-success'}`;
-    btn.textContent = isReject ? 'Reject' : 'Approve';
+    btn.className   = `btn ${isReject ? 'btn-danger' : isIncomplete ? 'btn-outline' : 'btn-success'}`;
+    btn.textContent = isReject ? 'Reject' : isIncomplete ? 'Mark Incomplete' : 'Approve';
     document.getElementById('verifyModal').classList.add('open');
   }
 
@@ -822,6 +924,22 @@
       loadWorkerDetail();
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  }
+
+  async function saveRestriction(field, value) {
+    const chkId = field === 'allowClockIn' ? 'toggleClockIn' : 'togglePayroll';
+    const chk = document.getElementById(chkId);
+    if (chk) chk.disabled = true;
+    try {
+      await API.updateRestrictions(workerId, { [field]: value });
+      showToast(`${field === 'allowClockIn' ? 'Clock-in' : 'Payroll'} access ${value ? 'enabled' : 'disabled'}`, 'success');
+      if (workerData) workerData[field] = value;
+    } catch (err) {
+      showToast(err.message, 'error');
+      if (chk) chk.checked = !value;
+    } finally {
+      if (chk) chk.disabled = false;
     }
   }
 

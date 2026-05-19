@@ -807,11 +807,20 @@
           <div class="step-panel" id="step5">
             <div class="step-title">📋 Review &amp; Submit</div>
             <div id="reviewContent"></div>
-            <div class="step-nav">
+            <div class="step-nav" style="flex-wrap:wrap;gap:10px;">
               <button type="button" class="btn btn-secondary" onclick="goStep(4)">← Back</button>
-              <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="submitWorker()">
-                ✅ Submit Registration
-              </button>
+              <div class="flex gap-2" style="flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline" id="skipVerifyBtn" onclick="submitWorker(true)"
+                  title="Save this worker with incomplete status — verification can be completed later">
+                  📋 Save as Incomplete
+                </button>
+                <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="submitWorker(false)">
+                  ✅ Submit &amp; Verify
+                </button>
+              </div>
+            </div>
+            <div style="margin-top:10px;font-size:12px;color:var(--gray-400);text-align:right;">
+              "Save as Incomplete" saves the worker now — a supervisor can complete verification later from the worker profile.
             </div>
           </div>
 
@@ -1220,9 +1229,10 @@
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  async function submitWorker() {
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
+  async function submitWorker(skipVerify = false) {
+    const btn    = document.getElementById('submitBtn');
+    const skipBtn = document.getElementById('skipVerifyBtn');
+    btn.disabled = true; skipBtn.disabled = true;
     btn.textContent = '⏳ Submitting…';
 
     const fd = new FormData();
@@ -1280,6 +1290,7 @@
     if (branch)        fd.append('branch', branch);
     if (shift)         fd.append('shift', shift);
     if (dateEmployed)  fd.append('dateEmployed', dateEmployed);
+    if (skipVerify)    fd.append('verificationStatus', 'incomplete');
 
     fd.append('workerIdDocType',   document.getElementById('w_idDocType').value);
     fd.append('workerIdDocNumber', document.getElementById('w_idDocNumber').value.trim());
@@ -1305,14 +1316,14 @@
 
     try {
       const res = await API.registerWorker(fd);
-      showToast('Worker registered successfully!', 'success');
+      showToast(skipVerify ? 'Worker saved as incomplete — verification pending.' : 'Worker registered successfully!', 'success');
       setTimeout(() => {
         window.location.href = `../admin/worker-detail.html?id=${res.workerId}`;
       }, 1000);
     } catch (err) {
       showToast(err.message || 'Registration failed. Please try again.', 'error');
-      btn.disabled = false;
-      btn.textContent = '✅ Submit Registration';
+      btn.disabled = false; skipBtn.disabled = false;
+      btn.textContent = '✅ Submit & Verify';
     }
   }
 

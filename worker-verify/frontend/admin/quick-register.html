@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Register Worker – WorkerSave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    .quick-hero {
+      background: linear-gradient(135deg, var(--primary) 0%, #2563EB 100%);
+      border-radius: var(--radius-xl);
+      padding: 22px 28px;
+      color: #fff;
+      margin-bottom: 24px;
+    }
+    .quick-hero h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .quick-hero p  { font-size: 13px; opacity: .85; }
+    .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .type-card {
+      border: 2px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: 16px 14px; cursor: pointer; transition: all .2s; text-align: center;
+      background: var(--white);
+    }
+    .type-card:hover { border-color: var(--primary); background: var(--primary-light); }
+    .type-card.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(77,163,255,.15); }
+    .type-card-icon  { font-size: 28px; margin-bottom: 8px; }
+    .type-card-label { font-size: 13px; font-weight: 700; color: var(--gray-800); }
+    .type-card-desc  { font-size: 11px; color: var(--gray-500); margin-top: 3px; line-height: 1.4; }
+    .required-note {
+      background: var(--warning-light); border: 1px solid rgba(245,158,11,.3);
+      border-radius: var(--radius); padding: 10px 14px;
+      font-size: 12.5px; color: var(--warning-dark); margin-bottom: 20px;
+    }
+    @media (max-width: 600px) {
+      .type-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole"></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"    class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">📋</span> Full Registration</a>
+      <a href="quick-register.html" class="nav-link active"><span class="nav-icon">⚡</span> Quick Register</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <a href="workers.html" class="btn btn-sm btn-outline">← Workers</a>
+        <h1 class="header-title">Quick Register</h1>
+      </div>
+      <a href="../staff/register-worker.html" class="btn btn-sm btn-outline">📋 Full Registration</a>
+    </header>
+
+    <main class="page-body">
+      <div style="max-width:720px;margin:0 auto;">
+
+        <!-- Hero -->
+        <div class="quick-hero">
+          <h2>⚡ Quick Worker Registration</h2>
+          <p>Add a worker to the system immediately. Only minimum details are needed — you can complete full verification later.</p>
+        </div>
+
+        <!-- Worker Type -->
+        <div class="card mb-4">
+          <div class="card-header"><h2 class="card-title">Worker Type</h2></div>
+          <div class="type-grid">
+            <div class="type-card selected" data-type="incomplete" onclick="selectType(this, 'incomplete')">
+              <div class="type-card-icon">📋</div>
+              <div class="type-card-label">Pending Verification</div>
+              <div class="type-card-desc">New hire. Full verification needed soon.</div>
+            </div>
+            <div class="type-card" data-type="temporary" onclick="selectType(this, 'temporary')">
+              <div class="type-card-icon">⏳</div>
+              <div class="type-card-label">Temporary Staff</div>
+              <div class="type-card-desc">Short-term or contract worker.</div>
+            </div>
+            <div class="type-card" data-type="legacy" onclick="selectType(this, 'legacy')">
+              <div class="type-card-icon">🗂</div>
+              <div class="type-card-label">Legacy Worker</div>
+              <div class="type-card-desc">Existing employee being onboarded into the system.</div>
+            </div>
+          </div>
+
+          <div class="required-note">
+            ⚠️ Workers registered via Quick Register will not appear as <strong>Fully Verified</strong> until their complete details are submitted. You can continue full verification from the worker's profile at any time.
+          </div>
+        </div>
+
+        <!-- Form -->
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Worker Details</h2></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Full Name <span class="required">*</span></label>
+              <input id="q_fullName" type="text" class="form-control" placeholder="e.g. Emeka Okonkwo" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone Number <span class="required">*</span></label>
+              <input id="q_phone" type="tel" class="form-control" placeholder="08012345678" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Gender</label>
+              <select id="q_gender" class="form-control">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Occupation / Role</label>
+              <input id="q_occupation" type="text" class="form-control" placeholder="e.g. Pump Attendant" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">NIN <span class="text-xs text-muted">(optional)</span></label>
+              <input id="q_nin" type="text" class="form-control" placeholder="Leave blank if unknown" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date of Birth <span class="text-xs text-muted">(optional)</span></label>
+              <input id="q_dob" type="date" class="form-control" />
+            </div>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Branch <span class="required">*</span></label>
+              <select id="q_branch" class="form-control">
+                <option value="">— Select Branch —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shift</label>
+              <select id="q_shift" class="form-control">
+                <option value="">Unassigned</option>
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Monthly Salary (₦) <span class="required">*</span></label>
+              <input id="q_salary" type="number" class="form-control" placeholder="e.g. 45000" min="0" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Employment Date</label>
+              <input id="q_dateEmployed" type="date" class="form-control" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Home Address <span class="text-xs text-muted">(optional)</span></label>
+            <input id="q_homeAddress" type="text" class="form-control" placeholder="Street address" />
+          </div>
+
+          <!-- Restriction options -->
+          <div class="section-divider"></div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Restrictions</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="q_allowClockIn" checked style="width:16px;height:16px;accent-color:var(--primary);" />
+                <span style="font-size:13px;font-weight:500;color:var(--gray-700);">Allow Clock-In</span>
+                <span class="text-xs text-muted">Worker can use attendance system</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="q_allowPayroll" checked style="width:16px;height:16px;accent-color:var(--primary);" />
+                <span style="font-size:13px;font-weight:500;color:var(--gray-700);">Include in Payroll</span>
+                <span class="text-xs text-muted">Worker appears in payroll calculations</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="formError" class="form-error hidden" style="margin-bottom:12px;padding:10px 14px;background:var(--danger-light);border-radius:var(--radius);border:1px solid rgba(239,68,68,.3);"></div>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-lg" id="submitBtn" onclick="submitQuickRegister()" style="flex:1;min-width:160px;">
+              ⚡ Register Worker
+            </button>
+            <a href="workers.html" class="btn btn-outline btn-lg">Cancel</a>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal-box" style="max-width:440px;text-align:center;">
+    <div style="padding:32px 24px;">
+      <div style="font-size:52px;margin-bottom:16px;">✅</div>
+      <h2 style="font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:8px;">Worker Registered!</h2>
+      <p id="successName" style="font-size:14px;color:var(--gray-600);margin-bottom:24px;"></p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="viewWorkerBtn" onclick="">👤 View Profile</button>
+        <button class="btn btn-outline" onclick="registerAnother()">➕ Register Another</button>
+        <a href="workers.html" class="btn btn-outline">Back to Workers</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const user = requireAuth(['super_admin', 'branch_manager', 'hr_staff']);
+  let selectedType = 'incomplete';
+  let lastRegisteredId = null;
+
+  if (user) {
+    populateSidebarUser();
+    loadBranches();
+    // Default today for date employed
+    document.getElementById('q_dateEmployed').value = new Date().toISOString().slice(0, 10);
+  }
+
+  function selectType(el, type) {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedType = type;
+  }
+
+  async function loadBranches() {
+    try {
+      const res = await API.getBranches();
+      const sel = document.getElementById('q_branch');
+      res.branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b._id;
+        opt.textContent = `${b.name} (${b.code})`;
+        sel.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  async function submitQuickRegister() {
+    const fullName = document.getElementById('q_fullName').value.trim();
+    const phone    = document.getElementById('q_phone').value.trim();
+    const branch   = document.getElementById('q_branch').value;
+    const salary   = document.getElementById('q_salary').value;
+    const errEl    = document.getElementById('formError');
+
+    errEl.classList.add('hidden');
+
+    if (!fullName) return showErr('Full name is required.');
+    if (!phone)    return showErr('Phone number is required.');
+    if (!branch)   return showErr('Please select a branch.');
+    if (!salary)   return showErr('Monthly salary is required.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Registering…';
+
+    try {
+      const body = {
+        fullName,
+        phone,
+        gender:       document.getElementById('q_gender').value,
+        occupation:   document.getElementById('q_occupation').value || 'General',
+        nin:          document.getElementById('q_nin').value.trim()  || undefined,
+        dateOfBirth:  document.getElementById('q_dob').value          || undefined,
+        homeAddress:  document.getElementById('q_homeAddress').value.trim() || undefined,
+        branch,
+        shift:        document.getElementById('q_shift').value         || undefined,
+        monthlySalary: parseFloat(salary),
+        dateEmployed: document.getElementById('q_dateEmployed').value  || undefined,
+        workerType:   selectedType,
+        allowClockIn: document.getElementById('q_allowClockIn').checked,
+        allowPayroll: document.getElementById('q_allowPayroll').checked
+      };
+
+      const res = await API.quickRegisterWorker(body);
+      lastRegisteredId = res.workerId;
+
+      document.getElementById('successName').textContent =
+        `${fullName} has been added as a ${selectedType === 'incomplete' ? 'Pending Verification' : selectedType === 'temporary' ? 'Temporary Staff' : 'Legacy Worker'}.`;
+      document.getElementById('viewWorkerBtn').onclick = () => {
+        window.location.href = `worker-detail.html?id=${lastRegisteredId}`;
+      };
+      document.getElementById('successModal').classList.add('open');
+    } catch (err) {
+      showErr(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⚡ Register Worker';
+    }
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('formError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function registerAnother() {
+    document.getElementById('successModal').classList.remove('open');
+    document.getElementById('q_fullName').value  = '';
+    document.getElementById('q_phone').value     = '';
+    document.getElementById('q_nin').value       = '';
+    document.getElementById('q_dob').value       = '';
+    document.getElementById('q_occupation').value= '';
+    document.getElementById('q_homeAddress').value = '';
+    document.getElementById('q_salary').value    = '';
+    document.getElementById('formError').classList.add('hidden');
+    lastRegisteredId = null;
+  }
+
+  function showToast(msg, type) {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = `<span class="toast-icon">${type==='success'?'✅':'❌'}</span><span>${msg}</span>`;
+    c.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('toast-show'));
+    setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 400); }, 3500);
+  }
+</script>
+<script src="../assets/js/theme.js"></script>
+</body>
+</html>

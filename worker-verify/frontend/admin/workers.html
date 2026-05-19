@@ -45,7 +45,10 @@
         <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
         <h1 class="header-title">Workers</h1>
       </div>
-      <a href="../staff/register-worker.html" class="btn btn-primary btn-sm">➕ Register Worker</a>
+      <div class="flex gap-2">
+        <a href="quick-register.html" class="btn btn-outline btn-sm">⚡ Quick Register</a>
+        <a href="../staff/register-worker.html" class="btn btn-primary btn-sm">➕ Register Worker</a>
+      </div>
     </header>
 
     <main class="page-body">
@@ -60,9 +63,13 @@
           <div class="filter-group">
             <select id="statusFilter" class="filter-select">
               <option value="all">All Verification</option>
-              <option value="pending">Pending</option>
               <option value="verified">Verified</option>
+              <option value="pending">Pending</option>
+              <option value="incomplete">Incomplete</option>
+              <option value="legacy">Legacy Worker</option>
+              <option value="temporary">Temporary</option>
               <option value="rejected">Rejected</option>
+              <option value="unverified">Unverified (All)</option>
             </select>
             <select id="empFilter" class="filter-select">
               <option value="all">All Status</option>
@@ -85,6 +92,9 @@
             <button class="btn btn-outline btn-sm" onclick="clearFilters()">Reset</button>
           </div>
         </div>
+
+        <!-- Attention banner -->
+        <div id="attentionBanner" style="display:none;margin-bottom:12px;"></div>
 
         <!-- Table -->
         <div class="table-wrapper">
@@ -134,6 +144,26 @@
     if (p.get('branch')) document.getElementById('branchFilter').value = p.get('branch');
     if (p.get('shift'))  document.getElementById('shiftFilter').value  = p.get('shift');
     loadWorkers();
+    loadAttentionCount();
+  }
+
+  async function loadAttentionCount() {
+    try {
+      const res = await API.getWorkers('?incomplete=true&limit=1');
+      const count = res.pagination?.total || 0;
+      if (count > 0) {
+        const banner = document.getElementById('attentionBanner');
+        banner.style.display = '';
+        banner.innerHTML = `
+          <div class="status-warn-banner incomplete" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span>⚠️ <strong>${count}</strong> worker${count===1?'':'s'} with incomplete or unverified records need attention.</span>
+            <button class="btn btn-sm btn-outline" style="border-color:currentColor;"
+              onclick="document.getElementById('statusFilter').value='unverified';applyFilters();">
+              View All
+            </button>
+          </div>`;
+      }
+    } catch(_) {}
   }
 
   async function loadBranchOptions() {
@@ -180,7 +210,8 @@
 
     let qs = `?page=${page}&limit=${pageSize}`;
     if (search) qs += `&search=${encodeURIComponent(search)}`;
-    if (status !== 'all') qs += `&status=${status}`;
+    if (status === 'unverified') qs += '&incomplete=true';
+    else if (status !== 'all') qs += `&status=${status}`;
     if (emp    !== 'all') qs += `&employmentStatus=${emp}`;
     if (branch !== 'all') qs += `&branch=${branch}`;
     if (shift  !== 'all') qs += `&shift=${shift}`;
@@ -211,8 +242,13 @@
               ? `<img src="${w.passportPhoto}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" />`
               : `<div style="width:34px;height:34px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>`}
             <div>
-              <div class="font-semibold">${w.fullName}</div>
-              <div class="text-xs text-muted">${w.gender} &bull; ${w.occupation}</div>
+              <div class="font-semibold">
+                ${w.fullName}
+                ${['pending','incomplete','legacy','temporary'].includes(w.verificationStatus)
+                  ? `<span title="Needs attention" style="display:inline-block;width:7px;height:7px;background:var(--warning);border-radius:50%;margin-left:5px;vertical-align:middle;"></span>`
+                  : ''}
+              </div>
+              <div class="text-xs text-muted">${w.gender || '—'} &bull; ${w.occupation || '—'}</div>
             </div>
           </div>
         </td>

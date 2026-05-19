@@ -101,9 +101,13 @@ function formatDate(dateStr) {
 // Status badge HTML
 function statusBadge(status) {
   const map = {
-    pending:  'badge-warning',
-    verified: 'badge-success',
-    rejected: 'badge-danger'
+    pending:    { cls: 'badge-warning',    label: 'Pending' },
+    verified:   { cls: 'badge-success',    label: 'Verified' },
+    rejected:   { cls: 'badge-danger',     label: 'Rejected' },
+    incomplete: { cls: 'badge-incomplete', label: 'Incomplete' },
+    legacy:     { cls: 'badge-legacy',     label: 'Legacy Worker' },
+    temporary:  { cls: 'badge-temporary',  label: 'Temporary' },
   };
-  return `<span class="badge ${map[status] || ''}">${status}</span>`;
+  const m = map[status] || { cls: '', label: status };
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
 }

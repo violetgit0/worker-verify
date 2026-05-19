@@ -40,12 +40,15 @@ const API = {
   staffStats: ()      => apiFetch('/dashboard/staff'),
 
   // Workers
-  getWorkers:    (params = '') => apiFetch('/workers' + params),
-  getWorker:     (id)          => apiFetch(`/workers/${id}`),
-  registerWorker:(fd)          => apiFetch('/workers', { method: 'POST', body: fd }),
-  searchWorkers: (q)           => apiFetch(`/workers/search?q=${encodeURIComponent(q)}`),
-  updateStatus:  (id, body)    => apiFetch(`/workers/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
-  flagDocument:  (id, body)    => apiFetch(`/workers/${id}/flag-document`, { method: 'PUT', body: JSON.stringify(body) }),
+  getWorkers:          (params = '') => apiFetch('/workers' + params),
+  getWorker:           (id)          => apiFetch(`/workers/${id}`),
+  registerWorker:      (fd)          => apiFetch('/workers', { method: 'POST', body: fd }),
+  quickRegisterWorker: (body)        => apiFetch('/workers/quick', { method: 'POST', body: JSON.stringify(body) }),
+  searchWorkers:       (q)           => apiFetch(`/workers/search?q=${encodeURIComponent(q)}`),
+  updateStatus:        (id, body)    => apiFetch(`/workers/${id}/status`, { method: 'PUT', body: JSON.stringify(body) }),
+  flagDocument:        (id, body)    => apiFetch(`/workers/${id}/flag-document`, { method: 'PUT', body: JSON.stringify(body) }),
+  getWorkerCompletion: (id)          => apiFetch(`/workers/${id}/completion`),
+  updateRestrictions:  (id, body)    => apiFetch(`/workers/${id}/restrictions`, { method: 'PUT', body: JSON.stringify(body) }),
 
   // Worker workforce management (super_admin only)
   assignBranch:          (id, body) => apiFetch(`/workers/${id}/assign-branch`,     { method: 'PUT', body: JSON.stringify(body) }),

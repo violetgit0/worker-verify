@@ -52,6 +52,9 @@ const workerClockIn = async (req, res) => {
   if (!worker.branch) {
     return res.status(400).json({ success: false, message: 'You are not assigned to a branch yet' });
   }
+  if (worker.allowClockIn === false) {
+    return res.status(403).json({ success: false, message: 'Clock-in is restricted for your account. Contact your supervisor.' });
+  }
 
   const today = toMidnightUTC();
   const existing = await Attendance.findOne({ worker: worker._id, date: today });
@@ -229,6 +232,9 @@ const adminClockIn = async (req, res) => {
   const worker = await Worker.findById(workerId).populate('branch');
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
   if (!worker.branch) return res.status(400).json({ success: false, message: 'Worker has no branch' });
+  if (worker.allowClockIn === false) {
+    return res.status(403).json({ success: false, message: `Clock-in is restricted for ${worker.fullName}` });
+  }
 
   const date = dateStr ? toMidnightUTC(new Date(dateStr)) : toMidnightUTC();
   const existing = await Attendance.findOne({ worker: worker._id, date });
