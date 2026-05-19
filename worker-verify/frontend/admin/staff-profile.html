@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Profile – WorkerSave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    /* ── Toggle Switch ─────────────────────────────────────────────── */
+    .toggle-wrap { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+    .toggle-wrap input { opacity:0; width:0; height:0; }
+    .toggle-slider {
+      position:absolute; cursor:pointer; inset:0;
+      background:#d1d5db; border-radius:26px; transition:.25s;
+    }
+    .toggle-slider::before {
+      content:""; position:absolute;
+      width:20px; height:20px; left:3px; bottom:3px;
+      background:#fff; border-radius:50%; transition:.25s;
+      box-shadow:0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle-wrap input:checked + .toggle-slider { background:#16a34a; }
+    .toggle-wrap input:checked + .toggle-slider::before { transform:translateX(20px); }
+    .toggle-wrap input:disabled + .toggle-slider { opacity:.45; cursor:not-allowed; }
+
+    /* ── Permission Rows ───────────────────────────────────────────── */
+    .perm-category { margin-bottom:20px; }
+    .perm-category-title {
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.6px; color:var(--gray-400);
+      margin-bottom:6px; padding-bottom:6px;
+      border-bottom:1px solid var(--gray-200);
+    }
+    .perm-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:9px 0; border-bottom:1px solid var(--gray-100); gap:12px;
+    }
+    .perm-row:last-child { border-bottom:none; }
+    .perm-label { font-size:13px; font-weight:500; line-height:1.3; }
+    .perm-desc { font-size:11px; color:var(--gray-400); margin-top:2px; }
+
+    /* ── Profile card ──────────────────────────────────────────────── */
+    .profile-avatar {
+      width:80px; height:80px; border-radius:50%; object-fit:cover;
+      border:3px solid var(--gray-200); flex-shrink:0;
+    }
+    .profile-avatar-placeholder {
+      width:80px; height:80px; border-radius:50%;
+      background:var(--gray-200); display:flex; align-items:center;
+      justify-content:center; font-size:32px; flex-shrink:0;
+    }
+    .info-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; }
+    .info-label { color:var(--gray-400); width:110px; flex-shrink:0; }
+    .role-chip {
+      display:inline-block; padding:3px 10px; border-radius:12px;
+      font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;
+    }
+    .role-branch_manager       { background:#dbeafe; color:#1d4ed8; }
+    .role-hr_staff             { background:#d1fae5; color:#065f46; }
+    .role-attendance_officer   { background:#fed7aa; color:#92400e; }
+    .role-verification_officer { background:#e0e7ff; color:#3730a3; }
+    .role-staff                { background:#f3f4f6; color:#374151; }
+
+    /* ── Presets ───────────────────────────────────────────────────── */
+    .preset-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+
+    /* ── Save indicator ────────────────────────────────────────────── */
+    .save-indicator {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:12px; color:var(--gray-400);
+      transition:color .3s;
+    }
+    .save-indicator.saving { color:#d97706; }
+    .save-indicator.saved  { color:#16a34a; }
+
+    /* ── Activity log ──────────────────────────────────────────────── */
+    .activity-item {
+      padding:10px 0; border-bottom:1px solid var(--gray-100); font-size:13px;
+    }
+    .activity-item:last-child { border-bottom:none; }
+    .activity-meta { font-size:11px; color:var(--gray-400); margin-top:2px; }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .profile-grid {
+      display:grid;
+      grid-template-columns:340px 1fr;
+      gap:20px;
+      align-items:start;
+    }
+    @media(max-width:900px){
+      .profile-grid { grid-template-columns:1fr; }
+    }
+    .perm-count-badge {
+      display:inline-block; background:#eff6ff; color:#1d4ed8;
+      border-radius:12px; padding:1px 8px; font-size:11px; font-weight:600;
+      margin-left:6px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> WorkerSave</div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole"></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"    class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link active"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <a href="staff.html" class="btn btn-outline btn-sm" style="margin-right:4px;">← Back</a>
+        <h1 class="header-title" id="pageTitle">Staff Profile</h1>
+      </div>
+      <span class="save-indicator" id="saveIndicator"></span>
+    </header>
+
+    <main class="page-body" id="pageBody">
+      <div style="text-align:center;padding:60px;color:var(--gray-400);">Loading profile…</div>
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+const currentUser = requireAuth(['super_admin']);
+
+const ROLE_LABELS = {
+  branch_manager: 'Branch Manager', hr_staff: 'HR Staff',
+  attendance_officer: 'Attendance Officer', verification_officer: 'Verification Officer',
+  staff: 'Staff'
+};
+
+const PERM_GROUPS = [
+  {
+    title: 'Worker Management',
+    perms: [
+      { key: 'canRegisterWorkers',   label: 'Register Workers',         desc: 'Create new worker records' },
+      { key: 'canEditWorkers',       label: 'Edit Workers',             desc: 'Update worker information' },
+      { key: 'canDeleteWorkers',     label: 'Delete Workers',           desc: 'Permanently remove worker records' },
+      { key: 'canSuspendWorkers',    label: 'Suspend Workers',          desc: 'Temporarily suspend a worker account' },
+      { key: 'canRestoreWorkers',    label: 'Restore Workers',          desc: 'Reactivate a suspended worker' },
+      { key: 'canSackWorkers',       label: 'Terminate Workers',        desc: 'Change employment status to terminated' },
+    ]
+  },
+  {
+    title: 'Operations',
+    perms: [
+      { key: 'canAssignShifts',       label: 'Assign Shifts',           desc: 'Set or change worker shift schedules' },
+      { key: 'canMoveWorkersBranch',  label: 'Move Workers Between Branches', desc: 'Transfer workers to different branches' },
+      { key: 'canManageAttendance',   label: 'Manage Attendance',       desc: 'Clock in/out and mark absences on behalf of workers' },
+    ]
+  },
+  {
+    title: 'Verification',
+    perms: [
+      { key: 'canApproveVerification', label: 'Approve Verification',  desc: 'Review and approve/reject worker document verification' },
+    ]
+  },
+  {
+    title: 'Finance & Reports',
+    perms: [
+      { key: 'canViewPayroll',   label: 'View Payroll',    desc: 'Access payroll records and summaries' },
+      { key: 'canEditPayroll',   label: 'Edit Payroll',    desc: 'Generate payroll and update payment status' },
+      { key: 'canExportReports', label: 'Export Reports',  desc: 'Download data exports and reports' },
+    ]
+  },
+  {
+    title: 'Administration',
+    perms: [
+      { key: 'canManageBranches',        label: 'Manage Branches',              desc: 'Create and update branch offices' },
+      { key: 'canCreateStaff',           label: 'Create Staff Accounts',        desc: 'Add new staff members to the system' },
+      { key: 'canViewAllBranches',       label: 'View All Branches',            desc: 'Access data from all branches' },
+      { key: 'canOnlyViewAssignedBranch',label: 'Restrict to Assigned Branch',  desc: 'Limit data access to this staff\'s assigned branch only' },
+    ]
+  }
+];
+
+let staffData = null;
+let saveTimer = null;
+
+const staffId = new URLSearchParams(location.search).get('id');
+if (!staffId) {
+  location.href = 'staff.html';
+}
+
+if (currentUser) {
+  populateSidebarUser();
+  loadProfile();
+}
+
+async function loadProfile() {
+  try {
+    const [staffRes, activityRes] = await Promise.all([
+      API.getStaff(staffId),
+      API.getActivityLogs(`?performedBy=${staffId}&limit=10`)
+    ]);
+    staffData = staffRes.staff;
+    document.getElementById('pageTitle').textContent = staffData.fullName;
+    renderProfile(staffData, staffRes.workerCount, activityRes.logs || []);
+  } catch (err) {
+    document.getElementById('pageBody').innerHTML =
+      `<div class="card" style="padding:40px;text-align:center;color:var(--gray-400);">Failed to load profile: ${err.message}</div>`;
+  }
+}
+
+function renderProfile(staff, workerCount, activityLogs) {
+  const perms = staff.permissions || {};
+  const activeCount = Object.values(perms).filter(Boolean).length;
+
+  const lastLogin = staff.loginHistory && staff.loginHistory[0]
+    ? new Date(staff.loginHistory[0].timestamp).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
+    : 'Never';
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="profile-grid">
+
+      <!-- LEFT COLUMN -->
+      <div>
+        <!-- Profile Card -->
+        <div class="card" style="padding:20px;margin-bottom:16px;">
+          <div class="flex items-center gap-3" style="margin-bottom:16px;">
+            ${staff.passportPhoto
+              ? `<img src="${staff.passportPhoto}" class="profile-avatar" alt="Photo" />`
+              : `<div class="profile-avatar-placeholder">👤</div>`}
+            <div>
+              <div style="font-size:18px;font-weight:700;">${staff.fullName}</div>
+              <div class="text-muted text-sm">@${staff.username}</div>
+              <span class="role-chip role-${staff.role}" style="margin-top:6px;display:inline-block;">
+                ${ROLE_LABELS[staff.role] || staff.role}
+              </span>
+            </div>
+          </div>
+
+          <div class="info-row"><span class="info-label">Status</span>
+            <span class="badge ${staff.isActive ? 'badge-success' : 'badge-danger'}">${staff.isActive ? 'Active' : 'Suspended'}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Branch</span>
+            <span>${staff.branch ? staff.branch.name : '— Not assigned —'}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Email</span>
+            <span class="text-sm">${staff.email}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Phone</span>
+            <span class="text-sm">${staff.phone}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Last Login</span>
+            <span class="text-sm">${lastLogin}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Joined</span>
+            <span class="text-sm">${new Date(staff.createdAt).toLocaleDateString('en-NG', { year:'numeric', month:'short', day:'numeric' })}</span>
+          </div>
+          <div class="info-row"><span class="info-label">Workers</span>
+            <span class="text-sm">${workerCount || 0} registered</span>
+          </div>
+          ${staff.accountNumber ? `
+          <div class="info-row"><span class="info-label">Bank</span>
+            <span class="text-sm">${staff.accountNumber} · ${staff.bankName}</span>
+          </div>` : ''}
+          ${!staff.isActive && staff.suspendReason ? `
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-top:8px;font-size:12px;color:#b91c1c;">
+            Suspended: ${staff.suspendReason}
+          </div>` : ''}
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="card" style="padding:20px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Quick Permission Presets</div>
+          <div class="preset-bar">
+            <button class="btn btn-sm btn-primary"   onclick="applyPreset('fullHR')">Full HR Access</button>
+            <button class="btn btn-sm btn-outline"   onclick="applyPreset('attendance')">Attendance Only</button>
+            <button class="btn btn-sm btn-outline"   onclick="applyPreset('verification')">Verification Only</button>
+            <button class="btn btn-sm btn-danger"    onclick="applyPreset('none')">Remove All</button>
+          </div>
+          <div style="font-size:11px;color:var(--gray-400);">Instantly replaces all toggles below with preset values.</div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card" style="padding:20px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Recent Activity</div>
+          ${activityLogs.length === 0
+            ? `<p class="text-muted text-sm">No activity recorded yet.</p>`
+            : activityLogs.map(a => `
+              <div class="activity-item">
+                <div>${formatAction(a.action)} ${a.targetName && a.targetName !== a.performedByName ? `→ <strong>${a.targetName}</strong>` : ''}</div>
+                <div class="activity-meta">${new Date(a.createdAt).toLocaleString('en-NG', { dateStyle:'medium', timeStyle:'short' })}${a.ip ? ' · ' + a.ip : ''}</div>
+              </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Permission Panel -->
+      <div class="card" style="padding:20px;">
+        <div class="flex items-center" style="justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <span style="font-size:15px;font-weight:700;">Permissions</span>
+            <span class="perm-count-badge" id="permCountBadge">${activeCount} active</span>
+          </div>
+          <span class="save-indicator" id="permSaveStatus"></span>
+        </div>
+
+        ${PERM_GROUPS.map(group => `
+          <div class="perm-category">
+            <div class="perm-category-title">${group.title}</div>
+            ${group.perms.map(p => `
+              <div class="perm-row">
+                <div>
+                  <div class="perm-label">${p.label}</div>
+                  <div class="perm-desc">${p.desc}</div>
+                </div>
+                <label class="toggle-wrap" title="${p.label}">
+                  <input type="checkbox" id="perm_${p.key}"
+                    ${perms[p.key] ? 'checked' : ''}
+                    onchange="onToggle('${p.key}', this.checked)" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+
+    </div>
+  `;
+}
+
+function formatAction(action) {
+  const map = {
+    login: 'Logged in', create_staff: 'Created staff', update_staff: 'Updated staff',
+    suspend_staff: 'Suspended staff', activate_staff: 'Activated staff', delete_staff: 'Deleted staff',
+    reset_password: 'Reset password', assign_branch: 'Assigned branch',
+    update_permissions: 'Updated permissions', apply_permission_preset: 'Applied permission preset',
+    register_worker: 'Registered worker', update_verification: 'Updated verification',
+    flag_document: 'Flagged document', clock_in: 'Clocked in worker', clock_out: 'Clocked out worker',
+    mark_absent: 'Marked absent',
+  };
+  return map[action] || action.replace(/_/g, ' ');
+}
+
+function onToggle(permKey, value) {
+  clearTimeout(saveTimer);
+  setStatus('saving', 'Saving…');
+  saveTimer = setTimeout(() => savePermission(permKey, value), 350);
+}
+
+async function savePermission(permKey, value) {
+  try {
+    const res = await API.updatePermissions(staffId, { [permKey]: value });
+    staffData.permissions = res.permissions;
+    updatePermCount(res.permissions);
+    setStatus('saved', 'Saved');
+    setTimeout(() => setStatus('', ''), 2500);
+  } catch (err) {
+    setStatus('', '');
+    showToast('Failed to save: ' + err.message, 'error');
+    // Revert toggle
+    const el = document.getElementById('perm_' + permKey);
+    if (el) el.checked = !value;
+  }
+}
+
+async function applyPreset(preset) {
+  const labels = { fullHR:'Full HR Access', attendance:'Attendance Only', verification:'Verification Only', none:'Remove All Permissions' };
+  if (!confirm(`Apply preset "${labels[preset]}"? This will replace all current permission settings.`)) return;
+  try {
+    setStatus('saving', 'Applying preset…');
+    const res = await API.applyPreset(staffId, preset);
+    staffData.permissions = res.permissions;
+    // Update all toggles
+    const perms = res.permissions;
+    PERM_GROUPS.forEach(g => g.perms.forEach(p => {
+      const el = document.getElementById('perm_' + p.key);
+      if (el) el.checked = Boolean(perms[p.key]);
+    }));
+    updatePermCount(perms);
+    setStatus('saved', 'Preset applied');
+    showToast(`Preset applied: ${labels[preset]}`, 'success');
+    setTimeout(() => setStatus('', ''), 2500);
+  } catch (err) {
+    setStatus('', '');
+    showToast('Failed: ' + err.message, 'error');
+  }
+}
+
+function updatePermCount(perms) {
+  const count = Object.values(perms).filter(Boolean).length;
+  const badge = document.getElementById('permCountBadge');
+  if (badge) badge.textContent = count + ' active';
+}
+
+function setStatus(type, text) {
+  const el = document.getElementById('permSaveStatus');
+  if (!el) return;
+  el.className = 'save-indicator' + (type ? ' ' + type : '');
+  el.textContent = text;
+}
+</script>
+</body>
+</html>

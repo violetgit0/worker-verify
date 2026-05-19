@@ -3,6 +3,26 @@ const bcrypt = require('bcryptjs');
 
 const ROLES = ['super_admin', 'branch_manager', 'hr_staff', 'attendance_officer', 'verification_officer', 'staff'];
 
+const permissionsSchema = new mongoose.Schema({
+  canRegisterWorkers:      { type: Boolean, default: false },
+  canEditWorkers:          { type: Boolean, default: false },
+  canDeleteWorkers:        { type: Boolean, default: false },
+  canApproveVerification:  { type: Boolean, default: false },
+  canSuspendWorkers:       { type: Boolean, default: false },
+  canManageAttendance:     { type: Boolean, default: false },
+  canViewPayroll:          { type: Boolean, default: false },
+  canEditPayroll:          { type: Boolean, default: false },
+  canManageBranches:       { type: Boolean, default: false },
+  canCreateStaff:          { type: Boolean, default: false },
+  canAssignShifts:         { type: Boolean, default: false },
+  canMoveWorkersBranch:    { type: Boolean, default: false },
+  canSackWorkers:          { type: Boolean, default: false },
+  canRestoreWorkers:       { type: Boolean, default: false },
+  canExportReports:        { type: Boolean, default: false },
+  canViewAllBranches:      { type: Boolean, default: false },
+  canOnlyViewAssignedBranch: { type: Boolean, default: false }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   fullName:      { type: String, required: true, trim: true },
   username:      { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -18,6 +38,7 @@ const userSchema = new mongoose.Schema({
   suspendedAt:   { type: Date, default: null },
   suspendedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   suspendReason: { type: String, default: '' },
+  permissions:   { type: permissionsSchema, default: () => ({}) },
   loginHistory:  [{
     timestamp: { type: Date, default: Date.now },
     ip:        { type: String, default: '' },

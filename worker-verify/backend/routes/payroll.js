@@ -5,14 +5,14 @@ const {
   updatePayrollStatus, getPayrollSummary
 } = require('../controllers/payrollController');
 const { protect } = require('../middleware/auth');
-const { authorize } = require('../middleware/roleCheck');
+const { hasPermission } = require('../middleware/roleCheck');
 const { workerProtect } = require('../middleware/workerAuth');
 
-router.get('/summary',         protect, getPayrollSummary);
-router.get('/',                protect, getPayroll);
-router.get('/worker/:workerId',protect, getWorkerPayroll);
-router.get('/my-payroll',      workerProtect, getWorkerPayroll);
-router.post('/generate',       protect, authorize('super_admin'), generatePayroll);
-router.put('/:id/status',      protect, authorize('super_admin'), updatePayrollStatus);
+router.get('/summary',          protect, getPayrollSummary);
+router.get('/',                 protect, hasPermission('canViewPayroll'), getPayroll);
+router.get('/worker/:workerId', protect, hasPermission('canViewPayroll'), getWorkerPayroll);
+router.get('/my-payroll',       workerProtect, getWorkerPayroll);
+router.post('/generate',        protect, hasPermission('canEditPayroll'), generatePayroll);
+router.put('/:id/status',       protect, hasPermission('canEditPayroll'), updatePayrollStatus);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Worker = require('../models/Worker');
 const ActivityLog = require('../models/ActivityLog');
+const { ROLE_DEFAULTS } = require('../config/permissions');
 
 const ROLE_LABELS = {
   super_admin:          'Super Admin',
@@ -39,12 +40,14 @@ const createStaff = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Username or email already exists' });
   }
 
+  const resolvedRole = role || 'hr_staff';
   const data = {
     fullName, username, email, phone, password,
-    role: role || 'hr_staff',
+    role: resolvedRole,
     branch: branch || null,
     accountNumber: accountNumber || '',
     bankName: bankName || '',
+    permissions: ROLE_DEFAULTS[resolvedRole] || {},
     createdBy: req.user._id
   };
 

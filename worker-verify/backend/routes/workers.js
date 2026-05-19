@@ -6,22 +6,19 @@ const {
   assignBranch, assignShift, updateEmploymentStatus, updateSalary
 } = require('../controllers/workerController');
 const { protect } = require('../middleware/auth');
-const { authorize } = require('../middleware/roleCheck');
+const { hasPermission } = require('../middleware/roleCheck');
 const { workerUpload } = require('../middleware/upload');
-
-const CAN_REGISTER = ['super_admin', 'branch_manager', 'hr_staff'];
-const CAN_VERIFY   = ['super_admin', 'verification_officer'];
 
 router.get('/search', protect, searchWorkers);
 router.get('/',       protect, getAllWorkers);
-router.post('/',      protect, authorize(...CAN_REGISTER), workerUpload, registerWorker);
+router.post('/',      protect, hasPermission('canRegisterWorkers'), workerUpload, registerWorker);
 router.get('/:id',    protect, getWorkerById);
 
-router.put('/:id/status',            protect, authorize(...CAN_VERIFY),                    updateVerificationStatus);
-router.put('/:id/flag-document',     protect, authorize(...CAN_VERIFY),                    flagDocument);
-router.put('/:id/assign-branch',     protect, authorize('super_admin'),                    assignBranch);
-router.put('/:id/assign-shift',      protect, authorize('super_admin', 'branch_manager'),  assignShift);
-router.put('/:id/employment-status', protect, authorize('super_admin'),                    updateEmploymentStatus);
-router.put('/:id/salary',            protect, authorize('super_admin'),                    updateSalary);
+router.put('/:id/status',            protect, hasPermission('canApproveVerification'),            updateVerificationStatus);
+router.put('/:id/flag-document',     protect, hasPermission('canApproveVerification'),            flagDocument);
+router.put('/:id/assign-branch',     protect, hasPermission('canMoveWorkersBranch'),              assignBranch);
+router.put('/:id/assign-shift',      protect, hasPermission('canAssignShifts'),                   assignShift);
+router.put('/:id/employment-status', protect, hasPermission('canSackWorkers', 'canRestoreWorkers'), updateEmploymentStatus);
+router.put('/:id/salary',            protect, hasPermission('canEditPayroll'),                    updateSalary);
 
 module.exports = router;

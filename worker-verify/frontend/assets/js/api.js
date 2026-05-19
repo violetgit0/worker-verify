@@ -110,5 +110,9 @@ const API = {
   assignStaffBranch:  (id, b)   => apiFetch(`/staff/${id}/assign-branch`,    { method: 'PUT', body: JSON.stringify(b) }),
 
   // Activity logs (super_admin only)
-  getActivityLogs: (qs = '') => apiFetch(`/activity-logs${qs}`)
+  getActivityLogs: (qs = '') => apiFetch(`/activity-logs${qs}`),
+
+  // Permissions (super_admin only)
+  updatePermissions: (id, perms) => apiFetch(`/staff/${id}/permissions`,                { method: 'PUT',  body: JSON.stringify({ permissions: perms }) }),
+  applyPreset:       (id, preset) => apiFetch(`/staff/${id}/permissions/preset/${preset}`, { method: 'POST' })
 };
