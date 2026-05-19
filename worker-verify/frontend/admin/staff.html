@@ -626,27 +626,48 @@
     document.getElementById('staffModal').classList.add('open');
   }
 
-  function openEditModal(id) {
-    const s = staffList.find(x => x._id === id);
-    if (!s) return;
+  async function openEditModal(id) {
+    // Open modal immediately with loading state
     document.getElementById('staffModalTitle').textContent = 'Edit Staff';
     document.getElementById('staffSubmitBtn').textContent  = 'Save Changes';
     document.getElementById('editStaffId').value           = id;
-    document.getElementById('sf_fullName').value           = s.fullName;
-    document.getElementById('sf_phone').value              = s.phone;
-    document.getElementById('sf_username').value           = s.username;
-    document.getElementById('sf_email').value              = s.email;
-    document.getElementById('sf_role').value               = s.role;
-    document.getElementById('sf_branch').value             = s.branch ? s.branch._id : '';
-    document.getElementById('sf_accountNumber').value      = s.accountNumber || '';
-    document.getElementById('sf_bankName').value           = s.bankName || '';
+    document.getElementById('staffForm').reset();
     document.getElementById('passwordGroup').style.display = 'none';
+    document.getElementById('sf_photoPreview').classList.add('hidden');
+    document.getElementById('staffModal').classList.add('open');
+
+    // Try in-memory first, fall back to API fetch
+    let s = staffList.find(x => String(x._id) === String(id));
+    if (!s) {
+      try {
+        const res = await API.getStaff(id);
+        s = res.staff;
+      } catch (err) {
+        showToast('Failed to load staff details: ' + err.message, 'error');
+        closeModal('staffModal');
+        return;
+      }
+    }
+    if (!s) {
+      showToast('Staff not found', 'error');
+      closeModal('staffModal');
+      return;
+    }
+
+    document.getElementById('sf_fullName').value      = s.fullName      || '';
+    document.getElementById('sf_phone').value         = s.phone         || '';
+    document.getElementById('sf_username').value      = s.username      || '';
+    document.getElementById('sf_email').value         = s.email         || '';
+    document.getElementById('sf_role').value          = s.role          || 'hr_staff';
+    document.getElementById('sf_branch').value        = s.branch ? (s.branch._id || s.branch) : '';
+    document.getElementById('sf_accountNumber').value = s.accountNumber || '';
+    document.getElementById('sf_bankName').value      = s.bankName      || '';
+
     if (s.passportPhoto) {
       const preview = document.getElementById('sf_photoPreview');
       preview.src = s.passportPhoto;
       preview.classList.remove('hidden');
     }
-    document.getElementById('staffModal').classList.add('open');
   }
 
   async function submitStaff() {
