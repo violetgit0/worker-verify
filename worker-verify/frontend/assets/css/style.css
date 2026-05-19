@@ -2454,6 +2454,61 @@ tr.att-absent { background: rgba(239,68,68,.04);  }
   padding: 2px 0;
 }
 
+/* ─── Signature View Card (worker-detail) ───────────────────────────────────── */
+.sig-view-box {
+  margin-top: 4px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  background: #f0f7ff;
+  padding: 10px 12px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+}
+.sig-view-box img {
+  max-height: 80px;
+  max-width: 260px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.sig-view-box img:hover { transform: scale(1.03); }
+.sig-view-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sig-type-tag {
+  font-size: .68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.sig-type-tag.drawn    { background: #dbeafe; color: #1d4ed8; }
+.sig-type-tag.uploaded { background: #dcfce7; color: #166534; }
+.sig-view-download {
+  font-size: .72rem;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.sig-view-download:hover { text-decoration: underline; }
+.sig-none-label {
+  font-size: .8rem;
+  color: var(--gray-400);
+  font-style: italic;
+}
+
 /* ─── review-loc-block ───────────────────────────────────────────────────────── */
 .review-loc-block {
   margin-top: 4px;

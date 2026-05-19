@@ -33,7 +33,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024, fieldSize: 5 * 1024 * 1024 }, // 10 MB files, 5 MB text fields
   fileFilter: (req, file, cb) => {
     const allowed = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
@@ -89,4 +89,14 @@ const selfieUpload = multer({
   }
 }).single('selfie');
 
-module.exports = { cloudinary, upload, workerUpload, singleUpload, selfieUpload };
+// Upload a base64 data URL directly to Cloudinary (used for drawn/uploaded signatures)
+const uploadDataUrl = (dataUrl, folder = 'sage-worker-verify/signatures') => {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return Promise.resolve(null);
+  return cloudinary.uploader.upload(dataUrl, {
+    folder,
+    resource_type: 'image',
+    transformation: [{ width: 900, height: 400, crop: 'limit', quality: 'auto' }]
+  });
+};
+
+module.exports = { cloudinary, upload, workerUpload, singleUpload, selfieUpload, uploadDataUrl };

@@ -24,13 +24,18 @@
       margin-bottom:14px; display:flex; align-items:center; gap:6px;
     }
 
-    /* ── Signature pad ── */
-    .sig-pad-wrapper {
-      border:2px dashed var(--gray-300); border-radius:10px;
-      background:#fafafa; overflow:hidden; position:relative;
-      transition:border-color .2s;
+    /* ── Signature System ── */
+    .sig-mode-bar { display:flex; border:1.5px solid #bfdbfe; border-radius:10px; overflow:hidden; margin-bottom:14px; }
+    .sig-mode-btn { flex:1; padding:9px 12px; border:none; background:#eff6ff; cursor:pointer; font-size:13px; font-weight:500; color:#1e40af; transition:all .2s; }
+    .sig-mode-btn.active { background:#1e40af; color:#fff; }
+    .sig-mode-btn:hover:not(.active) { background:#dbeafe; }
+
+    .sig-draw-box {
+      background:linear-gradient(145deg, #f0f7ff 0%, #fff 100%);
+      border:2px dashed #93c5fd; border-radius:12px;
+      overflow:hidden; position:relative; transition:border-color .2s;
     }
-    .sig-pad-wrapper.signed { border-color:#16a34a; border-style:solid; }
+    .sig-draw-box.signed { border-color:#16a34a; border-style:solid; background:linear-gradient(145deg,#f0fdf4,#fff); }
     .sig-canvas {
       display:block; width:100%; height:180px;
       touch-action:none; cursor:crosshair;
@@ -38,23 +43,44 @@
     .sig-pad-hint {
       position:absolute; top:50%; left:50%;
       transform:translate(-50%,-50%);
-      font-size:.82rem; color:var(--gray-400);
+      font-size:.82rem; color:#93c5fd;
       pointer-events:none; text-align:center;
-      transition:opacity .2s;
+      transition:opacity .2s; line-height:1.5;
     }
-    .sig-pad-actions {
-      display:flex; align-items:center; gap:10px;
-      padding:8px 12px; border-top:1px solid var(--gray-200);
-      background:#fff;
+    .sig-controls {
+      display:flex; align-items:center; gap:8px;
+      padding:8px 12px; border-top:1px solid #e0f2fe; background:#f8fbff;
     }
-    .btn-clear-sig {
-      font-size:.78rem; padding:4px 12px;
-      border:1px solid var(--gray-300); border-radius:6px;
-      background:#fff; cursor:pointer; color:var(--gray-600);
+    .btn-sig-action {
+      font-size:12px; padding:5px 14px;
+      border:1.5px solid #bfdbfe; border-radius:7px;
+      background:#fff; cursor:pointer; color:#1e40af; font-weight:500;
+      transition:all .15s;
     }
-    .btn-clear-sig:hover { background:var(--gray-100); }
-    .sig-status { font-size:.75rem; color:var(--gray-400); margin-left:auto; }
+    .btn-sig-action:hover { background:#eff6ff; border-color:#3b82f6; }
+    .sig-status { font-size:12px; color:var(--gray-400); margin-left:auto; }
     .sig-status.done { color:#16a34a; font-weight:600; }
+
+    .sig-upload-zone {
+      border:2px dashed #93c5fd; border-radius:12px;
+      background:linear-gradient(145deg,#f0f7ff,#fff);
+      padding:36px 20px; text-align:center; cursor:pointer;
+      transition:all .2s; font-size:13px; color:#374151;
+    }
+    .sig-upload-zone:hover, .sig-upload-zone.drag-over {
+      border-color:#2563eb; background:#eff6ff;
+    }
+    .sig-upload-zone.uploaded { border-color:#16a34a; border-style:solid; background:#f0fdf4; }
+    .sig-upload-icon { font-size:30px; margin-bottom:8px; }
+
+    .sig-preview-box {
+      margin-top:12px; padding:14px;
+      background:#fff; border:1.5px solid #bfdbfe;
+      border-radius:10px; text-align:center;
+    }
+    .sig-preview-box img { max-height:100px; max-width:100%; border-radius:6px; }
+    .sig-preview-label { font-size:11px; color:var(--gray-400); margin-top:6px; }
+    .sig-preview-actions { display:flex; justify-content:center; gap:8px; margin-top:8px; }
 
     /* ── Visible location fields ── */
     .loc-fields-grid {
@@ -267,17 +293,41 @@
             <!-- Worker Signature -->
             <div class="form-section-card">
               <div class="form-section-card-title">✍️ Worker Signature</div>
-              <p class="form-hint" style="margin-bottom:10px;">Worker signs below to confirm the accuracy of all information provided</p>
-              <div class="sig-pad-wrapper" id="wSigWrapper">
-                <canvas id="wSigCanvas" class="sig-canvas" height="180"></canvas>
-                <div class="sig-pad-hint" id="wSigHint">Sign here using finger or mouse</div>
-                <div class="sig-pad-actions">
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('w')">🗑 Clear</button>
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('w')">✏️ Re-sign</button>
+              <p class="form-hint" style="margin-bottom:12px;">Worker signs to confirm the accuracy of all provided information</p>
+              <div class="sig-mode-bar">
+                <button type="button" class="sig-mode-btn active" onclick="switchSigMode('w','draw',this)">✏️ Draw Signature</button>
+                <button type="button" class="sig-mode-btn" onclick="switchSigMode('w','upload',this)">📤 Upload Image</button>
+              </div>
+              <div id="wSigDrawPanel">
+                <div class="sig-draw-box" id="wSigWrapper">
+                  <canvas id="wSigCanvas" class="sig-canvas" height="180"></canvas>
+                  <div class="sig-pad-hint" id="wSigHint">Sign here using finger or mouse</div>
+                </div>
+                <div class="sig-controls">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('w')">🗑 Clear</button>
+                  <button type="button" class="btn-sig-action" onclick="clearSig('w')">✏️ Re-sign</button>
                   <span class="sig-status" id="wSigStatus">Not yet signed</span>
                 </div>
               </div>
-              <input type="hidden" id="w_signature" />
+              <div id="wSigUploadPanel" style="display:none">
+                <div class="sig-upload-zone" id="wSigUploadZone"
+                  onclick="document.getElementById('wSigFile').click()"
+                  ondragover="sigDragOver(event,this)" ondragleave="sigDragLeave(this)" ondrop="sigDrop(event,'w',this)">
+                  <div class="sig-upload-icon">📤</div>
+                  <div style="font-weight:600;margin-bottom:4px;">Click or drag to upload signature</div>
+                  <div style="font-size:11px;color:var(--gray-400);">PNG, JPG, JPEG &mdash; max 2 MB</div>
+                  <input type="file" id="wSigFile" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="display:none" onchange="handleSigUpload('w',this)" />
+                </div>
+              </div>
+              <div id="wSigPreview" style="display:none" class="sig-preview-box">
+                <img id="wSigPreviewImg" src="" alt="Signature preview" />
+                <div class="sig-preview-label">Signature Preview — click to zoom</div>
+                <div class="sig-preview-actions">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('w')">Remove &amp; Re-do</button>
+                </div>
+              </div>
+              <input type="hidden" id="w_sigData" />
+              <input type="hidden" id="w_sigType" />
             </div>
 
             <div class="step-nav">
@@ -519,17 +569,41 @@
             <!-- Guarantor 1 Signature -->
             <div class="form-section-card">
               <div class="form-section-card-title">✍️ Guarantor 1 Signature</div>
-              <p class="form-hint" style="margin-bottom:10px;">Guarantor signs to confirm they are vouching for the worker</p>
-              <div class="sig-pad-wrapper" id="g1SigWrapper">
-                <canvas id="g1SigCanvas" class="sig-canvas" height="180"></canvas>
-                <div class="sig-pad-hint" id="g1SigHint">Sign here using finger or mouse</div>
-                <div class="sig-pad-actions">
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('g1')">🗑 Clear</button>
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('g1')">✏️ Re-sign</button>
+              <p class="form-hint" style="margin-bottom:12px;">Guarantor signs to confirm they are vouching for this worker</p>
+              <div class="sig-mode-bar">
+                <button type="button" class="sig-mode-btn active" onclick="switchSigMode('g1','draw',this)">✏️ Draw Signature</button>
+                <button type="button" class="sig-mode-btn" onclick="switchSigMode('g1','upload',this)">📤 Upload Image</button>
+              </div>
+              <div id="g1SigDrawPanel">
+                <div class="sig-draw-box" id="g1SigWrapper">
+                  <canvas id="g1SigCanvas" class="sig-canvas" height="180"></canvas>
+                  <div class="sig-pad-hint" id="g1SigHint">Sign here using finger or mouse</div>
+                </div>
+                <div class="sig-controls">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g1')">🗑 Clear</button>
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g1')">✏️ Re-sign</button>
                   <span class="sig-status" id="g1SigStatus">Not yet signed</span>
                 </div>
               </div>
-              <input type="hidden" id="g1_signature" />
+              <div id="g1SigUploadPanel" style="display:none">
+                <div class="sig-upload-zone" id="g1SigUploadZone"
+                  onclick="document.getElementById('g1SigFile').click()"
+                  ondragover="sigDragOver(event,this)" ondragleave="sigDragLeave(this)" ondrop="sigDrop(event,'g1',this)">
+                  <div class="sig-upload-icon">📤</div>
+                  <div style="font-weight:600;margin-bottom:4px;">Click or drag to upload signature</div>
+                  <div style="font-size:11px;color:var(--gray-400);">PNG, JPG, JPEG &mdash; max 2 MB</div>
+                  <input type="file" id="g1SigFile" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="display:none" onchange="handleSigUpload('g1',this)" />
+                </div>
+              </div>
+              <div id="g1SigPreview" style="display:none" class="sig-preview-box">
+                <img id="g1SigPreviewImg" src="" alt="Signature preview" />
+                <div class="sig-preview-label">Signature Preview</div>
+                <div class="sig-preview-actions">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g1')">Remove &amp; Re-do</button>
+                </div>
+              </div>
+              <input type="hidden" id="g1_sigData" />
+              <input type="hidden" id="g1_sigType" />
             </div>
 
             <div class="step-nav">
@@ -686,17 +760,41 @@
             <!-- Guarantor 2 Signature -->
             <div class="form-section-card">
               <div class="form-section-card-title">✍️ Guarantor 2 Signature</div>
-              <p class="form-hint" style="margin-bottom:10px;">Guarantor signs to confirm they are vouching for the worker</p>
-              <div class="sig-pad-wrapper" id="g2SigWrapper">
-                <canvas id="g2SigCanvas" class="sig-canvas" height="180"></canvas>
-                <div class="sig-pad-hint" id="g2SigHint">Sign here using finger or mouse</div>
-                <div class="sig-pad-actions">
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('g2')">🗑 Clear</button>
-                  <button type="button" class="btn-clear-sig" onclick="clearSig('g2')">✏️ Re-sign</button>
+              <p class="form-hint" style="margin-bottom:12px;">Guarantor signs to confirm they are vouching for this worker</p>
+              <div class="sig-mode-bar">
+                <button type="button" class="sig-mode-btn active" onclick="switchSigMode('g2','draw',this)">✏️ Draw Signature</button>
+                <button type="button" class="sig-mode-btn" onclick="switchSigMode('g2','upload',this)">📤 Upload Image</button>
+              </div>
+              <div id="g2SigDrawPanel">
+                <div class="sig-draw-box" id="g2SigWrapper">
+                  <canvas id="g2SigCanvas" class="sig-canvas" height="180"></canvas>
+                  <div class="sig-pad-hint" id="g2SigHint">Sign here using finger or mouse</div>
+                </div>
+                <div class="sig-controls">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g2')">🗑 Clear</button>
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g2')">✏️ Re-sign</button>
                   <span class="sig-status" id="g2SigStatus">Not yet signed</span>
                 </div>
               </div>
-              <input type="hidden" id="g2_signature" />
+              <div id="g2SigUploadPanel" style="display:none">
+                <div class="sig-upload-zone" id="g2SigUploadZone"
+                  onclick="document.getElementById('g2SigFile').click()"
+                  ondragover="sigDragOver(event,this)" ondragleave="sigDragLeave(this)" ondrop="sigDrop(event,'g2',this)">
+                  <div class="sig-upload-icon">📤</div>
+                  <div style="font-weight:600;margin-bottom:4px;">Click or drag to upload signature</div>
+                  <div style="font-size:11px;color:var(--gray-400);">PNG, JPG, JPEG &mdash; max 2 MB</div>
+                  <input type="file" id="g2SigFile" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="display:none" onchange="handleSigUpload('g2',this)" />
+                </div>
+              </div>
+              <div id="g2SigPreview" style="display:none" class="sig-preview-box">
+                <img id="g2SigPreviewImg" src="" alt="Signature preview" />
+                <div class="sig-preview-label">Signature Preview</div>
+                <div class="sig-preview-actions">
+                  <button type="button" class="btn-sig-action" onclick="clearSig('g2')">Remove &amp; Re-do</button>
+                </div>
+              </div>
+              <input type="hidden" id="g2_sigData" />
+              <input type="hidden" id="g2_sigType" />
             </div>
 
             <div class="step-nav">
@@ -764,65 +862,61 @@
     return (d && m && y) ? `${y}-${m}-${d}` : '';
   }
 
-  // ── Signature Pad ──────────────────────────────────────────────────────────
+  // ── Signature System ──────────────────────────────────────────────────────
   const sigPads = {};
+  const sigModes = { w: 'draw', g1: 'draw', g2: 'draw' };
 
   function initSigPad(prefix, canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    function resizeCanvas() {
-      const w = canvas.parentElement.clientWidth || 600;
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      canvas.width = w;
-      ctx.putImageData(imageData, 0, 0);
-      ctx.strokeStyle = '#1a1a2e';
-      ctx.lineWidth   = 2.5;
+    function applyStyle() {
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth   = 2.2;
       ctx.lineCap     = 'round';
       ctx.lineJoin    = 'round';
     }
+
+    function resizeCanvas() {
+      const w = canvas.parentElement.clientWidth || 600;
+      const snap = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = w;
+      canvas.height = 180;
+      applyStyle();
+      ctx.putImageData(snap, 0, 0);
+    }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    applyStyle();
 
-    ctx.strokeStyle = '#1a1a2e';
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
-
-    let drawing = false;
-    let hasMark = false;
+    let drawing = false, hasMark = false;
 
     function getPos(e) {
-      const rect   = canvas.getBoundingClientRect();
-      const scaleX = canvas.width  / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const src    = e.touches ? e.touches[0] : e;
+      const rect = canvas.getBoundingClientRect();
+      const src  = e.touches ? e.touches[0] : e;
       return {
-        x: (src.clientX - rect.left) * scaleX,
-        y: (src.clientY - rect.top)  * scaleY
+        x: (src.clientX - rect.left) * (canvas.width  / rect.width),
+        y: (src.clientY - rect.top)  * (canvas.height / rect.height)
       };
     }
 
     function start(e) {
       e.preventDefault();
+      if (sigModes[prefix] !== 'draw') return;
       drawing = true;
       const p = getPos(e);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
       const hint = document.getElementById(`${prefix}SigHint`);
       if (hint) hint.style.opacity = '0';
     }
-
-    function draw(e) {
+    function move(e) {
       if (!drawing) return;
       e.preventDefault();
       const p = getPos(e);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
+      ctx.lineTo(p.x, p.y); ctx.stroke();
       hasMark = true;
     }
-
     function stop() {
       if (!drawing) return;
       drawing = false;
@@ -830,23 +924,25 @@
     }
 
     canvas.addEventListener('mousedown',  start);
-    canvas.addEventListener('mousemove',  draw);
+    canvas.addEventListener('mousemove',  move);
     canvas.addEventListener('mouseup',    stop);
     canvas.addEventListener('mouseleave', stop);
     canvas.addEventListener('touchstart', start, { passive: false });
-    canvas.addEventListener('touchmove',  draw,  { passive: false });
+    canvas.addEventListener('touchmove',  move,  { passive: false });
     canvas.addEventListener('touchend',   stop);
 
     sigPads[prefix] = {
-      canvas,
-      ctx,
+      canvas, ctx,
       hasContent: () => hasMark,
-      reset:      () => { hasMark = false; }
+      reset: () => { hasMark = false; }
     };
   }
 
   function _saveSig(prefix, canvas) {
-    document.getElementById(`${prefix}_signature`).value = canvas.toDataURL('image/png');
+    const dataUrl = canvas.toDataURL('image/png');
+    document.getElementById(`${prefix}_sigData`).value = dataUrl;
+    document.getElementById(`${prefix}_sigType`).value = 'drawn';
+    _showSigPreview(prefix, dataUrl);
     const status  = document.getElementById(`${prefix}SigStatus`);
     const wrapper = document.getElementById(`${prefix}SigWrapper`);
     if (status)  { status.textContent = '✓ Signed'; status.classList.add('done'); }
@@ -855,16 +951,78 @@
 
   function clearSig(prefix) {
     const pad = sigPads[prefix];
-    if (!pad) return;
-    pad.ctx.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
-    pad.reset();
-    document.getElementById(`${prefix}_signature`).value = '';
-    const status  = document.getElementById(`${prefix}SigStatus`);
-    const wrapper = document.getElementById(`${prefix}SigWrapper`);
-    const hint    = document.getElementById(`${prefix}SigHint`);
-    if (status)  { status.textContent = 'Not yet signed'; status.classList.remove('done'); }
-    if (wrapper) wrapper.classList.remove('signed');
-    if (hint)    hint.style.opacity = '1';
+    if (pad) {
+      pad.ctx.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
+      pad.reset();
+      const wrapper = document.getElementById(`${prefix}SigWrapper`);
+      const hint    = document.getElementById(`${prefix}SigHint`);
+      if (wrapper) wrapper.classList.remove('signed');
+      if (hint)    hint.style.opacity = '1';
+      const status = document.getElementById(`${prefix}SigStatus`);
+      if (status)  { status.textContent = 'Not yet signed'; status.classList.remove('done'); }
+    }
+    // Also reset upload zone
+    const zone = document.getElementById(`${prefix}SigUploadZone`);
+    if (zone) { zone.classList.remove('uploaded'); }
+    const fileInput = document.getElementById(`${prefix}SigFile`);
+    if (fileInput) fileInput.value = '';
+    document.getElementById(`${prefix}_sigData`).value = '';
+    document.getElementById(`${prefix}_sigType`).value = '';
+    _hideSigPreview(prefix);
+  }
+
+  function switchSigMode(prefix, mode, btn) {
+    sigModes[prefix] = mode;
+    btn.closest('.sig-mode-bar').querySelectorAll('.sig-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const drawPanel   = document.getElementById(`${prefix}SigDrawPanel`);
+    const uploadPanel = document.getElementById(`${prefix}SigUploadPanel`);
+    if (drawPanel)   drawPanel.style.display   = mode === 'draw'   ? '' : 'none';
+    if (uploadPanel) uploadPanel.style.display = mode === 'upload' ? '' : 'none';
+    clearSig(prefix);
+  }
+
+  function handleSigUpload(prefix, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const allowed = ['image/png', 'image/jpg', 'image/jpeg'];
+    if (!allowed.includes(file.type)) {
+      showToast('Only PNG, JPG, or JPEG files are allowed for signatures', 'error');
+      input.value = ''; return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Signature image must be under 2 MB', 'error');
+      input.value = ''; return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      document.getElementById(`${prefix}_sigData`).value = dataUrl;
+      document.getElementById(`${prefix}_sigType`).value = 'uploaded';
+      _showSigPreview(prefix, dataUrl);
+      const zone = document.getElementById(`${prefix}SigUploadZone`);
+      if (zone) zone.classList.add('uploaded');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function sigDragOver(e, el) { e.preventDefault(); el.classList.add('drag-over'); }
+  function sigDragLeave(el)   { el.classList.remove('drag-over'); }
+  function sigDrop(e, prefix, el) {
+    e.preventDefault(); el.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    handleSigUpload(prefix, { files: [file] });
+  }
+
+  function _showSigPreview(prefix, src) {
+    const box = document.getElementById(`${prefix}SigPreview`);
+    const img = document.getElementById(`${prefix}SigPreviewImg`);
+    if (box && img) { img.src = src; box.style.display = ''; }
+  }
+  function _hideSigPreview(prefix) {
+    const box = document.getElementById(`${prefix}SigPreview`);
+    if (box) box.style.display = 'none';
   }
 
   initSigPad('w',  'wSigCanvas');
@@ -963,8 +1121,8 @@
       ? `<div style="text-align:center;"><img src="${src}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;"><div class="text-xs text-muted mt-1">${label}</div></div>`
       : '';
 
-    const sigEl = id => {
-      const val = document.getElementById(id)?.value;
+    const sigEl = prefix => {
+      const val = document.getElementById(`${prefix}_sigData`)?.value;
       return val
         ? `<div style="margin-top:6px;"><img src="${val}" style="max-height:60px;border:1px solid var(--gray-200);border-radius:6px;" alt="signature" /></div>`
         : '<span class="text-xs text-muted">Not signed</span>';
@@ -1019,7 +1177,7 @@
           ${multiThumb('streetPhotos')}
         </div>
         <div class="flex gap-3 mt-2">${photoEl(photoSrc('w_passport'),'Passport')}</div>
-        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('w_signature')}</div>
+        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('w')}</div>
       `) +
       section('👤 Guarantor 1', `
         ${row('Full Name',    document.getElementById('g1_fullName').value)}
@@ -1038,7 +1196,7 @@
           ${multiThumb('g1StreetPhotos')}
         </div>
         <div class="flex gap-3 mt-2">${photoEl(photoSrc('g1_passport'),'Passport')}</div>
-        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('g1_signature')}</div>
+        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('g1')}</div>
       `) +
       section('👤 Guarantor 2', `
         ${row('Full Name',    document.getElementById('g2_fullName').value)}
@@ -1057,7 +1215,7 @@
           ${multiThumb('g2StreetPhotos')}
         </div>
         <div class="flex gap-3 mt-2">${photoEl(photoSrc('g2_passport'),'Passport')}</div>
-        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('g2_signature')}</div>
+        <div style="padding-top:8px;"><span class="text-sm text-muted">Signature</span>${sigEl('g2')}</div>
       `);
   }
 
@@ -1083,7 +1241,8 @@
     fd.append('locationPlusCode', document.getElementById('workerLocationPlusCode').value);
     fd.append('locationMapsLink', document.getElementById('workerLocationMapsLink').value);
     fd.append('locationMethod',   document.getElementById('workerLocationMethod').value);
-    fd.append('workerSignature',  document.getElementById('w_signature').value);
+    fd.append('workerSigData',    document.getElementById('w_sigData').value);
+    fd.append('workerSigType',    document.getElementById('w_sigType').value);
 
     fd.append('g1FullName',         document.getElementById('g1_fullName').value.trim());
     fd.append('g1Phone',            document.getElementById('g1_phone').value.trim());
@@ -1097,7 +1256,8 @@
     fd.append('g1LocationPlusCode', document.getElementById('g1LocationPlusCode').value);
     fd.append('g1LocationMapsLink', document.getElementById('g1LocationMapsLink').value);
     fd.append('g1LocationMethod',   document.getElementById('g1LocationMethod').value);
-    fd.append('g1Signature',        document.getElementById('g1_signature').value);
+    fd.append('g1SigData',          document.getElementById('g1_sigData').value);
+    fd.append('g1SigType',          document.getElementById('g1_sigType').value);
 
     fd.append('g2FullName',         document.getElementById('g2_fullName').value.trim());
     fd.append('g2Phone',            document.getElementById('g2_phone').value.trim());
@@ -1111,7 +1271,8 @@
     fd.append('g2LocationPlusCode', document.getElementById('g2LocationPlusCode').value);
     fd.append('g2LocationMapsLink', document.getElementById('g2LocationMapsLink').value);
     fd.append('g2LocationMethod',   document.getElementById('g2LocationMethod').value);
-    fd.append('g2Signature',        document.getElementById('g2_signature').value);
+    fd.append('g2SigData',          document.getElementById('g2_sigData').value);
+    fd.append('g2SigType',          document.getElementById('g2_sigType').value);
 
     const branch      = document.getElementById('w_branch').value;
     const shift       = document.getElementById('w_shift').value;

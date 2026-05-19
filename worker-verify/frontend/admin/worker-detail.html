@@ -515,6 +515,21 @@
       </div>`;
     };
 
+    const sigCard = (sig, label) => {
+      if (!sig || !sig.url) return `<span class="sig-none-label">Not signed</span>`;
+      const tag = sig.sigType === 'uploaded' ? 'uploaded' : 'drawn';
+      const tagLabel = sig.sigType === 'uploaded' ? 'Uploaded' : 'Drawn';
+      const date = sig.signedAt ? new Date(sig.signedAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '';
+      return `<div class="sig-view-box">
+        <img src="${sig.url}" alt="${label} signature" onclick="zoomSig('${sig.url}')" title="Click to enlarge" />
+        <div class="sig-view-meta">
+          <span class="sig-type-tag ${tag}">${tagLabel}</span>
+          ${date ? `<span class="text-xs text-muted">${date}</span>` : ''}
+          <a class="sig-view-download" href="${sig.url}" download="${label.replace(/\s+/g,'-').toLowerCase()}-signature" target="_blank">⬇ Download</a>
+        </div>
+      </div>`;
+    };
+
     const guarantorHTML = (w.guarantors || []).map((g, i) => {
       const gKey = `g${i+1}`;
       return `
@@ -535,6 +550,8 @@
               <div class="flex gap-3 mb-3">
                 ${photo(g.passportPhoto, '👤')}
               </div>
+              <div class="section-subtitle" style="margin-top:12px;">Signature</div>
+              <div style="margin-bottom:12px;">${sigCard(g.signature, `Guarantor ${i+1}`)}</div>
               <div class="section-subtitle">House Photos</div>
               ${photoGallery(g.housePhotos, g.housePhoto, '🏠', 'House')}
               <div class="section-subtitle" style="margin-top:12px;">Street Photos</div>
@@ -589,6 +606,8 @@
             <div class="flex gap-3 mb-3">
               <div>${photo(w.passportPhoto)} <p class="text-xs text-muted mt-1 text-center">Passport</p></div>
             </div>
+            <div class="section-subtitle" style="margin-top:12px;">Signature</div>
+            <div style="margin-bottom:12px;">${sigCard(w.workerSignature, 'Worker')}</div>
             <div class="section-subtitle">House Photos</div>
             ${photoGallery(w.housePhotos, w.housePhoto, '🏠', 'House')}
             <div class="section-subtitle" style="margin-top:12px;">Street Photos</div>
@@ -810,6 +829,21 @@
     const overlay = document.createElement('div');
     overlay.className = 'zoom-modal-overlay';
     overlay.innerHTML = `<img class="zoom-modal-img" src="${src}" alt="zoom" />`;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+  }
+
+  function zoomSig(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'zoom-modal-overlay';
+    overlay.style.cssText = 'flex-direction:column;gap:16px;';
+    overlay.innerHTML = `
+      <img class="zoom-modal-img" src="${src}" alt="signature" style="max-height:60vh;background:#fff;border-radius:10px;padding:12px;" />
+      <a href="${src}" download="signature" target="_blank"
+         onclick="event.stopPropagation()"
+         style="color:#fff;font-size:14px;font-weight:600;text-decoration:none;background:rgba(255,255,255,.15);padding:8px 20px;border-radius:20px;">
+        ⬇ Download Signature
+      </a>`;
     overlay.onclick = () => overlay.remove();
     document.body.appendChild(overlay);
   }

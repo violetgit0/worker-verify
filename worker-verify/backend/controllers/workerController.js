@@ -4,6 +4,7 @@ const VerificationLog = require('../models/VerificationLog');
 const Branch = require('../models/Branch');
 const TransferLog = require('../models/TransferLog');
 const ActivityLog = require('../models/ActivityLog');
+const { uploadDataUrl } = require('../config/cloudinary');
 
 const logActivity = (action, by, targetId, targetName, details = {}, ip = '') =>
   ActivityLog.create({
@@ -41,18 +42,33 @@ const buildIdentityDoc = (docType, docNumber, file) => {
 
 const filePaths = (files, field) => (files[field] || []).map(f => f.path);
 
+// Upload a signature data URL to Cloudinary. Returns { sigType, url, signedAt } or null.
+const processSignature = async (dataUrl, sigType) => {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return null;
+  try {
+    const result = await uploadDataUrl(dataUrl);
+    if (!result?.secure_url) return null;
+    return { sigType: sigType || 'drawn', url: result.secure_url, signedAt: new Date() };
+  } catch (_) {
+    return null;
+  }
+};
+
 const registerWorker = async (req, res) => {
   const {
     fullName, phone, gender, dateOfBirth, nin, occupation,
     homeAddress, landmark,
     locationLat, locationLng, locationAddress, locationPlusCode, locationMapsLink, locationMethod,
     workerIdDocType, workerIdDocNumber,
+    workerSigData, workerSigType,
     g1FullName, g1Phone, g1Nin, g1Relationship, g1HomeAddress, g1Landmark,
     g1LocationLat, g1LocationLng, g1LocationAddress, g1LocationPlusCode, g1LocationMapsLink, g1LocationMethod,
     g1IdDocType, g1IdDocNumber,
+    g1SigData, g1SigType,
     g2FullName, g2Phone, g2Nin, g2Relationship, g2HomeAddress, g2Landmark,
     g2LocationLat, g2LocationLng, g2LocationAddress, g2LocationPlusCode, g2LocationMapsLink, g2LocationMethod,
-    g2IdDocType, g2IdDocNumber
+    g2IdDocType, g2IdDocNumber,
+    g2SigData, g2SigType
   } = req.body;
 
   const existingWorker = await Worker.findOne({ nin });
@@ -88,6 +104,14 @@ const registerWorker = async (req, res) => {
   const workerIdDoc = buildIdentityDoc(workerIdDocType, workerIdDocNumber, files.workerIdDoc?.[0]);
   if (workerIdDoc) workerData.identityDoc = workerIdDoc;
 
+  // Upload signatures in parallel
+  const [workerSig, g1Sig, g2Sig] = await Promise.all([
+    processSignature(workerSigData, workerSigType),
+    processSignature(g1SigData, g1SigType),
+    processSignature(g2SigData, g2SigType)
+  ]);
+  if (workerSig) workerData.workerSignature = workerSig;
+
   const worker = await Worker.create(workerData);
 
   const guarantorIds = [];
@@ -108,6 +132,7 @@ const registerWorker = async (req, res) => {
     };
     const g1IdDoc = buildIdentityDoc(g1IdDocType, g1IdDocNumber, files.g1IdDoc?.[0]);
     if (g1IdDoc) g1Data.identityDoc = g1IdDoc;
+    if (g1Sig) g1Data.signature = g1Sig;
     const g1 = await Guarantor.create(g1Data);
     guarantorIds.push(g1._id);
   }
@@ -128,6 +153,7 @@ const registerWorker = async (req, res) => {
     };
     const g2IdDoc = buildIdentityDoc(g2IdDocType, g2IdDocNumber, files.g2IdDoc?.[0]);
     if (g2IdDoc) g2Data.identityDoc = g2IdDoc;
+    if (g2Sig) g2Data.signature = g2Sig;
     const g2 = await Guarantor.create(g2Data);
     guarantorIds.push(g2._id);
   }

@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+const signatureSchema = new mongoose.Schema({
+  sigType:  { type: String, enum: ['drawn', 'uploaded'], default: null },
+  url:      { type: String, default: '' },
+  signedAt: { type: Date, default: null }
+}, { _id: false });
+
 const locationSchema = new mongoose.Schema({
   lat:         { type: Number,  default: null },
   lng:         { type: Number,  default: null },
@@ -51,6 +57,8 @@ const workerSchema = new mongoose.Schema({
   // Payroll
   monthlySalary:      { type: Number, default: 0 },
   dailyRate:          { type: Number, default: 0 },
+  // Signatures
+  workerSignature:    { type: signatureSchema, default: () => ({}) },
   // Worker portal PIN (bcrypt hashed)
   pin:                { type: String, default: '' }
 }, { timestamps: true });

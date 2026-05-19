@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+const signatureSchema = new mongoose.Schema({
+  sigType:  { type: String, enum: ['drawn', 'uploaded'], default: null },
+  url:      { type: String, default: '' },
+  signedAt: { type: Date, default: null }
+}, { _id: false });
+
 const identityDocSchema = new mongoose.Schema({
   docType: {
     type: String,
@@ -27,6 +33,7 @@ const guarantorSchema = new mongoose.Schema({
   housePhotos:     [{ type: String }],               // multiple house/building photos
   streetPhotos:    [{ type: String }],               // street / environment photos
   identityDoc:     { type: identityDocSchema, default: () => ({}) },
+  signature:       { type: signatureSchema, default: () => ({}) },
   location: {
     lat:         { type: Number,  default: null },
     lng:         { type: Number,  default: null },
