@@ -368,23 +368,44 @@
   // ── Data loading ───────────────────────────────────────────────────────────
 
   async function loadStaff() {
+    // Show loading state
+    document.getElementById('staffTable').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray-400);">Loading staff…</td></tr>`;
+
+    // Fetch active/suspended staff — this MUST succeed for the page to work
     try {
-      const [activeRes, deletedRes] = await Promise.all([
-        API.getAllStaff(),
-        API.getDeletedStaff()
-      ]);
-      staffList   = activeRes.staff || [];
-      deletedList = deletedRes.staff || [];
-      updateCounts();
-      renderCurrentTab();
+      const activeRes = await API.getAllStaff();
+      staffList = activeRes.staff || [];
+      console.log('[Staff] Loaded active/suspended staff:', staffList.length, staffList);
     } catch (err) {
+      console.error('[Staff] getAllStaff error:', err);
+      document.getElementById('staffTable').innerHTML =
+        `<tr><td colspan="7" style="text-align:center;padding:40px;">
+          <div style="color:var(--danger);font-weight:600;">⚠️ Failed to load staff</div>
+          <div class="text-sm text-muted mt-2">${err.message}</div>
+          <button class="btn btn-outline btn-sm mt-2" onclick="loadStaff()">Retry</button>
+        </td></tr>`;
       showToast('Failed to load staff: ' + err.message, 'error');
+      return;
     }
+
+    // Fetch archived staff — failure here is non-fatal
+    try {
+      const deletedRes = await API.getDeletedStaff();
+      deletedList = deletedRes.staff || [];
+      console.log('[Staff] Loaded archived staff:', deletedList.length);
+    } catch (err) {
+      console.warn('[Staff] getDeletedStaff error (non-fatal):', err);
+      deletedList = [];
+    }
+
+    updateCounts();
+    renderCurrentTab();
   }
 
   function updateCounts() {
-    const active    = staffList.filter(s => s.isActive).length;
-    const suspended = staffList.filter(s => !s.isActive).length;
+    const active    = staffList.filter(s => s.isActive !== false).length;
+    const suspended = staffList.filter(s => s.isActive === false).length;
     document.getElementById('countActive').textContent    = active;
     document.getElementById('countSuspended').textContent = suspended;
     document.getElementById('countDeleted').textContent   = deletedList.length;
@@ -434,14 +455,19 @@
     const role = document.getElementById('roleFilter').value;
 
     const filtered = staffList.filter(s => {
-      const matchQ    = !q || s.fullName.toLowerCase().includes(q)
-                           || s.username.toLowerCase().includes(q)
-                           || s.email.toLowerCase().includes(q);
+      const matchQ    = !q || (s.fullName || '').toLowerCase().includes(q)
+                           || (s.username || '').toLowerCase().includes(q)
+                           || (s.email || '').toLowerCase().includes(q);
       const matchRole = !role || s.role === role;
-      const matchTab  = currentTab === 'active' ? s.isActive : !s.isActive;
+      // Active tab: show all who are NOT suspended (isActive is true or unset)
+      // Suspended tab: show only explicitly suspended (isActive === false)
+      const matchTab  = currentTab === 'active'
+        ? s.isActive !== false
+        : s.isActive === false;
       return matchQ && matchRole && matchTab;
     });
 
+    console.log(`[Staff] Tab="${currentTab}" total=${staffList.length} filtered=${filtered.length}`, filtered);
     renderStaff(filtered);
   }
 
@@ -454,9 +480,14 @@
   function renderStaff(staff) {
     const tbody = document.getElementById('staffTable');
     if (!staff.length) {
+      const msg = currentTab === 'suspended' ? 'No suspended staff accounts' : 'No active staff accounts';
+      const hint = staffList.length > 0
+        ? `<div class="text-xs text-muted mt-1">(${staffList.length} total staff loaded — try clearing filters)</div>`
+        : '<div class="text-xs text-muted mt-1">No staff have been created yet, or the API returned nothing.</div>';
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">
         <div class="empty-icon">👤</div>
-        <p class="text-muted">${currentTab === 'suspended' ? 'No suspended staff' : 'No active staff accounts'}</p>
+        <p class="text-muted">${msg}</p>
+        ${hint}
       </td></tr>`;
       return;
     }
