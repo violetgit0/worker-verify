@@ -8,8 +8,11 @@ const {
   getWorkerAttendance, getAttendanceReport
 } = require('../controllers/attendanceController');
 const { protect } = require('../middleware/auth');
+const { authorize } = require('../middleware/roleCheck');
 const { workerProtect } = require('../middleware/workerAuth');
 const { selfieUpload } = require('../config/cloudinary');
+
+const CAN_MANAGE_ATTENDANCE = ['super_admin', 'branch_manager', 'attendance_officer'];
 
 // Worker self-service
 router.post('/clock-in',      workerProtect, selfieUpload, workerClockIn);
@@ -21,8 +24,8 @@ router.get('/',                       protect, getAttendance);
 router.get('/report',                 protect, getAttendanceReport);
 router.get('/today/:branchId',        protect, getTodayAttendance);
 router.get('/worker/:workerId',       protect, getWorkerAttendance);
-router.post('/admin-clock-in',        protect, adminClockIn);
-router.post('/admin-clock-out',       protect, adminClockOut);
-router.post('/mark-absent',           protect, markAbsent);
+router.post('/admin-clock-in',        protect, authorize(...CAN_MANAGE_ATTENDANCE), adminClockIn);
+router.post('/admin-clock-out',       protect, authorize(...CAN_MANAGE_ATTENDANCE), adminClockOut);
+router.post('/mark-absent',           protect, authorize(...CAN_MANAGE_ATTENDANCE), markAbsent);
 
 module.exports = router;

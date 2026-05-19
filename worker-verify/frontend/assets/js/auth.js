@@ -42,6 +42,15 @@ function requireAuth(allowedRoles = []) {
   return user;
 }
 
+const ROLE_DISPLAY = {
+  super_admin:          'Super Admin',
+  branch_manager:       'Branch Manager',
+  hr_staff:             'HR Staff',
+  attendance_officer:   'Attendance Officer',
+  verification_officer: 'Verification Officer',
+  staff:                'Staff'
+};
+
 // Populate sidebar user info on any page that has #sidebarUserName / #sidebarUserRole
 function populateSidebarUser() {
   const user = getUser();
@@ -52,7 +61,7 @@ function populateSidebarUser() {
   const avatarEl = document.getElementById('sidebarAvatar');
 
   if (nameEl)   nameEl.textContent = user.fullName;
-  if (roleEl)   roleEl.textContent = user.role === 'super_admin' ? 'Super Admin' : 'Staff';
+  if (roleEl)   roleEl.textContent = ROLE_DISPLAY[user.role] || user.role;
   if (avatarEl && user.passportPhoto) avatarEl.src = user.passportPhoto;
 }
 

@@ -98,10 +98,17 @@ const API = {
   deleteBranch:  (id)     => apiFetch(`/branches/${id}`, { method: 'DELETE' }),
 
   // Staff (super_admin only)
-  getAllStaff:        ()       => apiFetch('/staff'),
-  getStaff:          (id)     => apiFetch(`/staff/${id}`),
-  createStaff:       (fd)     => apiFetch('/staff', { method: 'POST', body: fd }),
-  updateStaff:       (id, fd) => apiFetch(`/staff/${id}`, { method: 'PUT', body: fd }),
-  deleteStaff:       (id)     => apiFetch(`/staff/${id}`, { method: 'DELETE' }),
-  resetStaffPassword:(id, b)  => apiFetch(`/staff/${id}/reset-password`, { method: 'PUT', body: JSON.stringify(b) })
+  getAllStaff:         ()        => apiFetch('/staff'),
+  getStaff:           (id)      => apiFetch(`/staff/${id}`),
+  createStaff:        (fd)      => apiFetch('/staff', { method: 'POST', body: fd }),
+  updateStaff:        (id, fd)  => apiFetch(`/staff/${id}`, { method: 'PUT', body: fd }),
+  deleteStaff:        (id)      => apiFetch(`/staff/${id}`, { method: 'DELETE' }),
+  resetStaffPassword: (id, b)   => apiFetch(`/staff/${id}/reset-password`,  { method: 'PUT', body: JSON.stringify(b) }),
+  suspendStaff:       (id, b)   => apiFetch(`/staff/${id}/suspend`,          { method: 'PUT', body: JSON.stringify(b) }),
+  activateStaff:      (id)      => apiFetch(`/staff/${id}/activate`,         { method: 'PUT' }),
+  getStaffLoginHistory:(id)     => apiFetch(`/staff/${id}/login-history`),
+  assignStaffBranch:  (id, b)   => apiFetch(`/staff/${id}/assign-branch`,    { method: 'PUT', body: JSON.stringify(b) }),
+
+  // Activity logs (super_admin only)
+  getActivityLogs: (qs = '') => apiFetch(`/activity-logs${qs}`)
 };

@@ -38,7 +38,8 @@ app.use('/api/worker-auth', require('./routes/workerAuth'));
 app.use('/api/attendance',  require('./routes/attendance'));
 app.use('/api/deductions',  require('./routes/deductions'));
 app.use('/api/payroll',     require('./routes/payroll'));
-app.use('/api/alerts',      require('./routes/alerts'));
+app.use('/api/alerts',        require('./routes/alerts'));
+app.use('/api/activity-logs', require('./routes/activityLog'));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'Worker Verify API is running' });

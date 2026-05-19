@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -15,8 +16,12 @@ const login = async (req, res) => {
     $or: [{ username: username.toLowerCase() }, { email: username.toLowerCase() }]
   });
 
-  if (!user || !user.isActive) {
+  if (!user) {
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+
+  if (!user.isActive) {
+    return res.status(401).json({ success: false, message: 'Account suspended. Contact your administrator.' });
   }
 
   const isMatch = await user.comparePassword(password);
@@ -24,17 +29,35 @@ const login = async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+  const ua = req.headers['user-agent'] || '';
+
+  user.loginHistory.unshift({ timestamp: new Date(), ip, userAgent: ua });
+  if (user.loginHistory.length > 20) user.loginHistory.length = 20;
+  await user.save();
+
+  ActivityLog.create({
+    action: 'login',
+    performedBy: user._id,
+    performedByName: user.fullName,
+    performedByRole: user.role,
+    targetType: 'system',
+    details: { ip, userAgent: ua },
+    ip
+  }).catch(() => {});
+
   const token = generateToken(user._id);
 
   res.json({
     success: true,
     token,
     user: {
-      id:           user._id,
-      fullName:     user.fullName,
-      username:     user.username,
-      email:        user.email,
-      role:         user.role,
+      id:            user._id,
+      fullName:      user.fullName,
+      username:      user.username,
+      email:         user.email,
+      role:          user.role,
+      branch:        user.branch,
       passportPhoto: user.passportPhoto
     }
   });

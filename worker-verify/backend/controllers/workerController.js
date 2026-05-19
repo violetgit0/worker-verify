@@ -3,6 +3,20 @@ const Guarantor = require('../models/Guarantor');
 const VerificationLog = require('../models/VerificationLog');
 const Branch = require('../models/Branch');
 const TransferLog = require('../models/TransferLog');
+const ActivityLog = require('../models/ActivityLog');
+
+const logActivity = (action, by, targetId, targetName, details = {}, ip = '') =>
+  ActivityLog.create({
+    action,
+    performedBy: by._id,
+    performedByName: by.fullName,
+    performedByRole: by.role,
+    targetType: 'worker',
+    targetId,
+    targetName,
+    details,
+    ip
+  }).catch(() => {});
 
 const parseLocation = (lat, lng, addr, plusCode = '', mapsLink = '', method = 'map') => ({
   lat:         lat ? parseFloat(lat) : null,
@@ -127,6 +141,9 @@ const registerWorker = async (req, res) => {
     notes: `Registered by ${req.user.fullName}`
   });
 
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+  logActivity('register_worker', req.user, worker._id, worker.fullName, { nin: worker.nin }, ip);
+
   res.status(201).json({ success: true, message: 'Worker registered successfully', workerId: worker._id });
 };
 
@@ -134,7 +151,12 @@ const getAllWorkers = async (req, res) => {
   const { page = 1, limit = 20, status, search, branch, shift, employmentStatus } = req.query;
   const query = {};
 
-  if (req.user.role === 'staff') query.registeredBy = req.user._id;
+  // Branch restriction for branch_manager
+  if (req.user.role === 'branch_manager' && req.user.branch) {
+    query.branch = req.user.branch;
+  } else if (req.user.role === 'staff') {
+    query.registeredBy = req.user._id;
+  }
   if (status && status !== 'all')           query.verificationStatus = status;
   if (branch && branch !== 'all')           query.branch = branch;
   if (shift && shift !== 'all')             query.shift = shift;
@@ -226,6 +248,10 @@ const updateVerificationStatus = async (req, res) => {
     newStatus: status,
     notes: rejectionReason || ''
   });
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+  logActivity(`${status}_worker`, req.user, worker._id, worker.fullName,
+    { previousStatus, newStatus: status, rejectionReason }, ip);
 
   res.json({ success: true, message: `Worker ${status} successfully` });
 };

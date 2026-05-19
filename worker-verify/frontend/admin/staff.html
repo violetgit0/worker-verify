@@ -6,16 +6,29 @@
   <title>Staff Management – WorkerSave</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    .role-badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .role-branch_manager       { background:#dbeafe; color:#1d4ed8; }
+    .role-hr_staff             { background:#d1fae5; color:#065f46; }
+    .role-attendance_officer   { background:#fed7aa; color:#92400e; }
+    .role-verification_officer { background:#e0e7ff; color:#3730a3; }
+    .role-staff                { background:#f3f4f6; color:#374151; }
+    .filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+    .filter-bar input { flex:1; min-width:180px; max-width:300px; }
+    .filter-bar select { min-width:150px; }
+    .login-history-item { padding:10px 0; border-bottom:1px solid var(--gray-100); font-size:13px; }
+    .login-history-item:last-child { border-bottom:none; }
+    .login-meta { font-size:11px; color:var(--gray-400); margin-top:2px; }
+    .suspend-note { font-size:11px; color:#b91c1c; margin-top:2px; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
 
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-logo"><div class="brand-icon">⚡</div> Sage Energy</div>
+      <div class="brand-logo"><div class="brand-icon">⚡</div> WorkerSave</div>
     </div>
     <div class="sidebar-user">
       <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
@@ -51,6 +64,23 @@
     </header>
 
     <main class="page-body">
+      <div class="filter-bar">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search name, username, email…" oninput="applyFilters()" />
+        <select id="roleFilter" class="form-control" onchange="applyFilters()">
+          <option value="">All Roles</option>
+          <option value="branch_manager">Branch Manager</option>
+          <option value="hr_staff">HR Staff</option>
+          <option value="attendance_officer">Attendance Officer</option>
+          <option value="verification_officer">Verification Officer</option>
+          <option value="staff">Staff</option>
+        </select>
+        <select id="statusFilter" class="form-control" onchange="applyFilters()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+
       <div class="card">
         <div class="table-wrapper">
           <table>
@@ -58,16 +88,15 @@
               <tr>
                 <th>#</th>
                 <th>Staff Member</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Bank Details</th>
-                <th>Workers</th>
+                <th>Role</th>
+                <th>Branch</th>
+                <th>Contact</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="staffTable">
-              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">Loading staff…</td></tr>
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray-400);">Loading staff…</td></tr>
             </tbody>
           </table>
         </div>
@@ -78,7 +107,7 @@
 
 <!-- Create / Edit Staff Modal -->
 <div class="modal-overlay" id="staffModal">
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:600px;">
     <div class="modal-header">
       <h2 class="modal-title" id="staffModalTitle">Add Staff</h2>
       <button class="btn-icon" onclick="closeModal('staffModal')">✕</button>
@@ -104,6 +133,24 @@
           <div class="form-group">
             <label class="form-label">Email <span class="required">*</span></label>
             <input type="email" id="sf_email" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Role <span class="required">*</span></label>
+            <select id="sf_role" class="form-control" required>
+              <option value="hr_staff">HR Staff</option>
+              <option value="branch_manager">Branch Manager</option>
+              <option value="attendance_officer">Attendance Officer</option>
+              <option value="verification_officer">Verification Officer</option>
+              <option value="staff">Staff</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Branch</label>
+            <select id="sf_branch" class="form-control">
+              <option value="">— No Branch —</option>
+            </select>
           </div>
         </div>
         <div class="form-group" id="passwordGroup">
@@ -158,15 +205,52 @@
   </div>
 </div>
 
+<!-- Suspend Modal -->
+<div class="modal-overlay" id="suspendModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Suspend Staff Account</h2>
+      <button class="btn-icon" onclick="closeModal('suspendModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="margin-bottom:12px;">Suspend <strong id="suspendStaffName"></strong>? They will lose system access until reactivated.</p>
+      <div class="form-group">
+        <label class="form-label">Reason (optional)</label>
+        <textarea id="suspendReason" class="form-control" rows="3" placeholder="Enter reason for suspension…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('suspendModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmSuspend()">Suspend Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Login History Modal -->
+<div class="modal-overlay" id="loginHistoryModal">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Login History — <span id="loginHistoryName"></span></h2>
+      <button class="btn-icon" onclick="closeModal('loginHistoryModal')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:420px;overflow-y:auto;">
+      <div id="loginHistoryList"><p class="text-muted">Loading…</p></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('loginHistoryModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete Confirm Modal -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal-box" style="max-width:400px;">
     <div class="modal-header">
-      <h2 class="modal-title">Delete Staff</h2>
+      <h2 class="modal-title">Delete Staff Account</h2>
       <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
     </div>
     <div class="modal-body">
-      <p class="text-sm">Are you sure you want to delete <strong id="deleteStaffName"></strong>? This action cannot be undone.</p>
+      <p class="text-sm">Are you sure you want to permanently delete <strong id="deleteStaffName"></strong>? This cannot be undone.</p>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
@@ -183,50 +267,101 @@
   let staffList = [];
   let targetStaffId = null;
 
+  const ROLE_LABELS = {
+    branch_manager:       'Branch Manager',
+    hr_staff:             'HR Staff',
+    attendance_officer:   'Attendance Officer',
+    verification_officer: 'Verification Officer',
+    staff:                'Staff'
+  };
+
   if (currentUser) {
     populateSidebarUser();
-    loadStaff();
+    Promise.all([loadStaff(), loadBranches()]);
   }
 
   async function loadStaff() {
     try {
       const res = await API.getAllStaff();
       staffList = res.staff;
-      renderStaff(staffList);
+      applyFilters();
     } catch (err) {
       showToast('Failed to load staff: ' + err.message, 'error');
     }
   }
 
+  async function loadBranches() {
+    try {
+      const res = await API.getBranches();
+      const branches = res.branches || [];
+      const sel = document.getElementById('sf_branch');
+      branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b._id;
+        opt.textContent = b.name + (b.code ? ` (${b.code})` : '');
+        sel.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  function applyFilters() {
+    const q      = document.getElementById('searchInput').value.toLowerCase();
+    const role   = document.getElementById('roleFilter').value;
+    const status = document.getElementById('statusFilter').value;
+
+    const filtered = staffList.filter(s => {
+      const matchQ      = !q || s.fullName.toLowerCase().includes(q) || s.username.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+      const matchRole   = !role   || s.role === role;
+      const matchStatus = !status || (status === 'active' ? s.isActive : !s.isActive);
+      return matchQ && matchRole && matchStatus;
+    });
+
+    renderStaff(filtered);
+  }
+
+  function esc(str) {
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
   function renderStaff(staff) {
     const tbody = document.getElementById('staffTable');
     if (!staff.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;">
-        <div class="empty-icon">👤</div><p class="text-muted">No staff accounts yet</p>
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">
+        <div class="empty-icon">👤</div><p class="text-muted">No staff accounts found</p>
       </td></tr>`;
       return;
     }
+
     tbody.innerHTML = staff.map((s, i) => `
       <tr>
-        <td>${i+1}</td>
+        <td>${i + 1}</td>
         <td>
           <div class="flex items-center gap-2">
-            ${s.passportPhoto ? `<img src="${s.passportPhoto}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" />` : '<div style="width:34px;height:34px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>'}
-            <div><div class="font-semibold">${s.fullName}</div><div class="text-xs text-muted">@${s.username}</div></div>
+            ${s.passportPhoto
+              ? `<img src="${s.passportPhoto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+              : '<div style="width:36px;height:36px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">👤</div>'}
+            <div>
+              <div class="font-semibold">${s.fullName}</div>
+              <div class="text-xs text-muted">@${s.username} · ${s.email}</div>
+            </div>
           </div>
         </td>
-        <td>${s.phone}</td>
-        <td>${s.email}</td>
+        <td><span class="role-badge role-${s.role}">${ROLE_LABELS[s.role] || s.role}</span></td>
+        <td>${s.branch ? `<span class="text-sm">${s.branch.name}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td><div class="text-sm">${s.phone}</div></td>
         <td>
-          ${s.accountNumber ? `<div class="text-sm">${s.accountNumber}</div><div class="text-xs text-muted">${s.bankName}</div>` : '<span class="text-muted">—</span>'}
+          <span class="badge ${s.isActive ? 'badge-success' : 'badge-danger'}">${s.isActive ? 'Active' : 'Suspended'}</span>
+          ${!s.isActive && s.suspendReason ? `<div class="suspend-note">${s.suspendReason.slice(0, 40)}${s.suspendReason.length > 40 ? '…' : ''}</div>` : ''}
         </td>
-        <td>—</td>
-        <td><span class="badge ${s.isActive ? 'badge-success' : 'badge-danger'}">${s.isActive ? 'Active' : 'Inactive'}</span></td>
         <td>
-          <div class="table-actions">
+          <div class="table-actions" style="flex-wrap:wrap;gap:4px;">
             <button class="btn btn-sm btn-outline" onclick="openEditModal('${s._id}')">Edit</button>
-            <button class="btn btn-sm btn-warning" onclick="openResetPwd('${s._id}')">Reset Pwd</button>
-            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${s.fullName}')">Delete</button>
+            <button class="btn btn-sm btn-warning" onclick="openResetPwd('${s._id}')">Pwd</button>
+            ${s.isActive
+              ? `<button class="btn btn-sm btn-danger" onclick="openSuspend('${s._id}','${esc(s.fullName)}')">Suspend</button>`
+              : `<button class="btn btn-sm btn-primary" onclick="activateStaffAccount('${s._id}')">Activate</button>`}
+            <button class="btn btn-sm btn-outline" onclick="openLoginHistory('${s._id}','${esc(s.fullName)}')">History</button>
+            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${esc(s.fullName)}')">Del</button>
           </div>
         </td>
       </tr>
@@ -249,12 +384,14 @@
     document.getElementById('staffModalTitle').textContent = 'Edit Staff';
     document.getElementById('staffSubmitBtn').textContent = 'Save Changes';
     document.getElementById('editStaffId').value = id;
-    document.getElementById('sf_fullName').value = s.fullName;
-    document.getElementById('sf_phone').value = s.phone;
-    document.getElementById('sf_username').value = s.username;
-    document.getElementById('sf_email').value = s.email;
+    document.getElementById('sf_fullName').value      = s.fullName;
+    document.getElementById('sf_phone').value         = s.phone;
+    document.getElementById('sf_username').value      = s.username;
+    document.getElementById('sf_email').value         = s.email;
+    document.getElementById('sf_role').value          = s.role;
+    document.getElementById('sf_branch').value        = s.branch ? s.branch._id : '';
     document.getElementById('sf_accountNumber').value = s.accountNumber || '';
-    document.getElementById('sf_bankName').value = s.bankName || '';
+    document.getElementById('sf_bankName').value      = s.bankName || '';
     document.getElementById('passwordGroup').style.display = 'none';
     if (s.passportPhoto) {
       const preview = document.getElementById('sf_photoPreview');
@@ -271,6 +408,8 @@
     fd.append('phone',         document.getElementById('sf_phone').value.trim());
     fd.append('username',      document.getElementById('sf_username').value.trim());
     fd.append('email',         document.getElementById('sf_email').value.trim());
+    fd.append('role',          document.getElementById('sf_role').value);
+    fd.append('branch',        document.getElementById('sf_branch').value);
     fd.append('accountNumber', document.getElementById('sf_accountNumber').value.trim());
     fd.append('bankName',      document.getElementById('sf_bankName').value.trim());
 
@@ -313,6 +452,58 @@
       closeModal('resetPwdModal');
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  }
+
+  function openSuspend(id, name) {
+    targetStaffId = id;
+    document.getElementById('suspendStaffName').textContent = name;
+    document.getElementById('suspendReason').value = '';
+    document.getElementById('suspendModal').classList.add('open');
+  }
+
+  async function confirmSuspend() {
+    const reason = document.getElementById('suspendReason').value.trim();
+    try {
+      await API.suspendStaff(targetStaffId, { reason });
+      showToast('Staff account suspended', 'success');
+      closeModal('suspendModal');
+      loadStaff();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function activateStaffAccount(id) {
+    if (!confirm('Reactivate this staff account?')) return;
+    try {
+      await API.activateStaff(id);
+      showToast('Staff account activated', 'success');
+      loadStaff();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function openLoginHistory(id, name) {
+    document.getElementById('loginHistoryName').textContent = name;
+    document.getElementById('loginHistoryList').innerHTML = '<p class="text-muted">Loading…</p>';
+    document.getElementById('loginHistoryModal').classList.add('open');
+    try {
+      const res = await API.getStaffLoginHistory(id);
+      const history = res.loginHistory || [];
+      if (!history.length) {
+        document.getElementById('loginHistoryList').innerHTML = '<p class="text-muted">No login records found.</p>';
+        return;
+      }
+      document.getElementById('loginHistoryList').innerHTML = history.map((h, i) => `
+        <div class="login-history-item">
+          <div><strong>#${i + 1}</strong> &nbsp;${new Date(h.timestamp).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+          <div class="login-meta">${h.ip || 'Unknown IP'} &nbsp;·&nbsp; ${(h.userAgent || 'Unknown browser').slice(0, 80)}</div>
+        </div>
+      `).join('');
+    } catch (err) {
+      document.getElementById('loginHistoryList').innerHTML = `<p class="text-muted">${err.message}</p>`;
     }
   }
 
