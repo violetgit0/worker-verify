@@ -111,6 +111,7 @@ const API = {
   updateStaff:        (id, fd)  => apiFetch(`/staff/${id}`, { method: 'PUT', body: fd }),
   deleteStaff:        (id)      => apiFetch(`/staff/${id}`, { method: 'DELETE' }),
   restoreStaff:       (id)      => apiFetch(`/staff/${id}/restore`,          { method: 'PUT' }),
+  resetAllStaff:      ()        => apiFetch('/staff/reset-all', { method: 'POST', body: JSON.stringify({ confirm: 'RESET_ALL_STAFF' }) }),
   resetStaffPassword: (id, b)   => apiFetch(`/staff/${id}/reset-password`,   { method: 'PUT', body: JSON.stringify(b) }),
   suspendStaff:       (id, b)   => apiFetch(`/staff/${id}/suspend`,          { method: 'PUT', body: JSON.stringify(b) }),
   activateStaff:      (id)      => apiFetch(`/staff/${id}/activate`,         { method: 'PUT' }),

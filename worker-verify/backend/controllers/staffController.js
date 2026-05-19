@@ -289,8 +289,40 @@ const assignBranch = async (req, res) => {
   res.json({ success: true, message: 'Branch assigned successfully' });
 };
 
+// Hard-delete ALL staff accounts (active, suspended, soft-deleted) — keeps super_admin only
+const resetAllStaff = async (req, res) => {
+  const confirmKey = req.body.confirm;
+  if (confirmKey !== 'RESET_ALL_STAFF') {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing confirmation key. Send { confirm: "RESET_ALL_STAFF" } to proceed.'
+    });
+  }
+
+  // Count what we're about to delete
+  const toDelete = await User.find({ role: { $ne: 'super_admin' } }).select('fullName username role');
+  const count = toDelete.length;
+
+  if (count === 0) {
+    return res.json({ success: true, message: 'Nothing to delete — no staff accounts found.', deleted: 0 });
+  }
+
+  await User.deleteMany({ role: { $ne: 'super_admin' } });
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+  log('reset_all_staff', req.user, 'system', null, 'ALL STAFF',
+    { deletedCount: count, deletedNames: toDelete.map(s => `${s.fullName} (${s.role})`) }, ip);
+
+  res.json({
+    success: true,
+    message: `Deleted ${count} staff account(s). Database is clean — only Super Admin remains.`,
+    deleted: count
+  });
+};
+
 module.exports = {
   createStaff, getAllStaff, getStaffById, updateStaff,
   suspendStaff, activateStaff, deleteStaff, restoreStaff,
-  resetStaffPassword, getStaffLoginHistory, assignBranch
+  resetStaffPassword, getStaffLoginHistory, assignBranch,
+  resetAllStaff
 };

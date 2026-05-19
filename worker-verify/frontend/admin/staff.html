@@ -118,6 +118,21 @@
         🗄️ These accounts have been archived (soft deleted). Their usernames and emails are freed — you can restore any account to reactivate it, or create a new account with the same credentials.
       </div>
 
+      <!-- Danger Zone -->
+      <details style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);padding:10px 14px;background:var(--danger-light);border-radius:var(--radius);list-style:none;display:flex;align-items:center;gap:8px;">
+          ⚠️ Danger Zone — Reset Staff Accounts
+        </summary>
+        <div style="margin-top:8px;padding:16px;border:2px solid var(--danger);border-radius:var(--radius);background:var(--danger-light);">
+          <p style="font-size:13px;margin-bottom:10px;">
+            <strong>Permanently delete all staff accounts.</strong> This removes every staff member
+            (active, suspended, and archived) from the database. <strong>Your Super Admin account is kept.</strong>
+            This cannot be undone.
+          </p>
+          <button class="btn btn-danger btn-sm" onclick="openResetAllModal()">🗑️ Reset All Staff Accounts</button>
+        </div>
+      </details>
+
       <div class="card">
         <div class="table-wrapper">
           <table>
@@ -337,6 +352,31 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('restoreSuggestModal')">Use Different Credentials</button>
       <button class="btn btn-success" onclick="confirmRestoreSuggested()">Restore Archived Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset All Staff Modal -->
+<div class="modal-overlay" id="resetAllModal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h2 class="modal-title" style="color:var(--danger);">⚠️ Reset All Staff Accounts</h2>
+      <button class="btn-icon" onclick="closeModal('resetAllModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="margin-bottom:14px;">
+        This will <strong>permanently delete every staff account</strong> (active, suspended, and archived).
+        Your Super Admin login will be kept. <strong>This cannot be undone.</strong>
+      </p>
+      <div class="form-group">
+        <label class="form-label">Type <code>DELETE ALL STAFF</code> to confirm</label>
+        <input type="text" id="resetConfirmText" class="form-control"
+          placeholder="DELETE ALL STAFF" autocomplete="off" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('resetAllModal')">Cancel</button>
+      <button class="btn btn-danger" id="resetAllBtn" onclick="confirmResetAll()">Delete All Staff</button>
     </div>
   </div>
 </div>
@@ -783,6 +823,37 @@
       `).join('');
     } catch (err) {
       document.getElementById('loginHistoryList').innerHTML = `<p class="text-muted">${err.message}</p>`;
+    }
+  }
+
+  // ── Reset All Staff ────────────────────────────────────────────────────────
+
+  function openResetAllModal() {
+    document.getElementById('resetConfirmText').value = '';
+    document.getElementById('resetAllModal').classList.add('open');
+    setTimeout(() => document.getElementById('resetConfirmText').focus(), 100);
+  }
+
+  async function confirmResetAll() {
+    const typed = document.getElementById('resetConfirmText').value.trim();
+    if (typed !== 'DELETE ALL STAFF') {
+      showToast('Please type the exact confirmation phrase', 'error');
+      return;
+    }
+    const btn = document.getElementById('resetAllBtn');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      const res = await API.resetAllStaff();
+      showToast(res.message, 'success');
+      closeModal('resetAllModal');
+      staffList   = [];
+      deletedList = [];
+      updateCounts();
+      renderCurrentTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Delete All Staff';
     }
   }
 

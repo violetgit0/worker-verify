@@ -4,7 +4,7 @@ const {
   createStaff, getAllStaff, getStaffById,
   updateStaff, suspendStaff, activateStaff,
   deleteStaff, restoreStaff, resetStaffPassword,
-  getStaffLoginHistory, assignBranch
+  getStaffLoginHistory, assignBranch, resetAllStaff
 } = require('../controllers/staffController');
 const { updatePermissions, applyPreset } = require('../controllers/permissionController');
 const { protect } = require('../middleware/auth');
@@ -26,5 +26,6 @@ router.get('/:id/login-history',                   getStaffLoginHistory);
 router.put('/:id/assign-branch',                   assignBranch);
 router.put('/:id/permissions',                     updatePermissions);
 router.post('/:id/permissions/preset/:preset',     applyPreset);
+router.post('/reset-all',                          resetAllStaff);
 
 module.exports = router;
