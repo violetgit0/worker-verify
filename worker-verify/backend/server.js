@@ -63,40 +63,86 @@ app.get('/api/resolve-maps', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ success: false, message: 'url query param required' });
 
-  try {
-    const headRes = await fetch(url, {
-      method: 'HEAD', redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorkerSaveBot/2.0)' },
-      signal: AbortSignal.timeout(12000)
-    });
-    const finalUrl = headRes.url;
-    let lat = null, lng = null;
+  // Browser-like UA — Google returns richer redirects to desktop browsers
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-    const atMatch = finalUrl.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (atMatch) { lat = parseFloat(atMatch[1]); lng = parseFloat(atMatch[2]); }
-
-    if (!lat) {
-      const dataMatch = finalUrl.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/);
-      if (dataMatch) { lat = parseFloat(dataMatch[1]); lng = parseFloat(dataMatch[2]); }
-    }
-
-    if (!lat) {
-      try {
-        const u = new URL(finalUrl);
-        for (const p of ['q','ll','center']) {
-          const v = u.searchParams.get(p);
-          if (v) {
-            const m = v.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
-            if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); break; }
-          }
+  const extractCoords = (text) => {
+    // @lat,lng,zoom  (most common full Maps URL)
+    const m1 = text.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+    // !3d<lat>!4d<lng>  (place data format)
+    const m2 = text.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
+    if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
+    // query params: q=lat,lng  ll=lat,lng  center=lat,lng
+    try {
+      const u = new URL(text.startsWith('http') ? text : 'https://x.invalid/?' + text);
+      for (const p of ['q', 'll', 'center', 'query']) {
+        const v = u.searchParams.get(p);
+        if (v) {
+          const m = v.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+          if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
         }
-      } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  try {
+    // Use GET — maps.app.goo.gl short links (esp. with ?g_st=ac from mobile sharing)
+    // do NOT follow through to the coordinate-bearing URL with HEAD requests.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    let getRes;
+    try {
+      getRes = await fetch(url, {
+        method: 'GET', redirect: 'follow',
+        headers: { 'User-Agent': UA },
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
     }
 
-    if (!lat || !lng) {
-      return res.json({ success: false, finalUrl, message: 'Could not extract coordinates from this link' });
+    const finalUrl = getRes.url;
+
+    // Try the final redirected URL first — usually contains @lat,lng
+    const fromUrl = extractCoords(finalUrl);
+    if (fromUrl) {
+      return res.json({ success: true, lat: fromUrl.lat, lng: fromUrl.lng, finalUrl });
     }
-    res.json({ success: true, lat, lng, finalUrl });
+
+    // Fallback: read first 10KB of HTML body — coords appear in og:url / canonical / JS
+    let chunk = '';
+    try {
+      const reader = getRes.body.getReader();
+      const decoder = new TextDecoder();
+      let totalRead = 0;
+      while (totalRead < 10240) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunk += decoder.decode(value, { stream: true });
+        totalRead += value.length;
+      }
+      reader.cancel().catch(() => {});
+    } catch (_) {}
+
+    // Try raw body text
+    const fromBody = extractCoords(chunk);
+    if (fromBody) {
+      return res.json({ success: true, lat: fromBody.lat, lng: fromBody.lng, finalUrl });
+    }
+
+    // Try og:url and canonical <link> href values
+    const metaUrls = [...chunk.matchAll(/(?:og:url|canonical)[^>]+?(?:content|href)="([^"]+)"/g)]
+      .map(m => m[1]);
+    for (const mu of metaUrls) {
+      const fromMeta = extractCoords(mu);
+      if (fromMeta) {
+        return res.json({ success: true, lat: fromMeta.lat, lng: fromMeta.lng, finalUrl: mu });
+      }
+    }
+
+    return res.json({ success: false, finalUrl, message: 'Could not extract coordinates from this link' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
