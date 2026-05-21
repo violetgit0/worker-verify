@@ -128,7 +128,12 @@
   const token  = localStorage.getItem('wv_worker_token');
   const worker = (() => { try { return JSON.parse(localStorage.getItem('wv_worker')); } catch { return null; } })();
 
-  if (!token || !worker) { window.location.href = 'index.html'; }
+  if (!token || !worker) {
+    // Clear both keys so index.html doesn't redirect back here (loop prevention)
+    localStorage.removeItem('wv_worker_token');
+    localStorage.removeItem('wv_worker');
+    window.location.href = 'index.html';
+  }
 
   function getWorkerHeaders(isFormData = false) {
     const h = { 'Authorization': `Bearer ${token}` };

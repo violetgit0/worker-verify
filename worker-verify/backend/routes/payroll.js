@@ -9,6 +9,9 @@ const { companyScope } = require('../middleware/companyScope');
 const { hasPermission } = require('../middleware/roleCheck');
 const { workerProtect } = require('../middleware/workerAuth');
 
+// Worker self-service route (uses worker JWT, must be before protect middleware)
+router.get('/my-payroll', workerProtect, getWorkerPayroll);
+
 router.use(protect, companyScope);
 
 router.get('/summary',          getPayrollSummary);

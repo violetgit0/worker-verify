@@ -37,12 +37,7 @@
       <div style="font-weight:700;font-size:1rem;" id="phoneDisplay"></div>
     </div>
     <div style="display:flex;justify-content:center;gap:8px;margin-bottom:20px;" id="pinDigits"></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto 16px;">
-      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k => `
-        <button class="pin-key" onclick="pinPress('${k}')"
-          style="padding:14px 0;font-size:1.1rem;font-weight:600;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);cursor:pointer;${k===''?'visibility:hidden;':''}"
-        >${k}</button>`).join('')}
-    </div>
+    <div id="pinKeyboard" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto 16px;"></div>
     <button class="btn btn-primary" style="width:100%;" onclick="submitLogin()">Sign In</button>
     <button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:0.85rem;color:var(--gray-500);" onclick="backToPhone()">← Change number</button>
   </div>
@@ -58,6 +53,17 @@
   if (localStorage.getItem('wv_worker_token')) {
     window.location.href = 'dashboard.html';
   }
+
+  // Build PIN number pad (must be JS — template literals don't evaluate in raw HTML)
+  (function buildPinKeyboard() {
+    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'];
+    document.getElementById('pinKeyboard').innerHTML = keys.map(k => `
+      <button onclick="pinPress('${k}')"
+        style="padding:14px 0;font-size:1.1rem;font-weight:600;border:1px solid var(--gray-200);
+               border-radius:10px;background:var(--white);cursor:pointer;
+               ${k === '' ? 'visibility:hidden;' : ''}"
+      >${k}</button>`).join('');
+  })();
 
   let pinValue = '';
   const MAX_PIN = 6;
