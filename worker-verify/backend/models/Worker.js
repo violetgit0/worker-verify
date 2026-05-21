@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const signatureSchema = new mongoose.Schema({
-  sigType:  { type: String, enum: ['drawn', 'uploaded'], default: null },
+  sigType:  { type: String, enum: ['drawn', 'uploaded', null], default: null },
   url:      { type: String, default: '' },
   signedAt: { type: Date, default: null }
 }, { _id: false });
