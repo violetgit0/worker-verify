@@ -3,7 +3,8 @@ const router  = express.Router();
 const {
   getAllCompanies, getCompanyById, suspendCompany, activateCompany,
   updateCompanySubscription, getPlatformStats,
-  getPlans, createPlan, updatePlan, getPlatformLogs
+  getPlans, createPlan, updatePlan, getPlatformLogs,
+  resetSystem
 } = require('../controllers/superAdminController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/roleCheck');
@@ -21,5 +22,6 @@ router.get('/plans',                          getPlans);
 router.post('/plans',                         createPlan);
 router.put('/plans/:id',                      updatePlan);
 router.get('/logs',                           getPlatformLogs);
+router.post('/reset-all',                     resetSystem);
 
 module.exports = router;

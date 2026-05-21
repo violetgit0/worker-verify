@@ -1,8 +1,17 @@
-const Company = require('../models/Company');
-const User    = require('../models/User');
-const Worker  = require('../models/Worker');
-const Plan    = require('../models/Plan');
-const ActivityLog = require('../models/ActivityLog');
+const Company        = require('../models/Company');
+const User           = require('../models/User');
+const Worker         = require('../models/Worker');
+const Plan           = require('../models/Plan');
+const ActivityLog    = require('../models/ActivityLog');
+const Branch         = require('../models/Branch');
+const Attendance     = require('../models/Attendance');
+const Deduction      = require('../models/Deduction');
+const DeductionRule  = require('../models/DeductionRule');
+const Payroll        = require('../models/Payroll');
+const SecurityAlert  = require('../models/SecurityAlert');
+const Guarantor      = require('../models/Guarantor');
+const TransferLog    = require('../models/TransferLog');
+const VerificationLog= require('../models/VerificationLog');
 
 const log = (action, by, targetId, targetName, details = {}) =>
   ActivityLog.create({
@@ -227,8 +236,72 @@ const getPlatformLogs = async (req, res) => {
   }
 };
 
+// ── System Reset ─────────────────────────────────────────────────────────────
+
+const resetSystem = async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    if (confirm !== 'RESET_ALL_COMPANIES') {
+      return res.status(400).json({
+        success: false,
+        message: 'Send { confirm: "RESET_ALL_COMPANIES" } to proceed'
+      });
+    }
+
+    const companyCount = await Company.countDocuments();
+    if (companyCount === 0) {
+      return res.json({ success: true, message: 'Nothing to reset — no companies found.', counts: {} });
+    }
+
+    // Cascade delete all tenant data. Plans and super_admin users are preserved.
+    const [
+      cResult, uResult, wResult, bResult, aResult,
+      dResult, drResult, pResult, saResult,
+      gResult, tlResult, vlResult, alResult
+    ] = await Promise.all([
+      Company.deleteMany({}),
+      User.deleteMany({ role: { $ne: 'super_admin' } }),
+      Worker.deleteMany({}),
+      Branch.deleteMany({}),
+      Attendance.deleteMany({}),
+      Deduction.deleteMany({}),
+      DeductionRule.deleteMany({}),
+      Payroll.deleteMany({}),
+      SecurityAlert.deleteMany({}),
+      Guarantor.deleteMany({}),
+      TransferLog.deleteMany({}),
+      VerificationLog.deleteMany({}),
+      ActivityLog.deleteMany({ company: { $ne: null } })
+    ]);
+
+    const counts = {
+      companies:       cResult.deletedCount,
+      users:           uResult.deletedCount,
+      workers:         wResult.deletedCount,
+      branches:        bResult.deletedCount,
+      attendance:      aResult.deletedCount,
+      deductions:      dResult.deletedCount,
+      deductionRules:  drResult.deletedCount,
+      payroll:         pResult.deletedCount,
+      securityAlerts:  saResult.deletedCount,
+    };
+
+    log('reset_system', req.user, null, 'ALL COMPANIES', counts);
+
+    res.json({
+      success: true,
+      message: `System reset complete. Deleted ${cResult.deletedCount} company(ies) and all related data.`,
+      counts
+    });
+  } catch (err) {
+    console.error('[resetSystem]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   getAllCompanies, getCompanyById, suspendCompany, activateCompany,
   updateCompanySubscription, getPlatformStats,
-  getPlans, createPlan, updatePlan, getPlatformLogs
+  getPlans, createPlan, updatePlan, getPlatformLogs,
+  resetSystem
 };

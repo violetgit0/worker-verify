@@ -147,5 +147,6 @@ const API = {
   getSuperAdminPlans:         ()           => apiFetch('/superadmin/plans'),
   createPlan:                 (body)       => apiFetch('/superadmin/plans',      { method: 'POST', body: JSON.stringify(body) }),
   updatePlan:                 (id, body)   => apiFetch(`/superadmin/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  getPlatformLogs:            (qs = '')    => apiFetch(`/superadmin/logs${qs}`)
+  getPlatformLogs:            (qs = '')    => apiFetch(`/superadmin/logs${qs}`),
+  resetSystem:                ()           => apiFetch('/superadmin/reset-all', { method: 'POST', body: JSON.stringify({ confirm: 'RESET_ALL_COMPANIES' }) })
 };

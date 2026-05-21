@@ -35,12 +35,6 @@
     .status-suspended { color:var(--danger-dark);  font-weight:600; font-size:12px; }
     .status-expired   { color:var(--warning-dark); font-weight:600; font-size:12px; }
 
-    /* modal */
-    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px; }
-    .modal-box { background:var(--white);border-radius:var(--radius-xl);padding:32px;width:100%;max-width:480px;box-shadow:var(--shadow-lg); }
-    .modal-title { font-size:18px;font-weight:700;margin:0 0 20px; }
-    .modal-actions { display:flex;gap:10px;justify-content:flex-end;margin-top:24px; }
-
     /* log table */
     .log-action { font-size:12px;color:var(--gray-500);background:var(--gray-100);padding:2px 8px;border-radius:4px; }
 
@@ -56,6 +50,11 @@
     .plan-card-footer { display:flex;justify-content:space-between;align-items:center; }
     .plans-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px; }
     .inactive-plan { opacity:.5; }
+
+    /* danger zone */
+    .danger-zone { border:2px solid var(--danger); border-radius:var(--radius-md); padding:20px; background:var(--danger-light); margin-top:24px; }
+    .danger-zone-title { font-size:14px; font-weight:700; color:var(--danger-dark); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    .danger-zone-desc  { font-size:13px; color:var(--gray-600); margin-bottom:14px; line-height:1.6; }
 
     @media(max-width:640px){
       .sa-tabs { flex-wrap:wrap; width:100%; }
@@ -80,10 +79,10 @@
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section-title">Platform</div>
-      <a href="#" class="nav-link active" onclick="showTab('overview')"><span class="nav-icon">📊</span> Overview</a>
-      <a href="#" class="nav-link" onclick="showTab('companies')"><span class="nav-icon">🏢</span> Companies</a>
-      <a href="#" class="nav-link" onclick="showTab('plans')"><span class="nav-icon">💳</span> Plans</a>
-      <a href="#" class="nav-link" onclick="showTab('logs')"><span class="nav-icon">📋</span> Platform Logs</a>
+      <a href="#" class="nav-link active" onclick="showTab('overview');return false;"><span class="nav-icon">📊</span> Overview</a>
+      <a href="#" class="nav-link" onclick="showTab('companies');return false;"><span class="nav-icon">🏢</span> Companies</a>
+      <a href="#" class="nav-link" onclick="showTab('plans');return false;"><span class="nav-icon">💳</span> Plans</a>
+      <a href="#" class="nav-link" onclick="showTab('logs');return false;"><span class="nav-icon">📋</span> Platform Logs</a>
     </nav>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
@@ -164,7 +163,7 @@
         </div>
 
         <!-- Recent companies -->
-        <div class="card">
+        <div class="card" style="margin-bottom:24px;">
           <div class="card-header">
             <h3 class="card-title">Recent Companies</h3>
             <button class="btn btn-primary btn-sm" onclick="showTab('companies')">View All →</button>
@@ -181,6 +180,18 @@
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="danger-zone">
+          <div class="danger-zone-title">⚠️ Danger Zone – Reset SaaS System</div>
+          <div class="danger-zone-desc">
+            <strong>Permanently wipe all company tenants.</strong>
+            This deletes every company, their workers, staff accounts, branches, attendance records,
+            payroll, deductions, and alerts. <strong>Your Platform Admin account is preserved.</strong>
+            Subscription plans are also preserved. This cannot be undone.
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="openResetModal()">🗑️ Reset All Companies</button>
         </div>
       </div>
 
@@ -263,51 +274,95 @@
 </div>
 
 <!-- ── Suspend Modal ── -->
-<div id="suspendModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <h3 class="modal-title">Suspend Company</h3>
-    <p style="color:var(--gray-500);font-size:14px;margin-bottom:16px;">Suspended companies lose all API access immediately. Their data is preserved and they can be reactivated.</p>
-    <div class="form-group">
-      <label class="form-label">Reason (shown to company admin)</label>
-      <textarea id="suspendReason" class="form-control" rows="3" placeholder="e.g. Payment overdue, violation of terms…"></textarea>
+<div id="suspendModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Suspend Company</h2>
+      <button class="btn-icon" onclick="closeModal('suspendModal')">✕</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('suspendModal')">Cancel</button>
-      <button class="btn btn-danger" id="suspendConfirmBtn" onclick="confirmSuspend()">Suspend Company</button>
+    <div class="modal-body">
+      <p style="color:var(--gray-500);font-size:14px;margin-bottom:16px;">
+        Suspended companies lose all API access immediately. Their data is preserved and they can be reactivated.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Company being suspended</label>
+        <div id="suspendCompanyName" style="font-weight:600;font-size:14px;padding:8px 0;color:var(--danger-dark);"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason (shown to company admin)</label>
+        <textarea id="suspendReason" class="form-control" rows="3" placeholder="e.g. Payment overdue, violation of terms…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('suspendModal')">Cancel</button>
+      <button class="btn btn-danger" id="suspendConfirmBtn" onclick="confirmSuspend()">⛔ Suspend Company</button>
     </div>
   </div>
 </div>
 
 <!-- ── Subscription Modal ── -->
-<div id="subModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <h3 class="modal-title">Update Subscription</h3>
-    <input type="hidden" id="subCompanyId" />
-    <div class="form-group">
-      <label class="form-label">Plan</label>
-      <select id="subPlan" class="form-control">
-        <option value="trial">Free Trial</option>
-        <option value="basic">Basic</option>
-        <option value="standard">Standard</option>
-        <option value="enterprise">Enterprise</option>
-      </select>
+<div id="subModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Update Subscription</h2>
+      <button class="btn-icon" onclick="closeModal('subModal')">✕</button>
     </div>
-    <div class="form-group">
-      <label class="form-label">Subscription Ends</label>
-      <input type="date" id="subEndsAt" class="form-control" />
+    <div class="modal-body">
+      <input type="hidden" id="subCompanyId" />
+      <div class="form-group">
+        <label class="form-label">Plan</label>
+        <select id="subPlan" class="form-control">
+          <option value="trial">Free Trial</option>
+          <option value="basic">Basic</option>
+          <option value="standard">Standard</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subscription Status</label>
+        <select id="subStatus" class="form-control">
+          <option value="active">Active</option>
+          <option value="expired">Expired</option>
+          <option value="suspended">Suspended</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subscription Ends</label>
+        <input type="date" id="subEndsAt" class="form-control" />
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Status</label>
-      <select id="subStatus" class="form-control">
-        <option value="active">Active</option>
-        <option value="expired">Expired</option>
-        <option value="suspended">Suspended</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('subModal')">Cancel</button>
+      <button class="btn btn-primary" id="subConfirmBtn" onclick="confirmSubscription()">✅ Update Subscription</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('subModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmSubscription()">Update Subscription</button>
+  </div>
+</div>
+
+<!-- ── Reset System Modal ── -->
+<div id="resetModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h2 class="modal-title" style="color:var(--danger);">⚠️ Reset All Companies</h2>
+      <button class="btn-icon" onclick="closeModal('resetModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--danger-light);border:1px solid var(--danger);border-radius:var(--radius);padding:14px;margin-bottom:16px;font-size:13px;color:var(--danger-dark);line-height:1.6;">
+        <strong>This will permanently delete:</strong><br/>
+        All companies · All workers · All staff accounts · All branches ·
+        All attendance · All payroll · All deductions · All alerts<br/><br/>
+        <strong>This will be kept:</strong><br/>
+        ✅ Your Platform Admin account &nbsp;·&nbsp; ✅ Subscription plans
+      </div>
+      <div id="resetCountPreview" style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">Loading preview…</div>
+      <div class="form-group">
+        <label class="form-label">Type <code>RESET ALL COMPANIES</code> to confirm</label>
+        <input type="text" id="resetConfirmText" class="form-control" placeholder="RESET ALL COMPANIES" autocomplete="off" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('resetModal')">Cancel</button>
+      <button class="btn btn-danger" id="resetConfirmBtn" onclick="confirmReset()">🗑️ Delete Everything</button>
     </div>
   </div>
 </div>
@@ -318,7 +373,6 @@
 <script>
   const user = requireAuth(['super_admin']);
   if (!user || user.company) {
-    // Company-level users should not be here
     window.location.href = '../admin/dashboard.html';
   }
 
@@ -355,24 +409,28 @@
   // ── Stats ─────────────────────────────────────────────────────────────────
   async function loadStats() {
     try {
-      const { stats } = await API.getPlatformStats();
+      const res = await API.getPlatformStats();
+      const stats = res.stats || {};
+      const recentCompanies = res.recentCompanies || [];
       statsLoaded = true;
 
-      document.getElementById('statCompanies').textContent = stats.totalCompanies ?? '—';
+      document.getElementById('statCompanies').textContent     = stats.totalCompanies  ?? '—';
       document.getElementById('statActiveCompanies').textContent = `${stats.activeCompanies ?? 0} active`;
-      document.getElementById('statWorkers').textContent   = stats.totalWorkers ?? '—';
-      document.getElementById('statPaying').textContent    = stats.payingCompanies ?? '—';
-      document.getElementById('statTrial').textContent     = (stats.planBreakdown?.trial ?? '—');
+      document.getElementById('statWorkers').textContent       = stats.totalWorkers    ?? '—';
+      document.getElementById('statPaying').textContent        = stats.paidCompanies   ?? '—';
+      document.getElementById('statTrial').textContent         = stats.planBreakdown?.trial ?? '—';
 
       const pb = stats.planBreakdown || {};
-      document.getElementById('planTrial').textContent    = pb.trial    ?? 0;
-      document.getElementById('planBasic').textContent    = pb.basic    ?? 0;
-      document.getElementById('planStandard').textContent = pb.standard ?? 0;
+      document.getElementById('planTrial').textContent      = pb.trial      ?? 0;
+      document.getElementById('planBasic').textContent      = pb.basic      ?? 0;
+      document.getElementById('planStandard').textContent   = pb.standard   ?? 0;
       document.getElementById('planEnterprise').textContent = pb.enterprise ?? 0;
 
-      // Recent companies
-      if (stats.recentCompanies?.length) {
-        renderRecentCompanies(stats.recentCompanies);
+      if (recentCompanies.length) {
+        renderRecentCompanies(recentCompanies);
+      } else {
+        document.getElementById('recentCompaniesTbody').innerHTML =
+          `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;">No companies yet</td></tr>`;
       }
     } catch (err) {
       showToast('Failed to load platform stats: ' + err.message, 'error');
@@ -394,6 +452,8 @@
 
   // ── Companies ─────────────────────────────────────────────────────────────
   async function loadCompanies() {
+    document.getElementById('companiesTbody').innerHTML =
+      `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>`;
     try {
       const { companies } = await API.getAllCompanies();
       allCompanies = companies || [];
@@ -401,16 +461,18 @@
       renderCompanies(allCompanies);
       document.getElementById('companiesCount').textContent = `${allCompanies.length} companies`;
     } catch (err) {
+      document.getElementById('companiesTbody').innerHTML =
+        `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;color:var(--danger);">${esc(err.message)}</td></tr>`;
       showToast('Failed to load companies: ' + err.message, 'error');
     }
   }
 
   function filterCompanies() {
-    const q   = document.getElementById('companySearch').value.toLowerCase();
-    const plan = document.getElementById('planFilter').value;
+    const q      = document.getElementById('companySearch').value.toLowerCase();
+    const plan   = document.getElementById('planFilter').value;
     const status = document.getElementById('statusFilter').value;
     const filtered = allCompanies.filter(c => {
-      const matchQ      = !q || c.name.toLowerCase().includes(q) || c.slug.includes(q);
+      const matchQ      = !q || c.name.toLowerCase().includes(q) || (c.slug || '').includes(q);
       const matchPlan   = !plan   || c.plan === plan;
       const matchStatus = !status || (status === 'active' ? c.isActive : !c.isActive);
       return matchQ && matchPlan && matchStatus;
@@ -426,7 +488,9 @@
     }
     tbody.innerHTML = list.map(c => {
       const statusCls = c.isActive ? 'status-active' : 'status-suspended';
-      const statusTxt = c.planStatus === 'suspended' ? 'Suspended' : c.planStatus === 'expired' ? 'Expired' : c.isActive ? 'Active' : 'Inactive';
+      const statusTxt = c.planStatus === 'suspended' ? 'Suspended'
+        : c.planStatus === 'expired' ? 'Expired'
+        : c.isActive ? 'Active' : 'Inactive';
       const expiry = c.plan === 'trial'
         ? (c.trialEndsAt ? formatDate(c.trialEndsAt) : '—')
         : (c.subscriptionEndsAt ? formatDate(c.subscriptionEndsAt) : '—');
@@ -449,10 +513,19 @@
         <td style="font-size:12px;color:var(--gray-500);">${expiry}</td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-outline btn-sm" onclick="openSubModal('${c._id}','${c.plan}','${c.planStatus}','${c.subscriptionEndsAt||''}')">✏️ Sub</button>
+            <button class="btn btn-outline btn-sm"
+              data-id="${c._id}"
+              data-plan="${esc(c.plan)}"
+              data-status="${esc(c.planStatus || 'active')}"
+              data-ends="${c.subscriptionEndsAt ? String(c.subscriptionEndsAt).slice(0,10) : ''}"
+              onclick="openSubModal(this.dataset.id,this.dataset.plan,this.dataset.status,this.dataset.ends)">✏️ Sub</button>
             ${c.isActive
-              ? `<button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger-dark);border:1px solid rgba(239,68,68,.2);" onclick="openSuspend('${c._id}','${esc(c.name)}')">⛔ Suspend</button>`
-              : `<button class="btn btn-sm" style="background:var(--success-light);color:var(--success-dark);border:1px solid rgba(16,185,129,.2);" onclick="activateCompany('${c._id}')">✅ Activate</button>`
+              ? `<button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger-dark);border:1px solid rgba(239,68,68,.2);"
+                  data-id="${c._id}" data-name="${esc(c.name)}"
+                  onclick="openSuspend(this.dataset.id,this.dataset.name)">⛔ Suspend</button>`
+              : `<button class="btn btn-sm" style="background:var(--success-light);color:var(--success-dark);border:1px solid rgba(16,185,129,.2);"
+                  data-id="${c._id}"
+                  onclick="activateCompanyAction(this.dataset.id)">✅ Activate</button>`
             }
           </div>
         </td>
@@ -508,10 +581,10 @@
       tbody.innerHTML = logs.map(l => `
         <tr>
           <td style="font-size:12px;white-space:nowrap;">${formatDate(l.createdAt)}</td>
-          <td style="font-size:13px;">${esc(l.performedBy?.fullName || 'System')}</td>
+          <td style="font-size:13px;">${esc(l.performedByName || l.performedBy?.fullName || 'System')}</td>
           <td><span class="log-action">${esc(l.action)}</span></td>
-          <td style="font-size:12px;color:var(--gray-500);">${esc(l.targetType || '—')}</td>
-          <td style="font-size:12px;color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.description || '—')}</td>
+          <td style="font-size:12px;color:var(--gray-500);">${esc(l.targetName || l.targetType || '—')}</td>
+          <td style="font-size:12px;color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(JSON.stringify(l.details || {}))}</td>
         </tr>`).join('');
 
       const pagination = res.pagination;
@@ -532,7 +605,8 @@
   function openSuspend(id, name) {
     pendingSuspendId = id;
     document.getElementById('suspendReason').value = '';
-    document.getElementById('suspendModal').style.display = 'flex';
+    document.getElementById('suspendCompanyName').textContent = name;
+    openModal('suspendModal');
   }
 
   async function confirmSuspend() {
@@ -541,24 +615,28 @@
     btn.disabled = true; btn.textContent = 'Suspending…';
     try {
       await API.suspendCompany(pendingSuspendId, { reason });
-      showToast('Company suspended', 'success');
+      showToast('Company suspended successfully', 'success');
       closeModal('suspendModal');
       companiesLoaded = false;
       loadCompanies();
+      statsLoaded = false;
+      loadStats();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
-      btn.disabled = false; btn.textContent = 'Suspend Company';
+      btn.disabled = false; btn.textContent = '⛔ Suspend Company';
     }
   }
 
-  async function activateCompany(id) {
+  async function activateCompanyAction(id) {
     if (!confirm('Reactivate this company?')) return;
     try {
       await API.activateCompany(id);
       showToast('Company activated', 'success');
       companiesLoaded = false;
       loadCompanies();
+      statsLoaded = false;
+      loadStats();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -567,7 +645,7 @@
   // ── Subscription Modal ────────────────────────────────────────────────────
   function openSubModal(id, plan, status, endsAt) {
     document.getElementById('subCompanyId').value = id;
-    document.getElementById('subPlan').value      = plan;
+    document.getElementById('subPlan').value      = plan || 'trial';
     document.getElementById('subStatus').value    = status || 'active';
     if (endsAt) {
       document.getElementById('subEndsAt').value = endsAt.slice(0, 10);
@@ -575,7 +653,7 @@
       const d = new Date(); d.setFullYear(d.getFullYear() + 1);
       document.getElementById('subEndsAt').value = d.toISOString().slice(0, 10);
     }
-    document.getElementById('subModal').style.display = 'flex';
+    openModal('subModal');
   }
 
   async function confirmSubscription() {
@@ -583,30 +661,80 @@
     const plan   = document.getElementById('subPlan').value;
     const status = document.getElementById('subStatus').value;
     const endsAt = document.getElementById('subEndsAt').value;
+    const btn    = document.getElementById('subConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
     try {
       await API.updateCompanySubscription(id, { plan, planStatus: status, subscriptionEndsAt: endsAt });
-      showToast('Subscription updated', 'success');
+      showToast('Subscription updated successfully', 'success');
       closeModal('subModal');
       companiesLoaded = false;
       loadCompanies();
+      statsLoaded = false;
+      loadStats();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '✅ Update Subscription';
     }
   }
 
-  function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
+  // ── Reset System ──────────────────────────────────────────────────────────
+  async function openResetModal() {
+    document.getElementById('resetConfirmText').value = '';
+    document.getElementById('resetCountPreview').textContent = 'Loading preview…';
+    openModal('resetModal');
+    // Load live counts for the preview
+    try {
+      const res = await API.getPlatformStats();
+      const stats = res.stats || {};
+      const totalCompanies = stats.totalCompanies ?? 0;
+      const totalWorkers   = stats.totalWorkers   ?? 0;
+      const totalUsers     = stats.totalUsers     ?? stats.activeCompanies ?? '?';
+      document.getElementById('resetCountPreview').innerHTML =
+        `<strong>Will delete:</strong> ${totalCompanies} company(ies), ${totalWorkers} workers, and all associated records.`;
+    } catch (_) {
+      document.getElementById('resetCountPreview').textContent = '';
+    }
   }
 
-  // Close modals on overlay click
+  async function confirmReset() {
+    const typed = document.getElementById('resetConfirmText').value.trim();
+    if (typed !== 'RESET ALL COMPANIES') {
+      showToast('Please type the exact confirmation phrase', 'error');
+      return;
+    }
+    const btn = document.getElementById('resetConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      const res = await API.resetSystem();
+      showToast(res.message || 'System reset complete', 'success');
+      closeModal('resetModal');
+      // Clear all cached data and reload
+      allCompanies = [];
+      statsLoaded = companiesLoaded = plansLoaded = false;
+      loadStats();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '🗑️ Delete Everything';
+    }
+  }
+
+  // ── Modal Helpers ─────────────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  // Close modals on backdrop click
   document.querySelectorAll('.modal-overlay').forEach(el => {
-    el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; });
+    el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
