@@ -101,7 +101,7 @@ const createStaff = async (req, res) => {
 const getAllStaff = async (req, res) => {
   try {
     const showDeleted = req.query.deleted === 'true';
-    const filter = { company: req.companyId, role: { $ne: 'super_admin' } };
+    const filter = { company: req.companyId, role: { $nin: ['super_admin', 'company_admin'] } };
     if (showDeleted) {
       filter.isDeleted = true;
     } else {

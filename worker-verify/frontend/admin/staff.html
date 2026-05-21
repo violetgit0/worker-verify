@@ -385,7 +385,7 @@
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script>
-  const currentUser = requireAuth(['super_admin']);
+  const currentUser = requireAuth(['super_admin', 'company_admin']);
   let staffList    = [];   // active + suspended
   let deletedList  = [];   // archived
   let targetStaffId     = null;
@@ -512,7 +512,13 @@
   }
 
   function esc(str) {
-    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // HTML-safe: prevents template corruption when names contain <, >, &, quotes
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   // ── Render: active / suspended ─────────────────────────────────────────────
@@ -538,31 +544,31 @@
         <td>
           <div class="flex items-center gap-2">
             ${s.passportPhoto
-              ? `<img src="${s.passportPhoto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+              ? `<img src="${esc(s.passportPhoto)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
               : '<div style="width:36px;height:36px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">👤</div>'}
             <div>
-              <div class="font-semibold">${s.fullName}</div>
-              <div class="text-xs text-muted">@${s.username} · ${s.email}</div>
+              <div class="font-semibold">${esc(s.fullName)}</div>
+              <div class="text-xs text-muted">@${esc(s.username)} · ${esc(s.email)}</div>
             </div>
           </div>
         </td>
-        <td><span class="role-badge role-${s.role}">${ROLE_LABELS[s.role] || s.role}</span></td>
-        <td>${s.branch ? `<span class="text-sm">${s.branch.name}</span>` : '<span class="text-muted">—</span>'}</td>
-        <td><div class="text-sm">${s.phone}</div></td>
+        <td><span class="role-badge role-${esc(s.role)}">${esc(ROLE_LABELS[s.role] || s.role)}</span></td>
+        <td>${s.branch ? `<span class="text-sm">${esc(s.branch.name)}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td><div class="text-sm">${esc(s.phone)}</div></td>
         <td>
-          <span class="badge ${s.isActive ? 'badge-success' : 'badge-danger'}">${s.isActive ? 'Active' : 'Suspended'}</span>
-          ${!s.isActive && s.suspendReason ? `<div class="suspend-note">${s.suspendReason.slice(0,40)}${s.suspendReason.length>40?'…':''}</div>` : ''}
+          <span class="badge ${s.isActive !== false ? 'badge-success' : 'badge-danger'}">${s.isActive !== false ? 'Active' : 'Suspended'}</span>
+          ${s.isActive === false && s.suspendReason ? `<div class="suspend-note">${esc(s.suspendReason.slice(0,40))}${s.suspendReason.length>40?'…':''}</div>` : ''}
         </td>
         <td>
           <div class="table-actions" style="flex-wrap:wrap;gap:4px;">
             <a href="staff-profile.html?id=${s._id}" class="btn btn-sm btn-primary">Permissions</a>
-            <button class="btn btn-sm btn-outline" onclick="openEditModal('${s._id}')">Edit</button>
-            <button class="btn btn-sm btn-warning" onclick="openResetPwd('${s._id}')">Pwd</button>
-            ${s.isActive
-              ? `<button class="btn btn-sm btn-danger" onclick="openSuspend('${s._id}','${esc(s.fullName)}')">Suspend</button>`
-              : `<button class="btn btn-sm btn-primary" onclick="activateStaffAccount('${s._id}')">Activate</button>`}
-            <button class="btn btn-sm btn-outline" onclick="openLoginHistory('${s._id}','${esc(s.fullName)}')">History</button>
-            <button class="btn btn-sm btn-danger" onclick="openDelete('${s._id}','${esc(s.fullName)}')">Archive</button>
+            <button class="btn btn-sm btn-outline" data-id="${s._id}" onclick="openEditModal(this.dataset.id)">Edit</button>
+            <button class="btn btn-sm btn-warning" data-id="${s._id}" onclick="openResetPwd(this.dataset.id)">Pwd</button>
+            ${s.isActive !== false
+              ? `<button class="btn btn-sm btn-danger" data-id="${s._id}" data-name="${esc(s.fullName)}" onclick="openSuspend(this.dataset.id,this.dataset.name)">Suspend</button>`
+              : `<button class="btn btn-sm btn-primary" data-id="${s._id}" onclick="activateStaffAccount(this.dataset.id)">Activate</button>`}
+            <button class="btn btn-sm btn-outline" data-id="${s._id}" data-name="${esc(s.fullName)}" onclick="openLoginHistory(this.dataset.id,this.dataset.name)">History</button>
+            <button class="btn btn-sm btn-danger" data-id="${s._id}" data-name="${esc(s.fullName)}" onclick="openDelete(this.dataset.id,this.dataset.name)">Archive</button>
           </div>
         </td>
       </tr>
@@ -587,27 +593,27 @@
         <td>
           <div class="flex items-center gap-2">
             ${s.passportPhoto
-              ? `<img src="${s.passportPhoto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;filter:grayscale(60%);" />`
+              ? `<img src="${esc(s.passportPhoto)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;filter:grayscale(60%);" />`
               : '<div style="width:36px;height:36px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">👤</div>'}
             <div>
-              <div class="font-semibold">${s.fullName}</div>
-              <div class="text-xs text-muted">Was: @${s.deletedUsername} · ${s.deletedEmail}</div>
+              <div class="font-semibold">${esc(s.fullName)}</div>
+              <div class="text-xs text-muted">Was: @${esc(s.deletedUsername || s.username)} · ${esc(s.deletedEmail || s.email)}</div>
             </div>
           </div>
         </td>
-        <td><span class="role-badge role-${s.role}">${ROLE_LABELS[s.role] || s.role}</span></td>
-        <td>${s.branch ? `<span class="text-sm">${s.branch.name}</span>` : '<span class="text-muted">—</span>'}</td>
-        <td><div class="text-sm">${s.phone}</div></td>
+        <td><span class="role-badge role-${esc(s.role)}">${esc(ROLE_LABELS[s.role] || s.role)}</span></td>
+        <td>${s.branch ? `<span class="text-sm">${esc(s.branch.name)}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td><div class="text-sm">${esc(s.phone)}</div></td>
         <td>
           <span class="badge badge-danger" style="font-size:11px;">Archived</span>
           <div class="deleted-info">
             ${s.deletedAt ? formatDate(s.deletedAt) : '—'}
-            ${s.deletedBy ? `· by ${s.deletedBy.fullName}` : ''}
+            ${s.deletedBy ? `· by ${esc(s.deletedBy.fullName)}` : ''}
           </div>
         </td>
         <td>
           <div class="table-actions" style="gap:4px;">
-            <button class="btn btn-sm btn-success" onclick="openRestore('${s._id}','${esc(s.fullName)}')">♻️ Restore</button>
+            <button class="btn btn-sm btn-success" data-id="${s._id}" data-name="${esc(s.fullName)}" onclick="openRestore(this.dataset.id,this.dataset.name)">♻️ Restore</button>
           </div>
         </td>
       </tr>
