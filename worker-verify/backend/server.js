@@ -93,14 +93,22 @@ app.get('/api/resolve-maps', async (req, res) => {
     return null;
   };
 
-  // Extract place name from a Google Maps place URL path segment
+  // Extract place name from a Google Maps URL — handles two redirect formats:
+  // 1. /maps/place/NAME/data=...   (g_st=ac links)
+  // 2. /maps?q=NAME&ftid=...       (g_st=ic links)
   const extractPlaceName = (mapUrl) => {
     try {
       const u = new URL(mapUrl);
+      // Format 1: place name in path
       const parts = u.pathname.split('/');
       const pi = parts.indexOf('place');
       if (pi !== -1 && parts[pi + 1]) {
         return decodeURIComponent(parts[pi + 1].replace(/\+/g, ' '));
+      }
+      // Format 2: place name in q= param (only when it's a name, not bare coordinates)
+      const q = u.searchParams.get('q');
+      if (q && !/^-?\d+\.?\d*[,\s]+-?\d+\.?\d*$/.test(q.trim())) {
+        return q;
       }
     } catch (_) {}
     return null;
