@@ -221,12 +221,16 @@
         </div>
         <div class="form-group">
           <label class="form-label">Passport Photo</label>
-          <div class="file-upload-area" onclick="document.getElementById('sf_photo').click()">
-            <div class="file-upload-icon">📸</div>
-            <div class="file-upload-text">Click to upload passport photo (JPG, PNG – max 5MB)</div>
-            <img id="sf_photoPreview" class="file-preview hidden" />
-            <input type="file" id="sf_photo" accept="image/*" onchange="previewImage(this,'sf_photoPreview')" />
-          </div>
+          <label for="sf_photo" class="file-upload-area" id="sf_uploadArea" style="display:block;cursor:pointer;">
+            <div class="file-upload-icon" id="sf_uploadIcon">📸</div>
+            <div class="file-upload-text" id="sf_uploadText">Click or tap to upload passport photo</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:4px;" id="sf_uploadHint">JPG, PNG, WebP · max 5MB</div>
+            <img id="sf_photoPreview" class="file-preview hidden" alt="Preview" />
+            <input type="file" id="sf_photo" name="passportPhoto"
+                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                   onchange="previewStaffPhoto(this)" />
+          </label>
+          <div id="sf_photoError" style="display:none;color:var(--danger);font-size:12px;margin-top:4px;"></div>
         </div>
       </form>
     </div>
@@ -628,7 +632,7 @@
     document.getElementById('editStaffId').value = '';
     document.getElementById('staffForm').reset();
     document.getElementById('passwordGroup').style.display = '';
-    document.getElementById('sf_photoPreview').classList.add('hidden');
+    resetPhotoUpload();
     document.getElementById('staffModal').classList.add('open');
   }
 
@@ -639,7 +643,7 @@
     document.getElementById('editStaffId').value           = id;
     document.getElementById('staffForm').reset();
     document.getElementById('passwordGroup').style.display = 'none';
-    document.getElementById('sf_photoPreview').classList.add('hidden');
+    resetPhotoUpload();
     document.getElementById('staffModal').classList.add('open');
 
     // Try in-memory first, fall back to API fetch
@@ -670,9 +674,7 @@
     document.getElementById('sf_bankName').value      = s.bankName      || '';
 
     if (s.passportPhoto) {
-      const preview = document.getElementById('sf_photoPreview');
-      preview.src = s.passportPhoto;
-      preview.classList.remove('hidden');
+      showPhotoPreview(s.passportPhoto);
     }
   }
 
@@ -696,28 +698,54 @@
     }
 
     const photoFile = document.getElementById('sf_photo').files[0];
-    if (photoFile) fd.append('passportPhoto', photoFile);
+    document.getElementById('sf_photoError').style.display = 'none';
+    if (photoFile) {
+      const MAX_SIZE = 5 * 1024 * 1024;
+      const ALLOWED  = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!ALLOWED.includes(photoFile.type)) {
+        const msg = 'Invalid file type. Please use JPG, PNG, or WebP.';
+        document.getElementById('sf_photoError').textContent = msg;
+        document.getElementById('sf_photoError').style.display = '';
+        showToast(msg, 'error');
+        return;
+      }
+      if (photoFile.size > MAX_SIZE) {
+        const msg = `Image too large (${(photoFile.size/1024/1024).toFixed(1)}MB). Max 5MB.`;
+        document.getElementById('sf_photoError').textContent = msg;
+        document.getElementById('sf_photoError').style.display = '';
+        showToast(msg, 'error');
+        return;
+      }
+      console.log('[Staff Upload] Photo selected:', photoFile.name, photoFile.type,
+                  (photoFile.size/1024).toFixed(0)+'KB');
+      fd.append('passportPhoto', photoFile);
+    }
 
     btn.disabled = true; btn.textContent = 'Saving…';
+    console.log('[Staff Upload] Submitting FormData, hasPhoto:', !!photoFile);
     try {
+      let res;
       if (id) {
-        await API.updateStaff(id, fd);
+        res = await API.updateStaff(id, fd);
+        console.log('[Staff Upload] updateStaff response:', res);
         showToast('Staff updated successfully', 'success');
       } else {
-        await API.createStaff(fd);
+        res = await API.createStaff(fd);
+        console.log('[Staff Upload] createStaff response:', res);
         showToast('Staff account created', 'success');
       }
       closeModal('staffModal');
       loadStaff();
     } catch (err) {
-      // 409 = archived account conflict — offer restore
+      console.error('[Staff Upload] Error:', err.status, err.message, err.data);
       if (err.status === 409 && err.data?.canRestore) {
         suggestedRestoreId = err.data.deletedStaffId;
         document.getElementById('suggestStaffName').textContent = err.data.deletedStaffName || 'Unknown';
         closeModal('staffModal');
         document.getElementById('restoreSuggestModal').classList.add('open');
       } else {
-        showToast(err.message, 'error');
+        const msg = err.message || 'Upload failed. Check your connection and try again.';
+        showToast(msg, 'error');
       }
     } finally {
       btn.disabled = false;
@@ -888,15 +916,45 @@
 
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-  function previewImage(input, previewId) {
+  function showPhotoPreview(src) {
+    const preview = document.getElementById('sf_photoPreview');
+    preview.src = src;
+    preview.classList.remove('hidden');
+    document.getElementById('sf_uploadIcon').style.display = 'none';
+    document.getElementById('sf_uploadText').style.display = 'none';
+    document.getElementById('sf_uploadHint').style.display = 'none';
+  }
+
+  function resetPhotoUpload() {
+    const preview = document.getElementById('sf_photoPreview');
+    preview.src = '';
+    preview.classList.add('hidden');
+    document.getElementById('sf_uploadIcon').style.display = '';
+    document.getElementById('sf_uploadText').style.display = '';
+    document.getElementById('sf_uploadHint').style.display = '';
+    document.getElementById('sf_photoError').style.display = 'none';
+  }
+
+  function previewStaffPhoto(input) {
     const file = input.files[0];
     if (!file) return;
+    const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!ALLOWED.includes(file.type)) {
+      document.getElementById('sf_photoError').textContent = 'Invalid file type. Use JPG, PNG, or WebP.';
+      document.getElementById('sf_photoError').style.display = '';
+      input.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      document.getElementById('sf_photoError').textContent =
+        `Image too large (${(file.size/1024/1024).toFixed(1)}MB). Max 5MB.`;
+      document.getElementById('sf_photoError').style.display = '';
+      input.value = '';
+      return;
+    }
+    document.getElementById('sf_photoError').style.display = 'none';
     const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.getElementById(previewId);
-      img.src = e.target.result;
-      img.classList.remove('hidden');
-    };
+    reader.onload = e => showPhotoPreview(e.target.result);
     reader.readAsDataURL(file);
   }
 </script>

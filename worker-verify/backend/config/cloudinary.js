@@ -2,6 +2,14 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('[Cloudinary] WARNING: One or more Cloudinary env vars are missing ' +
+               '(CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET). ' +
+               'File uploads will fail. Set these in your Render dashboard under Environment Variables.');
+} else {
+  console.log('[Cloudinary] Configured for cloud:', process.env.CLOUDINARY_CLOUD_NAME);
+}
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key:    process.env.CLOUDINARY_API_KEY,

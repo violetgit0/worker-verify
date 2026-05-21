@@ -76,7 +76,12 @@ const createStaff = async (req, res) => {
       createdBy:     req.user._id
     };
 
-    if (req.file) data.passportPhoto = req.file.path;
+    if (req.file) {
+      data.passportPhoto = req.file.path;
+      console.log('[createStaff] Photo saved to MongoDB:', req.file.path);
+    } else {
+      console.log('[createStaff] No photo file in request');
+    }
 
     const staff = await User.create(data);
 
@@ -163,7 +168,10 @@ const updateStaff = async (req, res) => {
     if (branch !== undefined)        staff.branch = branch || null;
     if (accountNumber !== undefined) staff.accountNumber = accountNumber;
     if (bankName !== undefined)      staff.bankName = bankName;
-    if (req.file)                    staff.passportPhoto = req.file.path;
+    if (req.file) {
+      staff.passportPhoto = req.file.path;
+      console.log('[updateStaff] Photo updated in MongoDB:', req.file.path);
+    }
 
     await staff.save();
 
