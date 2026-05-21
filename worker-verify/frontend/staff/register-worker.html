@@ -827,8 +827,8 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.js" defer></script>
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/auth.js"></script>
@@ -1350,6 +1350,10 @@
   }
 
   function openMapPicker(prefix) {
+    if (typeof L === 'undefined') {
+      showToast('Map is still loading, please try again in a moment', 'info');
+      return;
+    }
     const labels = { worker: 'Worker Home', g1: 'Guarantor 1 Home', g2: 'Guarantor 2 Home' };
     openLocationPicker(prefix, `📍 Pin ${labels[prefix] || prefix} Location`);
   }
