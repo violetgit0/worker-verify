@@ -93,7 +93,7 @@ const ROLE_DEFAULTS = {
     canOnlyViewAssignedBranch: false,
   },
   staff: {
-    canRegisterWorkers: false,
+    canRegisterWorkers: true,
     canEditWorkers: false,
     canDeleteWorkers: false,
     canApproveVerification: false,

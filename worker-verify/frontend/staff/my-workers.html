@@ -90,7 +90,7 @@
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script>
-  const user = requireAuth(['staff']);
+  const user = requireAuth(['staff', 'hr_staff', 'attendance_officer', 'verification_officer']);
   let currentPage = 1;
   const pageSize = 20;
 
