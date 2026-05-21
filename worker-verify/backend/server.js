@@ -67,15 +67,25 @@ app.get('/api/resolve-maps', async (req, res) => {
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
   const extractCoords = (text) => {
+    // Normalise URL-encoded characters so all patterns work on encoded text too
+    const t = text.replace(/%2C/gi, ',').replace(/%3D/gi, '=').replace(/&amp;/g, '&');
+
     // @lat,lng,zoom  (most common full Maps URL)
-    const m1 = text.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    const m1 = t.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+
     // !3d<lat>!4d<lng>  (place data format)
-    const m2 = text.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
+    const m2 = t.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
     if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
-    // query params: q=lat,lng  ll=lat,lng  center=lat,lng
+
+    // center=lat,lng  (staticmap URLs — coordinates appear here when Google
+    // returns a place-ID redirect that has no @lat,lng in the path)
+    const m3 = t.match(/[?&]center=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if (m3) return { lat: parseFloat(m3[1]), lng: parseFloat(m3[2]) };
+
+    // query params: q=lat,lng  ll=lat,lng  query=lat,lng
     try {
-      const u = new URL(text.startsWith('http') ? text : 'https://x.invalid/?' + text);
+      const u = new URL(t.startsWith('http') ? t : 'https://x.invalid/?' + t);
       for (const p of ['q', 'll', 'center', 'query']) {
         const v = u.searchParams.get(p);
         if (v) {
@@ -132,13 +142,16 @@ app.get('/api/resolve-maps', async (req, res) => {
       return res.json({ success: true, lat: fromBody.lat, lng: fromBody.lng, finalUrl });
     }
 
-    // Try og:url and canonical <link> href values
-    const metaUrls = [...chunk.matchAll(/(?:og:url|canonical)[^>]+?(?:content|href)="([^"]+)"/g)]
-      .map(m => m[1]);
+    // Try og:url, canonical, and og:image / itemprop="image" (staticmap URLs live here)
+    const metaUrls = [
+      ...[...chunk.matchAll(/(?:og:url|og:image|canonical)[^>]+?(?:content|href)="([^"]+)"/g)].map(m => m[1]),
+      ...[...chunk.matchAll(/itemprop="image"[^>]*content="([^"]+)"/g)].map(m => m[1]),
+      ...[...chunk.matchAll(/content="([^"]*staticmap[^"]+)"/g)].map(m => m[1])
+    ];
     for (const mu of metaUrls) {
       const fromMeta = extractCoords(mu);
       if (fromMeta) {
-        return res.json({ success: true, lat: fromMeta.lat, lng: fromMeta.lng, finalUrl: mu });
+        return res.json({ success: true, lat: fromMeta.lat, lng: fromMeta.lng, finalUrl });
       }
     }
 
