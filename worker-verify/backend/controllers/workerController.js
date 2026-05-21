@@ -6,8 +6,18 @@ const TransferLog = require('../models/TransferLog');
 const ActivityLog = require('../models/ActivityLog');
 const { uploadDataUrl } = require('../config/cloudinary');
 
+// Scoped worker lookup — enforces company isolation
+const findWorker = (id, req, populate = null) => {
+  const filter = { _id: id };
+  if (req.companyId) filter.company = req.companyId;
+  let q = Worker.findOne(filter);
+  if (populate) q = q.populate(populate);
+  return q;
+};
+
 const logActivity = (action, by, targetId, targetName, details = {}, ip = '') =>
   ActivityLog.create({
+    company: by.company || null,
     action,
     performedBy: by._id,
     performedByName: by.fullName,
@@ -71,7 +81,9 @@ const registerWorker = async (req, res) => {
     g2SigData, g2SigType
   } = req.body;
 
-  const existingWorker = await Worker.findOne({ nin });
+  const ninFilter = { nin };
+  if (req.companyId) ninFilter.company = req.companyId;
+  const existingWorker = await Worker.findOne(ninFilter);
   if (existingWorker) {
     return res.status(400).json({ success: false, message: 'A worker with this NIN already exists' });
   }
@@ -97,6 +109,7 @@ const registerWorker = async (req, res) => {
     registeredBy:  req.user._id
   };
 
+  if (req.companyId) workerData.company = req.companyId;
   if (branchId)    workerData.branch = branchId;
   if (shift && ['A','B'].includes(shift)) workerData.shift = shift;
   if (dateEmployed) workerData.dateEmployed = dateEmployed;
@@ -177,6 +190,7 @@ const registerWorker = async (req, res) => {
 const getAllWorkers = async (req, res) => {
   const { page = 1, limit = 20, status, search, branch, shift, employmentStatus, incomplete } = req.query;
   const query = {};
+  if (req.companyId) query.company = req.companyId;
 
   // Branch restriction for branch_manager
   if (req.user.role === 'branch_manager' && req.user.branch) {
@@ -229,7 +243,9 @@ const getAllWorkers = async (req, res) => {
 };
 
 const getWorkerById = async (req, res) => {
-  const worker = await Worker.findById(req.params.id)
+  const wbFilter = { _id: req.params.id };
+  if (req.companyId) wbFilter.company = req.companyId;
+  const worker = await Worker.findOne(wbFilter)
     .populate('registeredBy', 'fullName username phone')
     .populate('verifiedBy', 'fullName')
     .populate('guarantors')
@@ -266,7 +282,9 @@ const quickRegisterWorker = async (req, res) => {
   }
 
   if (nin) {
-    const existing = await Worker.findOne({ nin });
+    const ninF2 = { nin };
+    if (req.companyId) ninF2.company = req.companyId;
+    const existing = await Worker.findOne(ninF2);
     if (existing) return res.status(400).json({ success: false, message: 'A worker with this NIN already exists' });
   }
 
@@ -285,6 +303,7 @@ const quickRegisterWorker = async (req, res) => {
     registeredBy: req.user._id
   };
 
+  if (req.companyId) workerData.company = req.companyId;
   if (branchId)    workerData.branch = branchId;
   if (shift && ['A', 'B'].includes(shift)) workerData.shift = shift;
   if (dateEmployed) workerData.dateEmployed = dateEmployed;
@@ -310,7 +329,7 @@ const quickRegisterWorker = async (req, res) => {
 
 // ── Get verification completion for a worker ───────────────────────────────────
 const getWorkerCompletion = async (req, res) => {
-  const worker = await Worker.findById(req.params.id).populate('guarantors');
+  const worker = await findWorker(req.params.id, req, 'guarantors');
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   const steps = {
@@ -338,7 +357,7 @@ const getWorkerCompletion = async (req, res) => {
 // ── Update worker clock-in / payroll restrictions ─────────────────────────────
 const updateRestrictions = async (req, res) => {
   const { allowClockIn, allowPayroll } = req.body;
-  const worker = await Worker.findById(req.params.id);
+  const worker = await findWorker(req.params.id, req);
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   if (allowClockIn !== undefined) worker.allowClockIn = Boolean(allowClockIn);
@@ -360,7 +379,7 @@ const updateVerificationStatus = async (req, res) => {
     return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}` });
   }
 
-  const worker = await Worker.findById(req.params.id);
+  const worker = await findWorker(req.params.id, req);
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   const previousStatus = worker.verificationStatus;
@@ -399,14 +418,14 @@ const searchWorkers = async (req, res) => {
     ]
   }).distinct('worker');
 
-  const workers = await Worker.find({
-    $or: [
-      { fullName: { $regex: q, $options: 'i' } },
-      { phone:    { $regex: q, $options: 'i' } },
-      { nin:      { $regex: q, $options: 'i' } },
-      { _id:      { $in: guarantorWorkerIds } }
-    ]
-  }).populate('registeredBy', 'fullName').limit(30);
+  const searchFilter = { $or: [
+    { fullName: { $regex: q, $options: 'i' } },
+    { phone:    { $regex: q, $options: 'i' } },
+    { nin:      { $regex: q, $options: 'i' } },
+    { _id:      { $in: guarantorWorkerIds } }
+  ]};
+  if (req.companyId) searchFilter.company = req.companyId;
+  const workers = await Worker.find(searchFilter).populate('registeredBy', 'fullName').limit(30);
 
   res.json({ success: true, workers });
 };
@@ -419,7 +438,7 @@ const flagDocument = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid docStatus' });
   }
 
-  const worker = await Worker.findById(req.params.id).populate('guarantors');
+  const worker = await findWorker(req.params.id, req, 'guarantors');
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   let action = docStatus === 'approved' ? 'doc_approved' : 'doc_rejected';
@@ -450,7 +469,7 @@ const flagDocument = async (req, res) => {
 
 const updateSalary = async (req, res) => {
   const { monthlySalary, dailyRate } = req.body;
-  const worker = await Worker.findById(req.params.id);
+  const worker = await findWorker(req.params.id, req);
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
   if (monthlySalary !== undefined) worker.monthlySalary = parseFloat(monthlySalary) || 0;
   if (dailyRate !== undefined)     worker.dailyRate     = parseFloat(dailyRate) || 0;
@@ -462,7 +481,7 @@ const updateSalary = async (req, res) => {
 
 const assignBranch = async (req, res) => {
   const { branchId, notes } = req.body;
-  const worker = await Worker.findById(req.params.id).populate('branch', 'name code');
+  const worker = await findWorker(req.params.id, req, {path:'branch',select:'name code'});
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   if (branchId) {
@@ -474,7 +493,7 @@ const assignBranch = async (req, res) => {
   worker.branch = branchId || null;
   await worker.save();
 
-  const newWorker = await Worker.findById(req.params.id).populate('branch', 'name code');
+  const newWorker = await findWorker(req.params.id, req, {path:'branch',select:'name code'});
   const newBranch = newWorker.branch ? `${newWorker.branch.name} (${newWorker.branch.code})` : 'Unassigned';
 
   await TransferLog.create({
@@ -495,7 +514,7 @@ const assignShift = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid shift. Use A, B, or unassigned' });
   }
 
-  const worker = await Worker.findById(req.params.id);
+  const worker = await findWorker(req.params.id, req);
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   const oldShift = worker.shift;
@@ -521,7 +540,7 @@ const updateEmploymentStatus = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid employment status' });
   }
 
-  const worker = await Worker.findById(req.params.id);
+  const worker = await findWorker(req.params.id, req);
   if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
 
   const oldStatus = worker.employmentStatus;

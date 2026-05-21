@@ -4,69 +4,112 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#4DA3FF" />
-  <title>Login – WorkerSave</title>
+  <title>Sign In – WorkerSave</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .login-company-hint {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 14px; border-radius:8px;
+      background:var(--primary-light); margin-bottom:16px;
+      font-size:13px; color:var(--primary-dark);
+    }
+    .login-company-logo {
+      width:36px; height:36px; border-radius:8px;
+      object-fit:cover; flex-shrink:0;
+    }
+    .login-company-logo-placeholder {
+      width:36px; height:36px; border-radius:8px;
+      background:var(--primary); display:flex; align-items:center;
+      justify-content:center; font-size:18px; flex-shrink:0;
+    }
+    .form-toggle-link { font-size:13px; color:var(--primary); cursor:pointer; text-decoration:underline; }
+  </style>
 </head>
 <body>
 <div class="login-page">
 
   <!-- Brand Panel -->
-  <div class="login-brand">
+  <div class="login-brand" id="loginBrand">
     <div class="login-brand-logo">
-      <div class="login-brand-icon">⚡</div>
-      Sage Energy
+      <div class="login-brand-icon" id="brandIcon">⚡</div>
+      <span id="brandName">WorkerSave</span>
     </div>
-    <p class="login-tagline">Worker Verification & Staff Management System</p>
+    <p class="login-tagline" id="brandTagline">Multi-company Workforce Management Platform</p>
 
     <div class="login-feature">
       <div class="login-feature-icon">🛡️</div>
       <div class="login-feature-text">Secure identity & NIN verification for every worker</div>
     </div>
     <div class="login-feature">
-      <div class="login-feature-icon">📍</div>
-      <div class="login-feature-text">Google Maps address pinning for workers & guarantors</div>
+      <div class="login-feature-icon">🏢</div>
+      <div class="login-feature-text">Multi-branch workforce management across all locations</div>
     </div>
     <div class="login-feature">
-      <div class="login-feature-icon">📸</div>
-      <div class="login-feature-text">Cloudinary-powered photo & document storage</div>
+      <div class="login-feature-icon">💰</div>
+      <div class="login-feature-text">Automated payroll, attendance & deduction tracking</div>
     </div>
     <div class="login-feature">
-      <div class="login-feature-icon">👥</div>
-      <div class="login-feature-text">Role-based access for Admin and Staff accounts</div>
+      <div class="login-feature-icon">📊</div>
+      <div class="login-feature-text">Real-time analytics and branch performance reports</div>
     </div>
   </div>
 
   <!-- Login Form -->
   <div class="login-form-wrap">
-    <p class="login-form-eyebrow">Sage Energy Platform</p>
+    <p class="login-form-eyebrow">WorkerSave Platform</p>
     <h1 class="login-form-title">Welcome back</h1>
-    <p class="login-form-sub">Sign in to your account to continue</p>
+    <p class="login-form-sub">Sign in to your company account</p>
+
+    <!-- Company lookup hint -->
+    <div id="companyHint" style="display:none;" class="login-company-hint">
+      <div class="login-company-logo-placeholder" id="companyLogoWrap">🏢</div>
+      <div>
+        <div id="companyHintName" style="font-weight:600;"></div>
+        <div id="companyHintPlan" style="font-size:11px;color:var(--gray-500);text-transform:capitalize;"></div>
+      </div>
+    </div>
 
     <form id="loginForm" class="login-form" autocomplete="on">
       <div class="form-group">
+        <label class="form-label" for="companySlug">Company ID <span class="text-muted" style="font-weight:400;">(your company's unique identifier)</span></label>
+        <input id="companySlug" name="companySlug" type="text" class="form-control"
+          placeholder="e.g. sage-energy, acme-corp"
+          autocomplete="organization"
+          oninput="debounceCompanyLookup()"
+        />
+        <div class="form-hint" style="font-size:11px;color:var(--gray-400);margin-top:4px;">
+          Don't know your company ID? Contact your company admin.
+        </div>
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="username">Username or Email</label>
-        <input id="username" name="username" type="text" class="form-control" placeholder="Enter username or email" required autocomplete="username" />
-        <div class="form-error" id="usernameError"></div>
+        <input id="username" name="username" type="text" class="form-control"
+          placeholder="Enter username or email" required autocomplete="username" />
       </div>
 
       <div class="form-group">
         <label class="form-label" for="password">Password</label>
         <div style="position:relative;">
-          <input id="password" name="password" type="password" class="form-control" placeholder="Enter password" required autocomplete="current-password" />
-          <button type="button" id="togglePwd" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--gray-400);">👁</button>
+          <input id="password" name="password" type="password" class="form-control"
+            placeholder="Enter password" required autocomplete="current-password" />
+          <button type="button" id="togglePwd"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--gray-400);">👁</button>
         </div>
-        <div class="form-error" id="passwordError"></div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">
-        Sign In
-      </button>
+      <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">Sign In</button>
     </form>
 
+    <div style="text-align:center;margin-top:16px;">
+      <span style="font-size:13px;color:var(--gray-500);">New to WorkerSave? </span>
+      <a href="register.html" style="font-size:13px;color:var(--primary);font-weight:600;">Register your company →</a>
+    </div>
+
     <div class="login-footer">
-      &copy; 2025 Sage Energy &amp; Natural Resources. All rights reserved.
+      &copy; 2025 WorkerSave. <a href="superadmin/login.html" style="color:var(--gray-400);font-size:11px;">Platform Admin</a>
     </div>
   </div>
 </div>
@@ -78,34 +121,95 @@
   // Redirect if already logged in
   if (getToken() && getUser()) {
     const u = getUser();
-    window.location.href = u.role === 'super_admin' ? 'admin/dashboard.html' : 'staff/dashboard.html';
+    if (u.role === 'super_admin' && !u.company) {
+      window.location.href = 'superadmin/dashboard.html';
+    } else if (['super_admin','company_admin'].includes(u.role)) {
+      window.location.href = 'admin/dashboard.html';
+    } else {
+      window.location.href = 'staff/dashboard.html';
+    }
   }
 
-  // Toggle password visibility
+  // Toggle password
   document.getElementById('togglePwd').addEventListener('click', () => {
-    const pwd = document.getElementById('password');
-    pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    const p = document.getElementById('password');
+    p.type = p.type === 'password' ? 'text' : 'password';
   });
 
-  // Login form submit
+  // Debounce company slug lookup
+  let lookupTimer;
+  function debounceCompanyLookup() {
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(lookupCompany, 600);
+  }
+
+  async function lookupCompany() {
+    const slug = document.getElementById('companySlug').value.trim().toLowerCase();
+    if (!slug || slug.length < 3) {
+      document.getElementById('companyHint').style.display = 'none';
+      document.getElementById('brandName').textContent = 'WorkerSave';
+      return;
+    }
+    try {
+      const res = await apiFetch(`/companies/lookup/${encodeURIComponent(slug)}`);
+      const c   = res.company;
+      document.getElementById('companyHintName').textContent = c.name;
+      document.getElementById('companyHintPlan').textContent = `${c.plan} plan`;
+      if (c.branding?.logo) {
+        document.getElementById('companyLogoWrap').innerHTML =
+          `<img src="${c.branding.logo}" class="login-company-logo" />`;
+      } else {
+        document.getElementById('companyLogoWrap').textContent = '🏢';
+      }
+      document.getElementById('companyHint').style.display = 'flex';
+      document.getElementById('brandName').textContent = c.name;
+      // Apply company colors
+      if (c.branding?.primaryColor) {
+        document.documentElement.style.setProperty('--primary', c.branding.primaryColor);
+      }
+    } catch (_) {
+      document.getElementById('companyHint').style.display = 'none';
+    }
+  }
+
+  // Pre-fill company slug from URL param (?company=sage-energy)
+  const urlSlug = new URLSearchParams(window.location.search).get('company');
+  if (urlSlug) {
+    document.getElementById('companySlug').value = urlSlug;
+    lookupCompany();
+  }
+
+  // Login
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('loginBtn');
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    const btn        = document.getElementById('loginBtn');
+    const username   = document.getElementById('username').value.trim();
+    const password   = document.getElementById('password').value;
+    const companySlug= document.getElementById('companySlug').value.trim().toLowerCase();
+
+    if (!companySlug) {
+      showToast('Please enter your Company ID to continue', 'error');
+      document.getElementById('companySlug').focus();
+      return;
+    }
 
     btn.disabled = true;
     btn.textContent = 'Signing in…';
 
     try {
-      const res = await API.login({ username, password });
+      const res = await API.login({ username, password, companySlug });
       saveSession(res.token, res.user);
+      // Store company info for branding
+      if (res.company) localStorage.setItem('wv_company', JSON.stringify(res.company));
       showToast('Login successful! Redirecting…', 'success');
       setTimeout(() => {
-        window.location.href = res.user.role === 'super_admin'
-          ? 'admin/dashboard.html'
-          : 'staff/dashboard.html';
-      }, 600);
+        const role = res.user.role;
+        if (['super_admin','company_admin','branch_manager'].includes(role)) {
+          window.location.href = 'admin/dashboard.html';
+        } else {
+          window.location.href = 'staff/dashboard.html';
+        }
+      }, 500);
     } catch (err) {
       showToast(err.message || 'Login failed', 'error');
       btn.disabled = false;

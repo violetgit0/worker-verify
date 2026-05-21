@@ -5,20 +5,20 @@ const {
   getDeductions, getWorkerDeductions, createManualDeduction, deleteDeduction
 } = require('../controllers/deductionController');
 const { protect } = require('../middleware/auth');
+const { companyScope } = require('../middleware/companyScope');
 const { authorize } = require('../middleware/roleCheck');
 const { workerProtect } = require('../middleware/workerAuth');
 
-// Rules (super_admin only)
-router.get('/rules',           protect, getDeductionRules);
-router.post('/rules',          protect, authorize('super_admin'), createDeductionRule);
-router.put('/rules/:id',       protect, authorize('super_admin'), updateDeductionRule);
-router.delete('/rules/:id',    protect, authorize('super_admin'), deleteDeductionRule);
+router.use(protect, companyScope);
 
-// Records
-router.get('/',                protect, getDeductions);
-router.get('/worker/:workerId', protect, getWorkerDeductions);
-router.get('/my-deductions',   workerProtect, getWorkerDeductions);
-router.post('/manual',         protect, authorize('super_admin'), createManualDeduction);
-router.delete('/:id',          protect, authorize('super_admin'), deleteDeduction);
+router.get('/rules',            getDeductionRules);
+router.post('/rules',           authorize('super_admin', 'company_admin'), createDeductionRule);
+router.put('/rules/:id',        authorize('super_admin', 'company_admin'), updateDeductionRule);
+router.delete('/rules/:id',     authorize('super_admin', 'company_admin'), deleteDeductionRule);
+
+router.get('/',                 getDeductions);
+router.get('/worker/:workerId', getWorkerDeductions);
+router.post('/manual',          authorize('super_admin', 'company_admin'), createManualDeduction);
+router.delete('/:id',           authorize('super_admin', 'company_admin'), deleteDeduction);
 
 module.exports = router;

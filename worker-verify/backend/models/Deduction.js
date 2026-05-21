@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const deductionSchema = new mongoose.Schema({
+  company:    { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
   worker:     { type: mongoose.Schema.Types.ObjectId, ref: 'Worker', required: true },
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
   attendance: { type: mongoose.Schema.Types.ObjectId, ref: 'Attendance', default: null },
@@ -13,7 +14,7 @@ const deductionSchema = new mongoose.Schema({
   createdBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 
-deductionSchema.index({ worker: 1, month: 1, year: 1 });
+deductionSchema.index({ company: 1, worker: 1, month: 1, year: 1 });
 deductionSchema.index({ attendance: 1 });
 
 module.exports = mongoose.model('Deduction', deductionSchema);

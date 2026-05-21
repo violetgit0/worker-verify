@@ -6,7 +6,16 @@ const PERMISSIONS = [
   'canOnlyViewAssignedBranch'
 ];
 
+const ALL_PERMS = Object.fromEntries(
+  ['canRegisterWorkers','canEditWorkers','canDeleteWorkers','canApproveVerification',
+   'canSuspendWorkers','canManageAttendance','canViewPayroll','canEditPayroll',
+   'canManageBranches','canCreateStaff','canAssignShifts','canMoveWorkersBranch',
+   'canSackWorkers','canRestoreWorkers','canExportReports','canViewAllBranches',
+   'canOnlyViewAssignedBranch'].map(k => [k, true])
+);
+
 const ROLE_DEFAULTS = {
+  company_admin: { ...ALL_PERMS, canOnlyViewAssignedBranch: false },
   branch_manager: {
     canRegisterWorkers: true,
     canEditWorkers: true,

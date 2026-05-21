@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const ROLES = ['super_admin', 'branch_manager', 'hr_staff', 'attendance_officer', 'verification_officer', 'staff'];
+const ROLES = ['super_admin', 'company_admin', 'branch_manager', 'hr_staff', 'attendance_officer', 'verification_officer', 'staff'];
 
 const permissionsSchema = new mongoose.Schema({
   canRegisterWorkers:      { type: Boolean, default: false },
@@ -24,9 +24,12 @@ const permissionsSchema = new mongoose.Schema({
 }, { _id: false });
 
 const userSchema = new mongoose.Schema({
+  // Multi-tenant: null only for platform super_admin
+  company:       { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null },
+
   fullName:      { type: String, required: true, trim: true },
-  username:      { type: String, required: true, unique: true, lowercase: true, trim: true },
-  email:         { type: String, required: true, unique: true, lowercase: true, trim: true },
+  username:      { type: String, required: true, lowercase: true, trim: true },
+  email:         { type: String, required: true, lowercase: true, trim: true },
   phone:         { type: String, required: true },
   password:      { type: String, required: true },
   role:          { type: String, enum: ROLES, default: 'hr_staff' },
@@ -51,6 +54,12 @@ const userSchema = new mongoose.Schema({
   }],
   createdBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
+
+// Username and email are unique PER COMPANY (compound index)
+userSchema.index({ company: 1, username: 1 }, { unique: true });
+userSchema.index({ company: 1, email: 1 },    { unique: true });
+userSchema.index({ company: 1, role: 1 });
+userSchema.index({ company: 1, isDeleted: 1 });
 
 module.exports.ROLES = ROLES;
 

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const securityAlertSchema = new mongoose.Schema({
+  company:    { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
   worker:     { type: mongoose.Schema.Types.ObjectId, ref: 'Worker', required: true },
   attendance: { type: mongoose.Schema.Types.ObjectId, ref: 'Attendance', default: null },
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch',    default: null },
@@ -21,8 +22,7 @@ const securityAlertSchema = new mongoose.Schema({
   notes:      { type: String, default: '' }
 }, { timestamps: true });
 
-securityAlertSchema.index({ worker: 1, createdAt: -1 });
-securityAlertSchema.index({ isResolved: 1, createdAt: -1 });
-securityAlertSchema.index({ type: 1, isResolved: 1 });
+securityAlertSchema.index({ company: 1, worker: 1, createdAt: -1 });
+securityAlertSchema.index({ company: 1, isResolved: 1, createdAt: -1 });
 
 module.exports = mongoose.model('SecurityAlert', securityAlertSchema);

@@ -5,6 +5,7 @@ const { ROLE_DEFAULTS } = require('../config/permissions');
 
 const log = (action, by, targetType, targetId, targetName, details = {}, ip = '') =>
   ActivityLog.create({
+    company: by.company || null,
     action,
     performedBy: by._id,
     performedByName: by.fullName,
@@ -24,16 +25,18 @@ const createStaff = async (req, res) => {
       return res.status(400).json({ success: false, message: 'fullName, username, email, phone and password are required' });
     }
 
-    const allowedRoles = ['branch_manager', 'hr_staff', 'attendance_officer', 'verification_officer', 'staff'];
+    const allowedRoles = ['branch_manager', 'hr_staff', 'attendance_officer', 'verification_officer', 'staff', 'company_admin'];
     if (role && !allowedRoles.includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role specified' });
     }
 
     const uname  = username.trim().toLowerCase();
     const uemail = email.trim().toLowerCase();
+    const cid    = req.companyId;
 
-    // Check for active (non-deleted) conflict
+    // Check active conflict within this company
     const activeConflict = await User.findOne({
+      company: cid,
       isDeleted: { $ne: true },
       $or: [{ username: uname }, { email: uemail }]
     });
@@ -41,8 +44,9 @@ const createStaff = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Username or email already exists' });
     }
 
-    // Check if a deleted record holds this username or email — suggest restore
+    // Check deleted conflict within this company
     const deletedConflict = await User.findOne({
+      company: cid,
       isDeleted: true,
       $or: [{ deletedUsername: uname }, { deletedEmail: uemail }]
     });
@@ -58,10 +62,11 @@ const createStaff = async (req, res) => {
 
     const resolvedRole = role || 'hr_staff';
     const data = {
-      fullName: fullName.trim(),
-      username: uname,
-      email:    uemail,
-      phone:    phone.trim(),
+      company:       cid,
+      fullName:      fullName.trim(),
+      username:      uname,
+      email:         uemail,
+      phone:         phone.trim(),
       password,
       role:          resolvedRole,
       branch:        branch || null,
@@ -71,7 +76,6 @@ const createStaff = async (req, res) => {
       createdBy:     req.user._id
     };
 
-    // req.file is set by singleUpload only if Cloudinary succeeded
     if (req.file) data.passportPhoto = req.file.path;
 
     const staff = await User.create(data);
@@ -86,7 +90,6 @@ const createStaff = async (req, res) => {
     });
   } catch (err) {
     console.error('[createStaff]', err);
-    // Friendly message for Mongoose duplicate-key error
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern || {})[0] || 'field';
       return res.status(400).json({ success: false, message: `Duplicate ${field} — this ${field} is already in use.` });
@@ -98,10 +101,12 @@ const createStaff = async (req, res) => {
 const getAllStaff = async (req, res) => {
   try {
     const showDeleted = req.query.deleted === 'true';
-
-    const filter = showDeleted
-      ? { role: { $ne: 'super_admin' }, isDeleted: true }
-      : { role: { $ne: 'super_admin' }, isDeleted: { $ne: true } };
+    const filter = { company: req.companyId, role: { $ne: 'super_admin' } };
+    if (showDeleted) {
+      filter.isDeleted = true;
+    } else {
+      filter.isDeleted = { $ne: true };
+    }
 
     const staff = await User.find(filter)
       .select('-password -loginHistory')
@@ -119,7 +124,10 @@ const getAllStaff = async (req, res) => {
 
 const getStaffById = async (req, res) => {
   try {
-    const staff = await User.findById(req.params.id)
+    const filter = { _id: req.params.id };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter)
       .select('-password')
       .populate('branch', 'name code')
       .populate('createdBy', 'fullName')
@@ -141,15 +149,17 @@ const getStaffById = async (req, res) => {
 const updateStaff = async (req, res) => {
   try {
     const { fullName, phone, role, branch, accountNumber, bankName } = req.body;
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    const filter = { _id: req.params.id, isDeleted: { $ne: true } };
+    if (req.companyId) filter.company = req.companyId;
 
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
 
     if (fullName !== undefined)      staff.fullName = fullName;
     if (phone !== undefined)         staff.phone = phone;
-    if (role !== undefined && role !== 'super_admin') staff.role = role;
+    if (role !== undefined && !['super_admin'].includes(role)) staff.role = role;
     if (branch !== undefined)        staff.branch = branch || null;
     if (accountNumber !== undefined) staff.accountNumber = accountNumber;
     if (bankName !== undefined)      staff.bankName = bankName;
@@ -170,8 +180,10 @@ const updateStaff = async (req, res) => {
 const suspendStaff = async (req, res) => {
   try {
     const { reason } = req.body;
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    const filter = { _id: req.params.id, isDeleted: { $ne: true } };
+    if (req.companyId) filter.company = req.companyId;
 
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
@@ -194,8 +206,10 @@ const suspendStaff = async (req, res) => {
 
 const activateStaff = async (req, res) => {
   try {
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    const filter = { _id: req.params.id, isDeleted: { $ne: true } };
+    if (req.companyId) filter.company = req.companyId;
 
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
@@ -216,10 +230,12 @@ const activateStaff = async (req, res) => {
   }
 };
 
-// Soft delete — mangles username/email so the unique index is freed
 const deleteStaff = async (req, res) => {
   try {
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    const filter = { _id: req.params.id, isDeleted: { $ne: true } };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
@@ -245,10 +261,12 @@ const deleteStaff = async (req, res) => {
   }
 };
 
-// Restore a soft-deleted staff account
 const restoreStaff = async (req, res) => {
   try {
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: true });
+    const filter = { _id: req.params.id, isDeleted: true };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter);
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Deleted staff not found' });
     }
@@ -256,11 +274,13 @@ const restoreStaff = async (req, res) => {
     const uname  = staff.deletedUsername;
     const uemail = staff.deletedEmail;
 
-    const conflict = await User.findOne({
+    const conflictFilter = {
+      company: staff.company,
       isDeleted: { $ne: true },
       _id: { $ne: staff._id },
       $or: [{ username: uname }, { email: uemail }]
-    });
+    };
+    const conflict = await User.findOne(conflictFilter);
     if (conflict) {
       return res.status(409).json({
         success: false,
@@ -298,7 +318,10 @@ const resetStaffPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const staff = await User.findById(req.params.id);
+    const filter = { _id: req.params.id };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
@@ -318,7 +341,10 @@ const resetStaffPassword = async (req, res) => {
 
 const getStaffLoginHistory = async (req, res) => {
   try {
-    const staff = await User.findById(req.params.id).select('fullName loginHistory');
+    const filter = { _id: req.params.id };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter).select('fullName loginHistory');
     if (!staff) return res.status(404).json({ success: false, message: 'Staff not found' });
     res.json({ success: true, fullName: staff.fullName, loginHistory: staff.loginHistory });
   } catch (err) {
@@ -330,7 +356,10 @@ const getStaffLoginHistory = async (req, res) => {
 const assignBranch = async (req, res) => {
   try {
     const { branch } = req.body;
-    const staff = await User.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    const filter = { _id: req.params.id, isDeleted: { $ne: true } };
+    if (req.companyId) filter.company = req.companyId;
+
+    const staff = await User.findOne(filter);
     if (!staff || staff.role === 'super_admin') {
       return res.status(404).json({ success: false, message: 'Staff not found' });
     }
@@ -348,7 +377,6 @@ const assignBranch = async (req, res) => {
   }
 };
 
-// Hard-delete ALL staff accounts — keeps super_admin only
 const resetAllStaff = async (req, res) => {
   try {
     const confirmKey = req.body.confirm;
@@ -359,14 +387,19 @@ const resetAllStaff = async (req, res) => {
       });
     }
 
-    const toDelete = await User.find({ role: { $ne: 'super_admin' } }).select('fullName username role');
+    const filter = {
+      role: { $nin: ['super_admin', 'company_admin'] }
+    };
+    if (req.companyId) filter.company = req.companyId;
+
+    const toDelete = await User.find(filter).select('fullName username role');
     const count = toDelete.length;
 
     if (count === 0) {
       return res.json({ success: true, message: 'Nothing to delete — no staff accounts found.', deleted: 0 });
     }
 
-    await User.deleteMany({ role: { $ne: 'super_admin' } });
+    await User.deleteMany(filter);
 
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
     log('reset_all_staff', req.user, 'system', null, 'ALL STAFF',
@@ -374,7 +407,7 @@ const resetAllStaff = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Deleted ${count} staff account(s). Database is clean — only Super Admin remains.`,
+      message: `Deleted ${count} staff account(s). Only Admin remains.`,
       deleted: count
     });
   } catch (err) {

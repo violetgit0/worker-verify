@@ -30,8 +30,9 @@ function requireAuth(allowedRoles = []) {
   }
 
   if (allowedRoles.length && !allowedRoles.includes(user.role)) {
-    // Wrong role – send to their proper dashboard
-    if (user.role === 'super_admin') {
+    if (user.role === 'super_admin' && !user.company) {
+      window.location.href = '/superadmin/dashboard.html';
+    } else if (['super_admin', 'company_admin'].includes(user.role)) {
       window.location.href = '/admin/dashboard.html';
     } else {
       window.location.href = '/staff/dashboard.html';
@@ -43,7 +44,8 @@ function requireAuth(allowedRoles = []) {
 }
 
 const ROLE_DISPLAY = {
-  super_admin:          'Super Admin',
+  super_admin:          'Platform Admin',
+  company_admin:        'Company Admin',
   branch_manager:       'Branch Manager',
   hr_staff:             'HR Staff',
   attendance_officer:   'Attendance Officer',
@@ -63,6 +65,26 @@ function populateSidebarUser() {
   if (nameEl)   nameEl.textContent = user.fullName;
   if (roleEl)   roleEl.textContent = ROLE_DISPLAY[user.role] || user.role;
   if (avatarEl && user.passportPhoto) avatarEl.src = user.passportPhoto;
+
+  applyCompanyBranding();
+}
+
+// Apply stored company branding (name, colors) to the current page
+function applyCompanyBranding() {
+  try {
+    const company = JSON.parse(localStorage.getItem('wv_company') || 'null');
+    if (!company) return;
+
+    const brandNameEl = document.getElementById('sidebarBrandName');
+    if (brandNameEl) brandNameEl.textContent = company.name || 'WorkerSave';
+
+    if (company.branding?.primaryColor) {
+      document.documentElement.style.setProperty('--primary', company.branding.primaryColor);
+    }
+    if (company.branding?.accentColor) {
+      document.documentElement.style.setProperty('--accent', company.branding.accentColor);
+    }
+  } catch (_) {}
 }
 
 // Toast notification system

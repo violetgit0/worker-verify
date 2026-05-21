@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Platform Admin Login – WorkerSave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    .sa-login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1a2744 100%);
+      padding: 24px;
+    }
+    .sa-login-card {
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-xl);
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 32px 64px rgba(0,0,0,.5);
+    }
+    .sa-brand {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .sa-brand-icon {
+      width: 60px; height: 60px;
+      background: linear-gradient(135deg, #4DA3FF, #1d4ed8);
+      border-radius: 16px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 28px; margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(77,163,255,.4);
+    }
+    .sa-brand-title { font-size: 22px; font-weight: 700; color: #f1f5f9; margin: 0; }
+    .sa-brand-sub   { font-size: 13px; color: #64748b; margin: 4px 0 0; }
+    .sa-badge {
+      display: inline-block;
+      background: rgba(239,68,68,.15);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,.25);
+      border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 10px;
+      margin-top: 8px;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .sa-form-label  { color: #94a3b8; font-size: 13px; font-weight: 500; display: block; margin-bottom: 6px; }
+    .sa-form-input  {
+      width: 100%; padding: 11px 14px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--radius);
+      color: #f1f5f9; font-size: 14px;
+      outline: none; box-sizing: border-box;
+      transition: border-color .15s;
+    }
+    .sa-form-input:focus  { border-color: #4DA3FF; background: rgba(77,163,255,.06); }
+    .sa-form-input::placeholder { color: #475569; }
+    .sa-form-group { margin-bottom: 18px; }
+    .sa-submit {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #4DA3FF, #1d4ed8);
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+      box-shadow: 0 4px 14px rgba(77,163,255,.35);
+      transition: opacity .15s;
+    }
+    .sa-submit:hover  { opacity: .9; }
+    .sa-submit:disabled { opacity: .6; cursor: not-allowed; }
+    .sa-back { text-align: center; margin-top: 20px; font-size: 13px; color: #475569; }
+    .sa-back a { color: #4DA3FF; text-decoration: none; }
+    .sa-pwd-wrap { position: relative; }
+    .sa-pwd-toggle {
+      position: absolute; right: 12px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: #475569; font-size: 16px; padding: 0;
+    }
+    .sa-warning {
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.2);
+      border-radius: var(--radius); padding: 10px 14px;
+      color: #fbbf24; font-size: 12px; margin-bottom: 20px;
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+  </style>
+</head>
+<body>
+<div class="sa-login-page">
+  <div class="sa-login-card">
+    <div class="sa-brand">
+      <div class="sa-brand-icon">⚡</div>
+      <h1 class="sa-brand-title">WorkerSave</h1>
+      <p class="sa-brand-sub">Workforce Management Platform</p>
+      <span class="sa-badge">Platform Admin Access</span>
+    </div>
+
+    <div class="sa-warning">
+      <span>⚠️</span>
+      <span>This login is for platform administrators only. Company staff should use the <a href="../index.html" style="color:#fbbf24;">main login page</a>.</span>
+    </div>
+
+    <form id="loginForm">
+      <div class="sa-form-group">
+        <label class="sa-form-label" for="username">Admin Username</label>
+        <input id="username" type="text" class="sa-form-input" placeholder="platform_admin" required autocomplete="username" />
+      </div>
+      <div class="sa-form-group">
+        <label class="sa-form-label" for="password">Password</label>
+        <div class="sa-pwd-wrap">
+          <input id="password" type="password" class="sa-form-input" placeholder="Enter password" required autocomplete="current-password" />
+          <button type="button" class="sa-pwd-toggle" id="togglePwd">👁</button>
+        </div>
+      </div>
+      <button type="submit" class="sa-submit" id="loginBtn">Sign In to Platform</button>
+    </form>
+
+    <div class="sa-back">
+      <a href="../index.html">← Back to company login</a>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  // Already logged in as platform super_admin?
+  const u = getUser();
+  if (u && getToken() && u.role === 'super_admin' && !u.company) {
+    window.location.href = 'dashboard.html';
+  }
+
+  document.getElementById('togglePwd').addEventListener('click', () => {
+    const p = document.getElementById('password');
+    p.type = p.type === 'password' ? 'text' : 'password';
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn      = document.getElementById('loginBtn');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    btn.disabled    = true;
+    btn.textContent = 'Signing in…';
+
+    try {
+      // No companySlug = platform super_admin path
+      const res = await API.login({ username, password });
+
+      if (res.user.role !== 'super_admin' || res.user.company) {
+        showToast('This login is for platform admins only. Use the main login page.', 'error');
+        btn.disabled    = false;
+        btn.textContent = 'Sign In to Platform';
+        return;
+      }
+
+      saveSession(res.token, res.user);
+      showToast('Welcome, Platform Admin!', 'success');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
+    } catch (err) {
+      showToast(err.message || 'Login failed', 'error');
+      btn.disabled    = false;
+      btn.textContent = 'Sign In to Platform';
+    }
+  });
+</script>
+</body>
+</html>

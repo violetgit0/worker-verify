@@ -8,15 +8,18 @@ const {
 } = require('../controllers/staffController');
 const { updatePermissions, applyPreset } = require('../controllers/permissionController');
 const { protect } = require('../middleware/auth');
+const { companyScope } = require('../middleware/companyScope');
 const { authorize } = require('../middleware/roleCheck');
 const { singleUpload } = require('../middleware/upload');
+const User = require('../models/User');
+const { enforceLimit } = require('../middleware/companyScope');
 
-router.use(protect, authorize('super_admin'));
+router.use(protect, companyScope, authorize('super_admin', 'company_admin'));
 
 router.get('/',                                    getAllStaff);
-router.post('/',                  singleUpload,    createStaff);
+router.post('/',            singleUpload, enforceLimit(User, 'maxStaff'), createStaff);
 router.get('/:id',                                 getStaffById);
-router.put('/:id',                singleUpload,    updateStaff);
+router.put('/:id',          singleUpload,          updateStaff);
 router.delete('/:id',                              deleteStaff);
 router.put('/:id/suspend',                         suspendStaff);
 router.put('/:id/activate',                        activateStaff);

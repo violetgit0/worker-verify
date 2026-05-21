@@ -1,5 +1,7 @@
 const { ROLE_DEFAULTS } = require('../config/permissions');
 
+const ADMIN_ROLES = ['super_admin', 'company_admin'];
+
 const authorize = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user.role)) {
     return res.status(403).json({
@@ -10,11 +12,9 @@ const authorize = (...roles) => (req, res, next) => {
   next();
 };
 
-// Permission-based middleware. super_admin always passes.
-// For other roles: checks req.user.permissions[permKey].
-// Falls back to ROLE_DEFAULTS if no permissions have been set yet (legacy users).
+// Permission-based middleware. super_admin and company_admin always pass.
 const hasPermission = (...permKeys) => (req, res, next) => {
-  if (req.user.role === 'super_admin') return next();
+  if (ADMIN_ROLES.includes(req.user.role)) return next();
 
   const perms = req.user.permissions ? req.user.permissions.toObject() : {};
   const hasAnySet = Object.values(perms).some(v => v === true);
@@ -30,7 +30,6 @@ const hasPermission = (...permKeys) => (req, res, next) => {
   next();
 };
 
-// Restricts branch_manager (or canOnlyViewAssignedBranch users) to their assigned branch.
 const branchRestrict = (req, res, next) => {
   const user = req.user;
   const perms = user.permissions ? user.permissions.toObject() : {};
@@ -45,4 +44,4 @@ const branchRestrict = (req, res, next) => {
   next();
 };
 
-module.exports = { authorize, hasPermission, branchRestrict };
+module.exports = { authorize, hasPermission, branchRestrict, ADMIN_ROLES };

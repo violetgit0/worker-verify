@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Platform Dashboard – WorkerSave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    /* ── Platform admin overrides ── */
+    .sidebar { background: #0f172a; }
+    .sidebar-brand .brand-icon { background: linear-gradient(135deg,#4DA3FF,#1d4ed8); }
+    .nav-link.active { background: rgba(77,163,255,.15); color: #60b4ff; }
+    .nav-link:hover  { background: rgba(255,255,255,.05); color: #e2e8f0; }
+    .sidebar-footer .logout-btn { background: rgba(239,68,68,.1); color: #f87171; border: 1px solid rgba(239,68,68,.2); }
+
+    /* tabs */
+    .sa-tabs { display:flex; gap:4px; margin-bottom:24px; background:var(--white); border-radius:var(--radius-md); padding:4px; box-shadow:var(--shadow-sm); width:fit-content; }
+    .sa-tab  { padding:8px 18px; border-radius:var(--radius); border:none; background:none; font-size:13px; font-weight:500; color:var(--gray-500); cursor:pointer; transition:all .15s; }
+    .sa-tab.active { background:var(--primary); color:#fff; box-shadow:var(--shadow-primary); }
+
+    /* platform badge on stat cards */
+    .stat-icon.purple-bg { background:var(--purple-light); color:var(--purple); }
+    .stat-icon.orange-bg  { background:#fff7ed; color:#f97316; }
+
+    /* company table */
+    .company-row td { vertical-align:middle; }
+    .plan-badge { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600; text-transform:capitalize; }
+    .plan-trial    { background:var(--warning-light); color:var(--warning-dark); }
+    .plan-basic    { background:var(--info-light);    color:var(--info); }
+    .plan-standard { background:var(--success-light); color:var(--success-dark); }
+    .plan-enterprise { background:var(--purple-light); color:var(--purple); }
+    .status-active    { color:var(--success-dark); font-weight:600; font-size:12px; }
+    .status-suspended { color:var(--danger-dark);  font-weight:600; font-size:12px; }
+    .status-expired   { color:var(--warning-dark); font-weight:600; font-size:12px; }
+
+    /* modal */
+    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px; }
+    .modal-box { background:var(--white);border-radius:var(--radius-xl);padding:32px;width:100%;max-width:480px;box-shadow:var(--shadow-lg); }
+    .modal-title { font-size:18px;font-weight:700;margin:0 0 20px; }
+    .modal-actions { display:flex;gap:10px;justify-content:flex-end;margin-top:24px; }
+
+    /* log table */
+    .log-action { font-size:12px;color:var(--gray-500);background:var(--gray-100);padding:2px 8px;border-radius:4px; }
+
+    /* search/filter bar */
+    .filter-bar { display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap; }
+    .filter-bar input, .filter-bar select { flex:1;min-width:160px; }
+
+    /* plan card */
+    .plan-card { background:var(--white);border-radius:var(--radius-md);padding:20px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200); }
+    .plan-card-name { font-size:16px;font-weight:700;margin-bottom:4px; }
+    .plan-card-price { font-size:22px;font-weight:800;color:var(--primary);margin-bottom:12px; }
+    .plan-card-limits { font-size:12px;color:var(--gray-500);margin-bottom:12px;line-height:1.8; }
+    .plan-card-footer { display:flex;justify-content:space-between;align-items:center; }
+    .plans-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px; }
+    .inactive-plan { opacity:.5; }
+
+    @media(max-width:640px){
+      .sa-tabs { flex-wrap:wrap; width:100%; }
+      .sa-tab  { flex:1; text-align:center; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> WorkerSave</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" style="font-size:16px;">👤</div>
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" style="color:#f87171;font-size:11px;">Platform Admin</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Platform</div>
+      <a href="#" class="nav-link active" onclick="showTab('overview')"><span class="nav-icon">📊</span> Overview</a>
+      <a href="#" class="nav-link" onclick="showTab('companies')"><span class="nav-icon">🏢</span> Companies</a>
+      <a href="#" class="nav-link" onclick="showTab('plans')"><span class="nav-icon">💳</span> Plans</a>
+      <a href="#" class="nav-link" onclick="showTab('logs')"><span class="nav-icon">📋</span> Platform Logs</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title" id="headerTitle">Platform Dashboard</h1>
+      </div>
+      <div class="header-right">
+        <span class="header-user" style="font-size:12px;background:rgba(239,68,68,.1);color:#f87171;padding:4px 10px;border-radius:20px;font-weight:600;">PLATFORM ADMIN</span>
+      </div>
+    </header>
+
+    <main class="page-body">
+
+      <!-- ══ OVERVIEW TAB ══ -->
+      <div id="tab-overview">
+        <div class="dash-greeting">
+          <div class="dash-greeting-content">
+            <div class="dash-greeting-eyebrow">Platform Overview</div>
+            <h1>Welcome, <span id="greetName">Admin</span> 👋</h1>
+            <p>Monitor all companies, subscriptions, and platform activity from here.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid stats-grid-lg" style="margin-bottom:20px;">
+          <div class="stat-card">
+            <div class="stat-card-top"><span class="stat-label">Total Companies</span><div class="stat-icon purple-bg">🏢</div></div>
+            <div class="stat-value" id="statCompanies">—</div>
+            <div class="stat-footer" id="statActiveCompanies">Loading…</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top"><span class="stat-label">Total Workers</span><div class="stat-icon yellow">👷</div></div>
+            <div class="stat-value" id="statWorkers">—</div>
+            <div class="stat-footer">Across all companies</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top"><span class="stat-label">Paying Customers</span><div class="stat-icon green">✅</div></div>
+            <div class="stat-value" id="statPaying">—</div>
+            <div class="stat-footer">Non-trial subscriptions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top"><span class="stat-label">On Trial</span><div class="stat-icon orange-bg">⏳</div></div>
+            <div class="stat-value" id="statTrial">—</div>
+            <div class="stat-footer">Free trial active</div>
+          </div>
+        </div>
+
+        <!-- Plan breakdown -->
+        <div class="card" style="margin-bottom:24px;">
+          <div class="card-header">
+            <h3 class="card-title">Plan Distribution</h3>
+          </div>
+          <div class="card-body">
+            <div id="planBreakdown" class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));">
+              <div class="stat-card" style="padding:16px;">
+                <div class="stat-label" style="margin-bottom:4px;">Trial</div>
+                <div class="stat-value" id="planTrial" style="font-size:24px;">—</div>
+              </div>
+              <div class="stat-card" style="padding:16px;">
+                <div class="stat-label" style="margin-bottom:4px;">Basic</div>
+                <div class="stat-value" id="planBasic" style="font-size:24px;">—</div>
+              </div>
+              <div class="stat-card" style="padding:16px;">
+                <div class="stat-label" style="margin-bottom:4px;">Standard</div>
+                <div class="stat-value" id="planStandard" style="font-size:24px;">—</div>
+              </div>
+              <div class="stat-card" style="padding:16px;">
+                <div class="stat-label" style="margin-bottom:4px;">Enterprise</div>
+                <div class="stat-value" id="planEnterprise" style="font-size:24px;">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent companies -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Recent Companies</h3>
+            <button class="btn btn-primary btn-sm" onclick="showTab('companies')">View All →</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table class="data-table" id="recentCompaniesTable">
+                <thead><tr>
+                  <th>Company</th><th>Plan</th><th>Workers</th><th>Status</th><th>Joined</th>
+                </tr></thead>
+                <tbody id="recentCompaniesTbody">
+                  <tr><td colspan="5" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ COMPANIES TAB ══ -->
+      <div id="tab-companies" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;font-size:20px;font-weight:700;">All Companies</h2>
+          <span id="companiesCount" class="badge badge-primary" style="font-size:13px;padding:4px 12px;"></span>
+        </div>
+
+        <div class="filter-bar">
+          <input type="text" class="form-control" id="companySearch" placeholder="Search by name or slug…" oninput="filterCompanies()" />
+          <select class="form-control" id="planFilter" onchange="filterCompanies()">
+            <option value="">All Plans</option>
+            <option value="trial">Trial</option>
+            <option value="basic">Basic</option>
+            <option value="standard">Standard</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+          <select class="form-control" id="statusFilter" onchange="filterCompanies()">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr>
+                  <th>Company</th><th>Slug</th><th>Plan</th><th>Workers</th><th>Staff</th><th>Status</th><th>Trial Ends / Sub Ends</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="companiesTbody">
+                  <tr><td colspan="8" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PLANS TAB ══ -->
+      <div id="tab-plans" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;font-size:20px;font-weight:700;">Subscription Plans</h2>
+        </div>
+
+        <div id="plansGrid" class="plans-grid">
+          <div style="padding:24px;color:var(--gray-400);">Loading plans…</div>
+        </div>
+      </div>
+
+      <!-- ══ LOGS TAB ══ -->
+      <div id="tab-logs" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;font-size:20px;font-weight:700;">Platform Activity Logs</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadLogs()">↻ Refresh</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr>
+                  <th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Details</th>
+                </tr></thead>
+                <tbody id="logsTbody">
+                  <tr><td colspan="5" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card-footer" style="display:flex;justify-content:center;gap:8px;padding:16px;" id="logsPagination"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── Suspend Modal ── -->
+<div id="suspendModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3 class="modal-title">Suspend Company</h3>
+    <p style="color:var(--gray-500);font-size:14px;margin-bottom:16px;">Suspended companies lose all API access immediately. Their data is preserved and they can be reactivated.</p>
+    <div class="form-group">
+      <label class="form-label">Reason (shown to company admin)</label>
+      <textarea id="suspendReason" class="form-control" rows="3" placeholder="e.g. Payment overdue, violation of terms…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('suspendModal')">Cancel</button>
+      <button class="btn btn-danger" id="suspendConfirmBtn" onclick="confirmSuspend()">Suspend Company</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Subscription Modal ── -->
+<div id="subModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3 class="modal-title">Update Subscription</h3>
+    <input type="hidden" id="subCompanyId" />
+    <div class="form-group">
+      <label class="form-label">Plan</label>
+      <select id="subPlan" class="form-control">
+        <option value="trial">Free Trial</option>
+        <option value="basic">Basic</option>
+        <option value="standard">Standard</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Subscription Ends</label>
+      <input type="date" id="subEndsAt" class="form-control" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select id="subStatus" class="form-control">
+        <option value="active">Active</option>
+        <option value="expired">Expired</option>
+        <option value="suspended">Suspended</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('subModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSubscription()">Update Subscription</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+  const user = requireAuth(['super_admin']);
+  if (!user || user.company) {
+    // Company-level users should not be here
+    window.location.href = '../admin/dashboard.html';
+  }
+
+  document.getElementById('sidebarUserName').textContent = user.fullName;
+  document.getElementById('greetName').textContent        = user.fullName.split(' ')[0];
+
+  // ── Tab Management ────────────────────────────────────────────────────────
+  const TABS = ['overview','companies','plans','logs'];
+  const TAB_TITLES = {
+    overview: 'Platform Dashboard',
+    companies: 'Companies',
+    plans: 'Subscription Plans',
+    logs: 'Platform Logs'
+  };
+
+  function showTab(name) {
+    TABS.forEach(t => {
+      document.getElementById(`tab-${t}`).style.display = t === name ? '' : 'none';
+    });
+    document.querySelectorAll('.nav-link').forEach((el, i) => {
+      el.classList.toggle('active', TABS[i] === name);
+    });
+    document.getElementById('headerTitle').textContent = TAB_TITLES[name] || 'Platform Dashboard';
+    if (name === 'overview' && !statsLoaded) loadStats();
+    if (name === 'companies' && !companiesLoaded) loadCompanies();
+    if (name === 'plans' && !plansLoaded) loadPlans();
+    if (name === 'logs' && !logsLoaded) loadLogs();
+  }
+
+  let statsLoaded = false, companiesLoaded = false, plansLoaded = false, logsLoaded = false;
+  let allCompanies = [];
+  let pendingSuspendId = null;
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const { stats } = await API.getPlatformStats();
+      statsLoaded = true;
+
+      document.getElementById('statCompanies').textContent = stats.totalCompanies ?? '—';
+      document.getElementById('statActiveCompanies').textContent = `${stats.activeCompanies ?? 0} active`;
+      document.getElementById('statWorkers').textContent   = stats.totalWorkers ?? '—';
+      document.getElementById('statPaying').textContent    = stats.payingCompanies ?? '—';
+      document.getElementById('statTrial').textContent     = (stats.planBreakdown?.trial ?? '—');
+
+      const pb = stats.planBreakdown || {};
+      document.getElementById('planTrial').textContent    = pb.trial    ?? 0;
+      document.getElementById('planBasic').textContent    = pb.basic    ?? 0;
+      document.getElementById('planStandard').textContent = pb.standard ?? 0;
+      document.getElementById('planEnterprise').textContent = pb.enterprise ?? 0;
+
+      // Recent companies
+      if (stats.recentCompanies?.length) {
+        renderRecentCompanies(stats.recentCompanies);
+      }
+    } catch (err) {
+      showToast('Failed to load platform stats: ' + err.message, 'error');
+    }
+  }
+
+  function renderRecentCompanies(list) {
+    const tbody = document.getElementById('recentCompaniesTbody');
+    tbody.innerHTML = list.map(c => `
+      <tr>
+        <td><strong>${esc(c.name)}</strong></td>
+        <td><span class="plan-badge plan-${c.plan}">${c.plan}</span></td>
+        <td>${c.workerCount ?? 0}</td>
+        <td><span class="${c.isActive ? 'status-active' : 'status-suspended'}">${c.isActive ? 'Active' : 'Suspended'}</span></td>
+        <td>${formatDate(c.createdAt)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Companies ─────────────────────────────────────────────────────────────
+  async function loadCompanies() {
+    try {
+      const { companies } = await API.getAllCompanies();
+      allCompanies = companies || [];
+      companiesLoaded = true;
+      renderCompanies(allCompanies);
+      document.getElementById('companiesCount').textContent = `${allCompanies.length} companies`;
+    } catch (err) {
+      showToast('Failed to load companies: ' + err.message, 'error');
+    }
+  }
+
+  function filterCompanies() {
+    const q   = document.getElementById('companySearch').value.toLowerCase();
+    const plan = document.getElementById('planFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const filtered = allCompanies.filter(c => {
+      const matchQ      = !q || c.name.toLowerCase().includes(q) || c.slug.includes(q);
+      const matchPlan   = !plan   || c.plan === plan;
+      const matchStatus = !status || (status === 'active' ? c.isActive : !c.isActive);
+      return matchQ && matchPlan && matchStatus;
+    });
+    renderCompanies(filtered);
+  }
+
+  function renderCompanies(list) {
+    const tbody = document.getElementById('companiesTbody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;">No companies found</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = list.map(c => {
+      const statusCls = c.isActive ? 'status-active' : 'status-suspended';
+      const statusTxt = c.planStatus === 'suspended' ? 'Suspended' : c.planStatus === 'expired' ? 'Expired' : c.isActive ? 'Active' : 'Inactive';
+      const expiry = c.plan === 'trial'
+        ? (c.trialEndsAt ? formatDate(c.trialEndsAt) : '—')
+        : (c.subscriptionEndsAt ? formatDate(c.subscriptionEndsAt) : '—');
+      return `
+      <tr class="company-row">
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${c.branding?.logo ? `<img src="${esc(c.branding.logo)}" style="width:32px;height:32px;border-radius:8px;object-fit:cover;" />` : '🏢'}</div>
+            <div>
+              <div style="font-weight:600;font-size:13px;">${esc(c.name)}</div>
+              <div style="font-size:11px;color:var(--gray-400);">${esc(c.email)}</div>
+            </div>
+          </div>
+        </td>
+        <td><code style="font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${esc(c.slug)}</code></td>
+        <td><span class="plan-badge plan-${c.plan}">${c.plan}</span></td>
+        <td>${c.workerCount ?? 0}</td>
+        <td>${c.staffCount ?? 0}</td>
+        <td><span class="${statusCls}">${statusTxt}</span></td>
+        <td style="font-size:12px;color:var(--gray-500);">${expiry}</td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="openSubModal('${c._id}','${c.plan}','${c.planStatus}','${c.subscriptionEndsAt||''}')">✏️ Sub</button>
+            ${c.isActive
+              ? `<button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger-dark);border:1px solid rgba(239,68,68,.2);" onclick="openSuspend('${c._id}','${esc(c.name)}')">⛔ Suspend</button>`
+              : `<button class="btn btn-sm" style="background:var(--success-light);color:var(--success-dark);border:1px solid rgba(16,185,129,.2);" onclick="activateCompany('${c._id}')">✅ Activate</button>`
+            }
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Plans ─────────────────────────────────────────────────────────────────
+  async function loadPlans() {
+    try {
+      const { plans } = await API.getSuperAdminPlans();
+      plansLoaded = true;
+      const grid = document.getElementById('plansGrid');
+      if (!plans?.length) { grid.innerHTML = '<p class="text-muted">No plans found.</p>'; return; }
+      grid.innerHTML = plans.map(p => {
+        const monthly = p.monthlyPrice ? `₦${(p.monthlyPrice/100).toLocaleString()}/mo` : 'Free';
+        return `
+        <div class="plan-card ${p.isActive ? '' : 'inactive-plan'}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <span class="plan-badge plan-${p.key}">${p.name}</span>
+            ${p.isActive ? '' : '<span style="font-size:11px;color:var(--gray-400);">Inactive</span>'}
+          </div>
+          <div class="plan-card-price">${monthly}</div>
+          <div class="plan-card-limits">
+            Workers: ${p.maxWorkers === -1 ? 'Unlimited' : p.maxWorkers}<br/>
+            Branches: ${p.maxBranches === -1 ? 'Unlimited' : p.maxBranches}<br/>
+            Staff: ${p.maxStaff === -1 ? 'Unlimited' : p.maxStaff}
+          </div>
+          <div class="plan-card-footer">
+            <span style="font-size:11px;color:var(--gray-400);">Key: <code>${p.key}</code></span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (err) {
+      showToast('Failed to load plans: ' + err.message, 'error');
+    }
+  }
+
+  // ── Logs ──────────────────────────────────────────────────────────────────
+  let logsPage = 1;
+  async function loadLogs(page = 1) {
+    logsPage = page;
+    logsLoaded = true;
+    const tbody = document.getElementById('logsTbody');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>`;
+    try {
+      const res = await API.getPlatformLogs(`?page=${page}&limit=20`);
+      const logs = res.logs || [];
+      if (!logs.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;">No platform logs yet</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = logs.map(l => `
+        <tr>
+          <td style="font-size:12px;white-space:nowrap;">${formatDate(l.createdAt)}</td>
+          <td style="font-size:13px;">${esc(l.performedBy?.fullName || 'System')}</td>
+          <td><span class="log-action">${esc(l.action)}</span></td>
+          <td style="font-size:12px;color:var(--gray-500);">${esc(l.targetType || '—')}</td>
+          <td style="font-size:12px;color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.description || '—')}</td>
+        </tr>`).join('');
+
+      const pagination = res.pagination;
+      const pag = document.getElementById('logsPagination');
+      if (pagination && pagination.pages > 1) {
+        pag.innerHTML = Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p =>
+          `<button class="btn btn-sm ${p === page ? 'btn-primary' : 'btn-outline'}" onclick="loadLogs(${p})">${p}</button>`
+        ).join('');
+      } else {
+        pag.innerHTML = '';
+      }
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;color:var(--danger);">${esc(err.message)}</td></tr>`;
+    }
+  }
+
+  // ── Suspend / Activate ────────────────────────────────────────────────────
+  function openSuspend(id, name) {
+    pendingSuspendId = id;
+    document.getElementById('suspendReason').value = '';
+    document.getElementById('suspendModal').style.display = 'flex';
+  }
+
+  async function confirmSuspend() {
+    const reason = document.getElementById('suspendReason').value.trim();
+    const btn    = document.getElementById('suspendConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Suspending…';
+    try {
+      await API.suspendCompany(pendingSuspendId, { reason });
+      showToast('Company suspended', 'success');
+      closeModal('suspendModal');
+      companiesLoaded = false;
+      loadCompanies();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Suspend Company';
+    }
+  }
+
+  async function activateCompany(id) {
+    if (!confirm('Reactivate this company?')) return;
+    try {
+      await API.activateCompany(id);
+      showToast('Company activated', 'success');
+      companiesLoaded = false;
+      loadCompanies();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ── Subscription Modal ────────────────────────────────────────────────────
+  function openSubModal(id, plan, status, endsAt) {
+    document.getElementById('subCompanyId').value = id;
+    document.getElementById('subPlan').value      = plan;
+    document.getElementById('subStatus').value    = status || 'active';
+    if (endsAt) {
+      document.getElementById('subEndsAt').value = endsAt.slice(0, 10);
+    } else {
+      const d = new Date(); d.setFullYear(d.getFullYear() + 1);
+      document.getElementById('subEndsAt').value = d.toISOString().slice(0, 10);
+    }
+    document.getElementById('subModal').style.display = 'flex';
+  }
+
+  async function confirmSubscription() {
+    const id     = document.getElementById('subCompanyId').value;
+    const plan   = document.getElementById('subPlan').value;
+    const status = document.getElementById('subStatus').value;
+    const endsAt = document.getElementById('subEndsAt').value;
+    try {
+      await API.updateCompanySubscription(id, { plan, planStatus: status, subscriptionEndsAt: endsAt });
+      showToast('Subscription updated', 'success');
+      closeModal('subModal');
+      companiesLoaded = false;
+      loadCompanies();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // Close modals on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; });
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadStats();
+</script>
+<script src="../assets/js/theme.js"></script>
+</body>
+</html>

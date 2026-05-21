@@ -123,5 +123,29 @@ const API = {
 
   // Permissions (super_admin only)
   updatePermissions: (id, perms) => apiFetch(`/staff/${id}/permissions`,                { method: 'PUT',  body: JSON.stringify({ permissions: perms }) }),
-  applyPreset:       (id, preset) => apiFetch(`/staff/${id}/permissions/preset/${preset}`, { method: 'POST' })
+  applyPreset:       (id, preset) => apiFetch(`/staff/${id}/permissions/preset/${preset}`, { method: 'POST' }),
+
+  // Companies (public + company admin)
+  getPlans:             ()        => apiFetch('/companies/plans'),
+  registerCompany:      (body)    => apiFetch('/companies/register', { method: 'POST', body: JSON.stringify(body) }),
+  lookupCompany:        (slug)    => apiFetch(`/companies/lookup/${encodeURIComponent(slug)}`),
+  getCompanyProfile:    ()        => apiFetch('/companies/profile'),
+  updateCompanyProfile: (body)    => apiFetch('/companies/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  updateBranding:       (fd)      => apiFetch('/companies/branding', { method: 'PUT', body: fd }),
+
+  // Billing
+  getBillingInfo:  ()     => apiFetch('/billing/subscription'),
+  initiateBilling: (body) => apiFetch('/billing/initiate', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Super Admin (platform owner only)
+  getPlatformStats:           ()           => apiFetch('/superadmin/stats'),
+  getAllCompanies:             (qs = '')    => apiFetch(`/superadmin/companies${qs}`),
+  getSuperAdminCompany:       (id)         => apiFetch(`/superadmin/companies/${id}`),
+  suspendCompany:             (id, body)   => apiFetch(`/superadmin/companies/${id}/suspend`,      { method: 'PUT', body: JSON.stringify(body) }),
+  activateCompany:            (id)         => apiFetch(`/superadmin/companies/${id}/activate`,     { method: 'PUT' }),
+  updateCompanySubscription:  (id, body)   => apiFetch(`/superadmin/companies/${id}/subscription`, { method: 'PUT', body: JSON.stringify(body) }),
+  getSuperAdminPlans:         ()           => apiFetch('/superadmin/plans'),
+  createPlan:                 (body)       => apiFetch('/superadmin/plans',      { method: 'POST', body: JSON.stringify(body) }),
+  updatePlan:                 (id, body)   => apiFetch(`/superadmin/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  getPlatformLogs:            (qs = '')    => apiFetch(`/superadmin/logs${qs}`)
 };
