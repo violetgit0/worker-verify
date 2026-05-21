@@ -264,7 +264,7 @@
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/maps.js?v=3"></script>
 <script>
-  const currentUser = requireAuth(['super_admin', 'staff']);
+  const currentUser = requireAuth(['super_admin', 'company_admin', 'staff']);
   const workerId = new URLSearchParams(window.location.search).get('id');
   let workerData = null;
   let pendingAction = null;

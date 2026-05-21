@@ -307,7 +307,7 @@
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script>
-  const user = requireAuth(['super_admin']);
+  const user = requireAuth(['super_admin', 'company_admin']);
   let listPage = 1;
 
   if (user) {
