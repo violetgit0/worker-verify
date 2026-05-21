@@ -359,8 +359,12 @@ function openLocationPicker(fieldPrefix, labelText = 'Pin Location') {
   const isShortLink = (url) => /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url);
 
   const doMapsLinkExtract = async () => {
-    const raw = document.getElementById('locMapsLinkInput').value.trim();
+    let raw = document.getElementById('locMapsLinkInput').value.trim();
     if (!raw) { showToast('Paste a Google Maps link first', 'error'); return; }
+    // Normalise — add https:// if user pasted without a scheme
+    if (!/^https?:\/\//i.test(raw) && !raw.toLowerCase().startsWith('geo:')) {
+      raw = 'https://' + raw;
+    }
 
     const extractBtn = modal.querySelector('#locMapsLinkExtract');
 

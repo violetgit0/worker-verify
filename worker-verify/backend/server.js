@@ -60,8 +60,12 @@ app.get('/api/health', (_req, res) => {
 
 // Resolve shortened Google Maps links server-side
 app.get('/api/resolve-maps', async (req, res) => {
-  const { url } = req.query;
+  let { url } = req.query;
   if (!url) return res.status(400).json({ success: false, message: 'url query param required' });
+  // Normalise — add https:// if pasted without scheme
+  if (!/^https?:\/\//i.test(url) && !url.toLowerCase().startsWith('geo:')) {
+    url = 'https://' + url;
+  }
 
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
