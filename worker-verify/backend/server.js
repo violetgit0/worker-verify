@@ -65,18 +65,20 @@ app.get('/api/resolve-maps', async (req, res) => {
 
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-  // Extract coordinates from any string — handles URL-encoded chars, all known Google Maps formats
-  const extractCoords = (text) => {
+  // Extract coords from a Google Maps URL (NOT from raw HTML bodies).
+  // Only matches patterns that are definitively the place location — not IP-based defaults.
+  const extractCoordsFromUrl = (text) => {
     const t = text.replace(/%2C/gi, ',').replace(/%3D/gi, '=').replace(/&amp;/g, '&');
+    // @lat,lng,zoom — only in canonical Maps URLs
     const m1 = t.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+    // !3d<lat>!4d<lng> — place data encoding
     const m2 = t.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
     if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
-    const m3 = t.match(/[?&]center=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
-    if (m3) return { lat: parseFloat(m3[1]), lng: parseFloat(m3[2]) };
+    // URL query params q=, ll=, center= when on the URL itself (not from HTML body)
     try {
       const u = new URL(t.startsWith('http') ? t : 'https://x.invalid/?' + t);
-      for (const p of ['q', 'll', 'center', 'query']) {
+      for (const p of ['q', 'll', 'center']) {
         const v = u.searchParams.get(p);
         if (v) {
           const m = v.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
@@ -150,50 +152,20 @@ app.get('/api/resolve-maps', async (req, res) => {
     const finalUrl = getRes.url;
     console.log('[resolve-maps] finalUrl:', finalUrl.slice(0, 120));
 
-    // Step 2: coords in the redirected URL itself (@lat,lng or !3d!4d)
-    const fromUrl = extractCoords(finalUrl);
+    // Step 2: extract coords from the redirected URL itself (@lat,lng or !3d!4d)
+    const fromUrl = extractCoordsFromUrl(finalUrl);
     if (fromUrl) {
       console.log('[resolve-maps] coords from URL:', fromUrl);
       return res.json({ success: true, ...fromUrl, finalUrl });
     }
 
-    // Step 3: scan first 12KB of HTML body (staticmap center=, og:image, canonical)
-    let chunk = '';
-    try {
-      const reader = getRes.body.getReader();
-      const decoder = new TextDecoder();
-      let totalRead = 0;
-      while (totalRead < 12288) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunk += decoder.decode(value, { stream: true });
-        totalRead += value.length;
-      }
-      reader.cancel().catch(() => {});
-    } catch (_) {}
-
-    const fromBody = extractCoords(chunk);
-    if (fromBody) {
-      console.log('[resolve-maps] coords from body:', fromBody);
-      return res.json({ success: true, ...fromBody, finalUrl });
-    }
-
-    for (const mu of [
-      ...[...chunk.matchAll(/(?:og:url|og:image|canonical)[^>]+?(?:content|href)="([^"]+)"/g)].map(m => m[1]),
-      ...[...chunk.matchAll(/content="([^"]*staticmap[^"]+)"/g)].map(m => m[1])
-    ]) {
-      const fromMeta = extractCoords(mu);
-      if (fromMeta) {
-        console.log('[resolve-maps] coords from meta:', fromMeta);
-        return res.json({ success: true, ...fromMeta, finalUrl });
-      }
-    }
-
-    // Step 4: extract place name from URL path, geocode with Nominatim (OSM)
-    // This works even when Google blocks HTML scraping from cloud server IPs
+    // Step 3: place name → Nominatim (OSM) geocoding.
+    // HTML body scraping is intentionally skipped — Google embeds its IP-based
+    // geolocation (Render US servers → Texas) into staticmap center= params,
+    // producing completely wrong coordinates for non-US places.
     const placeName = extractPlaceName(finalUrl);
     if (placeName) {
-      console.log('[resolve-maps] trying Nominatim for:', placeName);
+      console.log('[resolve-maps] no coords in URL, trying Nominatim for:', placeName);
       const fromNominatim = await nominatimGeocode(placeName);
       if (fromNominatim) {
         console.log('[resolve-maps] coords from Nominatim:', fromNominatim);
