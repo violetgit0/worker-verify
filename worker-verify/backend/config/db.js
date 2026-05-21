@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000, // fail fast rather than hanging 30s
-      socketTimeoutMS:          45000,
+      serverSelectionTimeoutMS: 60000,
+      socketTimeoutMS:          60000,
       maxPoolSize:              10,
       retryWrites:              true
     });
@@ -21,7 +21,7 @@ const connectDB = async () => {
     });
   } catch (err) {
     console.error('MongoDB initial connection failed:', err.message);
-    process.exit(1);
+    console.warn('Server will continue — Mongoose will keep retrying in the background.');
   }
 };
 
