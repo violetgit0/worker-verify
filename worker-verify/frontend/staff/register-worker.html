@@ -245,6 +245,22 @@
                   </select>
                 </div>
               </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Worker Category</label>
+                  <select id="w_category" class="form-control">
+                    <option value="">— No Category —</option>
+                  </select>
+                  <div class="form-hint">e.g. Pump Attendant, Security</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Shift Group</label>
+                  <select id="w_shiftRef" class="form-control">
+                    <option value="">— No Shift Group —</option>
+                  </select>
+                  <div class="form-hint">Named supervisor group</div>
+                </div>
+              </div>
               <div class="form-group">
                 <label class="form-label">Date Employed</label>
                 <input type="date" id="w_dateEmployed" class="form-control" />
@@ -832,7 +848,7 @@
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/auth.js"></script>
-<script src="../assets/js/maps.js?v=3"></script>
+<script src="../assets/js/maps.js?v=4"></script>
 <script>
   const user = requireAuth(['staff', 'super_admin', 'company_admin', 'branch_manager', 'hr_staff']);
   let currentStep = 1;
@@ -865,6 +881,8 @@
     populateSidebarUser();
     buildSidebarNav();
     loadBranchOptions();
+    loadCategoryOptions();
+    loadShiftOptions();
   }
 
   // ── DOB dropdowns ──────────────────────────────────────────────────────────
@@ -1081,6 +1099,33 @@
         const opt = document.createElement('option');
         opt.value = b._id;
         opt.textContent = `${b.name} (${b.code})`;
+        sel.appendChild(opt);
+      });
+    } catch(_) {}
+  }
+
+  // ── Category & Shift Group options ─────────────────────────────────────────
+  async function loadCategoryOptions() {
+    try {
+      const res = await API.getCategories('?active=true');
+      const sel = document.getElementById('w_category');
+      (res.categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c._id;
+        opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+    } catch(_) {}
+  }
+
+  async function loadShiftOptions() {
+    try {
+      const res = await API.getShifts('?active=true');
+      const sel = document.getElementById('w_shiftRef');
+      (res.shifts || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s._id;
+        opt.textContent = s.supervisorName ? `${s.name} (${s.supervisorName})` : s.name;
         sel.appendChild(opt);
       });
     } catch(_) {}
@@ -1308,9 +1353,13 @@
 
     const branch      = document.getElementById('w_branch').value;
     const shift       = document.getElementById('w_shift').value;
+    const category    = document.getElementById('w_category').value;
+    const shiftRef    = document.getElementById('w_shiftRef').value;
     const dateEmployed = document.getElementById('w_dateEmployed').value;
     if (branch)        fd.append('branch', branch);
     if (shift)         fd.append('shift', shift);
+    if (category)      fd.append('category', category);
+    if (shiftRef)      fd.append('shiftRef', shiftRef);
     if (dateEmployed)  fd.append('dateEmployed', dateEmployed);
     if (skipVerify)    fd.append('verificationStatus', 'incomplete');
 

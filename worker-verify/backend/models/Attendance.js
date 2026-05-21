@@ -8,6 +8,8 @@ const attendanceSchema = new mongoose.Schema({
   branch:    { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   date:      { type: Date, required: true },
   shift:     { type: String, enum: ['A', 'B', 'unassigned'], default: 'unassigned' },
+  shiftRef:  { type: mongoose.Schema.Types.ObjectId, ref: 'Shift', default: null },
+  category:  { type: mongoose.Schema.Types.ObjectId, ref: 'WorkerCategory', default: null },
 
   clockInTime:  { type: Date, default: null },
   clockOutTime: { type: Date, default: null },

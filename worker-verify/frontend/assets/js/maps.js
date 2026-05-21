@@ -172,12 +172,14 @@ function openLocationPicker(fieldPrefix, labelText = 'Pin Location') {
       <!-- ── MAPS LINK TAB ── -->
       <div class="loc-tab-panel" id="locTab_mapslink">
         <div class="loc-input-row">
-          <input id="locMapsLinkInput" type="text" class="form-control"
-            placeholder="Paste Google Maps link here…" />
+          <input id="locMapsLinkInput" type="url" inputmode="url" class="form-control"
+            placeholder="Paste Google Maps link here…" autocomplete="off" />
           <button class="btn btn-primary btn-sm" id="locMapsLinkExtract">Extract</button>
         </div>
+        <div id="locMapsLinkStatus" class="loc-maps-status" style="display:none;"></div>
         <div class="loc-hint">
-          ✅ Supports all Google Maps links — full links, short links (<code>maps.app.goo.gl</code>), and <code>geo:</code> URIs
+          Supports all formats: <code>maps.app.goo.gl</code> · <code>goo.gl/maps</code> · <code>google.com/maps</code> · <code>geo:</code> URIs<br/>
+          Just paste and the location will be extracted automatically.
         </div>
       </div>
 
@@ -356,53 +358,86 @@ function openLocationPicker(fieldPrefix, labelText = 'Pin Location') {
   addrInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAddressSearch(); } });
 
   // ── MAPS LINK TAB ───────────────────────────────────────────────────────────
-  const isShortLink = (url) => /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url);
+  const mapsLinkInput  = modal.querySelector('#locMapsLinkInput');
+  const mapsLinkStatus = modal.querySelector('#locMapsLinkStatus');
+  const extractBtn     = modal.querySelector('#locMapsLinkExtract');
+
+  function setMapsStatus(msg, type = '') {
+    if (!mapsLinkStatus) return;
+    mapsLinkStatus.textContent = msg;
+    mapsLinkStatus.className   = 'loc-maps-status' + (type ? ` loc-maps-status--${type}` : '');
+    mapsLinkStatus.style.display = msg ? 'block' : 'none';
+  }
 
   const doMapsLinkExtract = async () => {
-    let raw = document.getElementById('locMapsLinkInput').value.trim();
-    if (!raw) { showToast('Paste a Google Maps link first', 'error'); return; }
-    // Normalise — add https:// if user pasted without a scheme
+    let raw = mapsLinkInput.value.trim();
+    if (!raw) { setMapsStatus('Paste a Google Maps link first', 'error'); return; }
+
+    // Normalise — add https:// if pasted without scheme
     if (!/^https?:\/\//i.test(raw) && !raw.toLowerCase().startsWith('geo:')) {
       raw = 'https://' + raw;
     }
 
-    const extractBtn = modal.querySelector('#locMapsLinkExtract');
+    console.log('[Maps Link] Pasted:', raw);
+    setMapsStatus('Checking link…', '');
 
-    // Try direct parsing first (works for full links)
+    // Step 1 — try client-side parsing (works for full URLs with @lat,lng or !3d!4d)
     const coords = parseGoogleMapsLink(raw);
     if (coords) {
+      console.log('[Maps Link] Parsed directly:', coords);
       pinAt(coords.lat, coords.lng, 'maps_link');
-      setTimeout(() => { modal.dataset.mapsLink = raw; }, 50);
+      modal.dataset.mapsLink = raw;
+      setMapsStatus('✅ Valid branch location detected', 'success');
       return;
     }
 
-    // Shortened link — resolve via backend proxy
-    if (isShortLink(raw)) {
-      extractBtn.disabled = true;
-      extractBtn.textContent = '⏳ Resolving…';
-      try {
-        const apiBase = (window.CONFIG?.API_URL || 'http://localhost:5001/api').replace(/\/api$/, '');
-        const res = await fetch(`${apiBase}/api/resolve-maps?url=${encodeURIComponent(raw)}`);
-        const data = await res.json();
-        if (data.success && data.lat && data.lng) {
-          pinAt(data.lat, data.lng, 'maps_link');
-          setTimeout(() => { modal.dataset.mapsLink = raw; }, 50);
-        } else {
-          showToast('Could not extract coordinates from this link. Try the GPS tab.', 'error');
-        }
-      } catch (_) {
-        showToast('Server error resolving link. Try the GPS tab.', 'error');
-      } finally {
-        extractBtn.disabled = false;
-        extractBtn.textContent = 'Extract';
+    // Step 2 — send to backend proxy for all link types that need resolution
+    // (short links like maps.app.goo.gl, goo.gl/maps, place-name links, etc.)
+    extractBtn.disabled = true;
+    extractBtn.textContent = '⏳';
+    setMapsStatus('Resolving link…', '');
+
+    try {
+      const apiBase = (window.CONFIG?.API_URL || 'http://localhost:5001/api').replace(/\/api$/, '');
+      const proxyUrl = `${apiBase}/api/resolve-maps?url=${encodeURIComponent(raw)}`;
+      console.log('[Maps Link] Sending to proxy:', proxyUrl);
+
+      const res  = await fetch(proxyUrl, { signal: AbortSignal.timeout(18000) });
+      const data = await res.json();
+
+      console.log('[Maps Link] Proxy response:', data);
+
+      if (data.success && data.lat != null && data.lng != null) {
+        pinAt(data.lat, data.lng, 'maps_link');
+        modal.dataset.mapsLink = raw;
+        setMapsStatus('✅ Valid branch location detected', 'success');
+        return;
       }
-      return;
-    }
 
-    showToast('Could not extract coordinates. Try a full Maps link or use the GPS tab.', 'error');
+      // Proxy returned but couldn't find coords
+      console.warn('[Maps Link] Proxy could not extract coords. finalUrl:', data.finalUrl);
+      setMapsStatus('⚠️ Unable to read Google Maps link. Use the GPS tab to enter coordinates manually.', 'error');
+
+    } catch (err) {
+      console.error('[Maps Link] Proxy error:', err.message);
+      if (err.name === 'TimeoutError') {
+        setMapsStatus('⚠️ Request timed out. Try the GPS tab.', 'error');
+      } else {
+        setMapsStatus('⚠️ Could not connect to server. Try the GPS tab.', 'error');
+      }
+    } finally {
+      extractBtn.disabled    = false;
+      extractBtn.textContent = 'Extract';
+    }
   };
-  modal.querySelector('#locMapsLinkExtract').onclick = doMapsLinkExtract;
-  document.getElementById('locMapsLinkInput').addEventListener('keydown', e => {
+
+  extractBtn.onclick = doMapsLinkExtract;
+
+  // Auto-extract on paste (with tiny delay so input value is populated)
+  mapsLinkInput.addEventListener('paste', () => {
+    setTimeout(doMapsLinkExtract, 100);
+  });
+  mapsLinkInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); doMapsLinkExtract(); }
   });
 

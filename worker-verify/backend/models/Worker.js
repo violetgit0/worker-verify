@@ -60,6 +60,8 @@ const workerSchema = new mongoose.Schema({
   verifiedAt:         { type: Date },
   branch:             { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
   shift:              { type: String, enum: ['A', 'B', 'unassigned'], default: 'unassigned' },
+  category:           { type: mongoose.Schema.Types.ObjectId, ref: 'WorkerCategory', default: null },
+  shiftRef:           { type: mongoose.Schema.Types.ObjectId, ref: 'Shift', default: null },
   employmentStatus:   { type: String, enum: ['active', 'suspended', 'resigned', 'sacked', 'on_leave'], default: 'active' },
   dateEmployed:       { type: Date, default: Date.now },
   monthlySalary:      { type: Number, default: 0 },

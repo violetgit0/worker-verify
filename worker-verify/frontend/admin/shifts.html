@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shift Schedule Manager – WorkerSave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <style>
+    .tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:20px; }
+    .tab-btn {
+      padding:10px 22px; font-size:13px; font-weight:600; border:none;
+      background:none; color:var(--gray-500); cursor:pointer;
+      border-bottom:3px solid transparent; margin-bottom:-2px;
+      transition:color .15s, border-color .15s;
+    }
+    .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .tab-btn:hover:not(.active) { color:var(--gray-700); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .shift-grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap:16px;
+    }
+    .shift-card {
+      background:var(--white);
+      border:1px solid var(--gray-200);
+      border-radius:12px;
+      padding:18px;
+      position:relative;
+    }
+    .shift-card-header {
+      display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
+      margin-bottom:12px;
+    }
+    .shift-card-title { font-size:15px; font-weight:700; color:var(--gray-900); }
+    .shift-card-sup { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .shift-meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .shift-chip {
+      font-size:11px; font-weight:600; padding:3px 10px; border-radius:99px;
+      background:var(--gray-100); color:var(--gray-600);
+    }
+    .shift-chip.cat { background:#ede9fe; color:#6d28d9; }
+    .shift-chip.time { background:#dbeafe; color:#1d4ed8; }
+    .shift-chip.workers { background:#d1fae5; color:#065f46; }
+    .shift-chip.off { background:#fee2e2; color:#b91c1c; }
+    .shift-card-actions { display:flex; gap:8px; margin-top:12px; }
+    .shift-inactive { opacity:.55; }
+
+    .cat-grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap:14px;
+    }
+    .cat-card {
+      background:var(--white);
+      border:1px solid var(--gray-200);
+      border-radius:10px;
+      padding:16px;
+    }
+    .cat-color-dot {
+      display:inline-block; width:12px; height:12px;
+      border-radius:50%; margin-right:6px; flex-shrink:0;
+    }
+    .cat-card-header {
+      display:flex; align-items:center; gap:6px;
+      margin-bottom:10px;
+    }
+    .cat-card-title { font-size:14px; font-weight:700; color:var(--gray-900); }
+    .cat-meta { font-size:12px; color:var(--gray-500); margin-bottom:4px; }
+    .cat-card-actions { display:flex; gap:8px; margin-top:12px; }
+
+    .section-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:16px; flex-wrap:wrap; gap:8px;
+    }
+    .section-title { font-size:16px; font-weight:700; color:var(--gray-900); }
+
+    .day-checks { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .day-check label {
+      display:flex; align-items:center; gap:4px;
+      font-size:12px; cursor:pointer;
+      padding:4px 10px; border-radius:6px;
+      border:1px solid var(--gray-300); background:var(--white);
+      transition:background .15s, border-color .15s;
+    }
+    .day-check input[type=checkbox]:checked + span { color:var(--primary); font-weight:600; }
+    .day-check input[type=checkbox] { accent-color:var(--primary); }
+
+    .summary-bar {
+      display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;
+    }
+    .summary-chip {
+      background:var(--white); border:1px solid var(--gray-200);
+      border-radius:10px; padding:12px 18px; min-width:140px;
+      text-align:center;
+    }
+    .summary-chip .sc-val { font-size:22px; font-weight:800; color:var(--primary); }
+    .summary-chip .sc-lab { font-size:11px; color:var(--gray-500); margin-top:2px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><div class="brand-icon">⚡</div> <span id="sidebarBrandName">WorkerSave</span></div>
+    </div>
+    <div class="sidebar-user">
+      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
+      <div class="sidebar-user-info">
+        <div class="user-name" id="sidebarUserName">Loading…</div>
+        <div class="user-role" id="sidebarUserRole">Admin</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Main</div>
+      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="workers.html"    class="nav-link"><span class="nav-icon">👷</span> Workers</a>
+      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
+      <a href="shifts.html"     class="nav-link active"><span class="nav-icon">🔄</span> Shifts &amp; Categories</a>
+      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
+      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
+      <a href="attendance.html#alerts" class="nav-link"><span class="nav-icon">🚨</span> Security Alerts</a>
+      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
+      <div class="nav-section-title">Worker Entry</div>
+      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">➕</span> Register Worker</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="app-header">
+      <div class="flex items-center gap-2">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="header-title">Shifts &amp; Categories</h1>
+      </div>
+    </header>
+
+    <main class="page-body">
+
+      <!-- Summary bar -->
+      <div class="summary-bar" id="summaryBar">
+        <div class="summary-chip"><div class="sc-val" id="sumShifts">—</div><div class="sc-lab">Total Shifts</div></div>
+        <div class="summary-chip"><div class="sc-val" id="sumCategories">—</div><div class="sc-lab">Categories</div></div>
+        <div class="summary-chip"><div class="sc-val" id="sumAssigned">—</div><div class="sc-lab">Assigned Workers</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('shifts', this)">Shifts / Supervisors</button>
+        <button class="tab-btn" onclick="switchTab('categories', this)">Worker Categories</button>
+      </div>
+
+      <!-- Shifts Tab -->
+      <div class="tab-panel active" id="tab-shifts">
+        <div class="section-header">
+          <span class="section-title">Shift Groups</span>
+          <button class="btn btn-primary btn-sm" onclick="openShiftModal()">+ New Shift</button>
+        </div>
+        <div class="shift-grid" id="shiftGrid">
+          <div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+            <div class="empty-icon">🔄</div>
+            <p class="empty-text">Loading shifts…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories Tab -->
+      <div class="tab-panel" id="tab-categories">
+        <div class="section-header">
+          <span class="section-title">Worker Categories</span>
+          <button class="btn btn-primary btn-sm" onclick="openCategoryModal()">+ New Category</button>
+        </div>
+        <div class="cat-grid" id="catGrid">
+          <div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+            <div class="empty-icon">📋</div>
+            <p class="empty-text">Loading categories…</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ─── Shift Modal ──────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="shiftModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="shiftModalTitle">New Shift</h2>
+      <button class="btn-icon" onclick="closeModal('shiftModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sh_id" />
+
+      <div class="form-group">
+        <label class="form-label">Shift Name <span class="required">*</span></label>
+        <input type="text" id="sh_name" class="form-control" placeholder="e.g. Shift - Mr John" />
+        <div class="form-hint">Usually named after the supervisor</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Supervisor Name</label>
+          <input type="text" id="sh_supervisorName" class="form-control" placeholder="e.g. Mr John" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Branch (optional)</label>
+          <select id="sh_branch" class="form-control">
+            <option value="">Company-wide</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Worker Category (optional)</label>
+        <select id="sh_category" class="form-control">
+          <option value="">No category (category-agnostic)</option>
+        </select>
+        <div class="form-hint">Link this shift to a specific category of workers</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Resume Time override</label>
+          <input type="time" id="sh_resumeTime" class="form-control" />
+          <div class="form-hint">Leave blank to use category/branch default</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grace period (min)</label>
+          <input type="number" id="sh_lateAfterMinutes" class="form-control" placeholder="0" min="0" max="120" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Closing Time</label>
+          <input type="time" id="sh_closingTime" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Overtime after (min)</label>
+          <input type="number" id="sh_overtimeAfterMinutes" class="form-control" placeholder="60" min="0" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Work Pattern</label>
+        <select id="sh_workPattern" class="form-control" onchange="toggleShiftPattern()">
+          <option value="">Inherit from category</option>
+          <option value="all_week">All 7 days</option>
+          <option value="weekdays">Weekdays only (Mon–Fri)</option>
+          <option value="alternating">Alternating (days on / days off)</option>
+          <option value="custom">Custom off days</option>
+        </select>
+      </div>
+
+      <div id="sh_alternatingRow" class="form-row" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Days ON</label>
+          <input type="number" id="sh_daysOn" class="form-control" value="1" min="1" max="14" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Days OFF</label>
+          <input type="number" id="sh_daysOff" class="form-control" value="1" min="1" max="14" />
+        </div>
+      </div>
+      <div id="sh_refDateRow" class="form-group" style="display:none;">
+        <label class="form-label">Reference Date (for alternating pattern)</label>
+        <input type="date" id="sh_referenceDate" class="form-control" />
+        <div class="form-hint">A known "day 1 ON" date to anchor the rotation</div>
+      </div>
+
+      <div id="sh_offDaysRow" style="display:none;">
+        <label class="form-label">Off Days</label>
+        <div class="day-checks">
+          <div class="day-check"><label><input type="checkbox" value="0" class="sh-offday" /><span>Sun</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="1" class="sh-offday" /><span>Mon</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="2" class="sh-offday" /><span>Tue</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="3" class="sh-offday" /><span>Wed</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="4" class="sh-offday" /><span>Thu</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="5" class="sh-offday" /><span>Fri</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="6" class="sh-offday" /><span>Sat</span></label></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('shiftModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveShift()" id="sh_saveBtn">Save Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Category Modal ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="categoryModal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="catModalTitle">New Category</h2>
+      <button class="btn-icon" onclick="closeModal('categoryModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat_id" />
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Category Name <span class="required">*</span></label>
+          <input type="text" id="cat_name" class="form-control" placeholder="e.g. Pump Attendant" />
+        </div>
+        <div class="form-group" style="flex:0 0 100px;">
+          <label class="form-label">Badge Color</label>
+          <input type="color" id="cat_color" class="form-control" value="#6366f1" style="height:38px;padding:2px 4px;" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="cat_description" class="form-control" placeholder="Optional description" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Resume Time <span class="required">*</span></label>
+          <input type="time" id="cat_resumeTime" class="form-control" value="08:00" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grace period (min)</label>
+          <input type="number" id="cat_lateAfterMinutes" class="form-control" value="0" min="0" max="120" />
+          <div class="form-hint">Minutes after resume time before counting as late</div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Closing Time</label>
+          <input type="time" id="cat_closingTime" class="form-control" value="17:00" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Overtime after (min)</label>
+          <input type="number" id="cat_overtimeAfterMinutes" class="form-control" value="60" min="0" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Work Pattern</label>
+        <select id="cat_workPattern" class="form-control" onchange="toggleCatPattern()">
+          <option value="all_week">All 7 days</option>
+          <option value="weekdays">Weekdays only (Mon–Fri)</option>
+          <option value="alternating">Alternating (days on / days off)</option>
+          <option value="custom">Custom off days</option>
+        </select>
+      </div>
+
+      <div id="cat_alternatingRow" class="form-row" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Days ON</label>
+          <input type="number" id="cat_daysOn" class="form-control" value="1" min="1" max="14" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Days OFF</label>
+          <input type="number" id="cat_daysOff" class="form-control" value="1" min="1" max="14" />
+        </div>
+      </div>
+
+      <div id="cat_offDaysRow" style="display:none;">
+        <label class="form-label">Off Days</label>
+        <div class="day-checks">
+          <div class="day-check"><label><input type="checkbox" value="0" class="cat-offday" /><span>Sun</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="1" class="cat-offday" /><span>Mon</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="2" class="cat-offday" /><span>Tue</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="3" class="cat-offday" /><span>Wed</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="4" class="cat-offday" /><span>Thu</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="5" class="cat-offday" /><span>Fri</span></label></div>
+          <div class="day-check"><label><input type="checkbox" value="6" class="cat-offday" /><span>Sat</span></label></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('categoryModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCategory()" id="cat_saveBtn">Save Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script>
+requireAuth(['company_admin', 'hr_staff', 'branch_manager', 'attendance_officer']);
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let allShifts     = [];
+let allCategories = [];
+let allBranches   = [];
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initUser();
+  await Promise.all([loadBranches(), loadCategories(), loadShifts()]);
+  loadSummary();
+});
+
+async function loadBranches() {
+  try {
+    const d = await API.getBranches();
+    allBranches = d.branches || [];
+    const sel = document.getElementById('sh_branch');
+    allBranches.forEach(b => {
+      const o = new Option(`${b.name} (${b.code})`, b._id);
+      sel.add(o);
+    });
+  } catch (_) {}
+}
+
+async function loadCategories() {
+  try {
+    const d = await API.getCategories();
+    allCategories = d.categories || [];
+    renderCategories();
+    populateCategoryDropdowns();
+  } catch (err) {
+    document.getElementById('catGrid').innerHTML =
+      `<div class="card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--danger);">${err.message}</div>`;
+  }
+}
+
+async function loadShifts() {
+  try {
+    const d = await API.getShifts();
+    allShifts = d.shifts || [];
+    renderShifts();
+  } catch (err) {
+    document.getElementById('shiftGrid').innerHTML =
+      `<div class="card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--danger);">${err.message}</div>`;
+  }
+}
+
+async function loadSummary() {
+  try {
+    const d = await API.getShiftSummary();
+    const totalWorkers = (d.byShift || []).reduce((s, x) => s + x.count, 0);
+    document.getElementById('sumShifts').textContent     = allShifts.length;
+    document.getElementById('sumCategories').textContent = allCategories.length;
+    document.getElementById('sumAssigned').textContent   = totalWorkers;
+  } catch (_) {}
+}
+
+function populateCategoryDropdowns() {
+  const sel = document.getElementById('sh_category');
+  // Clear existing options except first
+  while (sel.options.length > 1) sel.remove(1);
+  allCategories.forEach(c => {
+    const o = new Option(c.name, c._id);
+    sel.add(o);
+  });
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ── Render Shifts ──────────────────────────────────────────────────────────────
+function renderShifts() {
+  const grid = document.getElementById('shiftGrid');
+  if (!allShifts.length) {
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+      <div class="empty-icon">🔄</div>
+      <p class="empty-text">No shifts yet. Create your first shift to group workers by supervisor.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = allShifts.map(s => {
+    const catName = s.category?.name || '';
+    const catColor = s.category?.color || '#6366f1';
+    const resumeDisplay = s.resumeTime || s.category?.resumeTime || '—';
+    const patternDisplay = formatPattern(s.workPattern || s.category?.workPattern);
+    const offDaysDisplay = formatOffDays(s.offDays?.length ? s.offDays : (s.category?.offDays || []));
+
+    return `<div class="shift-card ${s.isActive ? '' : 'shift-inactive'}">
+      <div class="shift-card-header">
+        <div>
+          <div class="shift-card-title">${esc(s.name)}</div>
+          ${s.supervisorName ? `<div class="shift-card-sup">Supervisor: ${esc(s.supervisorName)}</div>` : ''}
+          ${s.branch ? `<div class="shift-card-sup">Branch: ${esc(s.branch.name)}</div>` : ''}
+        </div>
+        ${!s.isActive ? `<span class="badge badge-secondary" style="font-size:10px;">Inactive</span>` : ''}
+      </div>
+      <div class="shift-meta">
+        ${catName ? `<span class="shift-chip cat" style="background:${catColor}22;color:${catColor};">${esc(catName)}</span>` : ''}
+        <span class="shift-chip time">▶ ${resumeDisplay}</span>
+        <span class="shift-chip workers">👷 ${s.workerCount} workers</span>
+        ${patternDisplay ? `<span class="shift-chip">${patternDisplay}</span>` : ''}
+        ${offDaysDisplay ? `<span class="shift-chip off">Off: ${offDaysDisplay}</span>` : ''}
+      </div>
+      <div class="shift-card-actions">
+        <button class="btn btn-sm btn-outline" onclick="editShift('${s._id}')">Edit</button>
+        <button class="btn btn-sm btn-ghost" style="color:var(--danger);" onclick="deleteShift('${s._id}', '${esc(s.name)}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render Categories ──────────────────────────────────────────────────────────
+function renderCategories() {
+  const grid = document.getElementById('catGrid');
+  if (!allCategories.length) {
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:60px;">
+      <div class="empty-icon">📋</div>
+      <p class="empty-text">No categories yet. Add categories like "Pump Attendant" or "Security".</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = allCategories.map(c => `
+    <div class="cat-card">
+      <div class="cat-card-header">
+        <span class="cat-color-dot" style="background:${c.color};"></span>
+        <span class="cat-card-title">${esc(c.name)}</span>
+        ${!c.isActive ? `<span class="badge badge-secondary" style="font-size:10px;margin-left:auto;">Inactive</span>` : ''}
+      </div>
+      ${c.description ? `<div class="cat-meta">${esc(c.description)}</div>` : ''}
+      <div class="cat-meta">Resume: <strong>${c.resumeTime || '08:00'}</strong>
+        ${c.lateAfterMinutes ? ` · Late after ${c.lateAfterMinutes}min` : ''}
+        ${c.closingTime ? ` · Close: ${c.closingTime}` : ''}
+      </div>
+      <div class="cat-meta">Pattern: <strong>${formatPattern(c.workPattern)}</strong>
+        ${c.offDays?.length ? ` · Off: ${formatOffDays(c.offDays)}` : ''}
+        ${c.workPattern === 'alternating' ? ` · ${c.daysOn}on/${c.daysOff}off` : ''}
+      </div>
+      <div class="cat-card-actions">
+        <button class="btn btn-sm btn-outline" onclick="editCategory('${c._id}')">Edit</button>
+        <button class="btn btn-sm btn-ghost" style="color:var(--danger);" onclick="deleteCategory('${c._id}', '${esc(c.name)}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Shift Modal ────────────────────────────────────────────────────────────────
+function openShiftModal(shift = null) {
+  document.getElementById('sh_id').value               = shift?._id || '';
+  document.getElementById('sh_name').value             = shift?.name || '';
+  document.getElementById('sh_supervisorName').value   = shift?.supervisorName || '';
+  document.getElementById('sh_branch').value           = shift?.branch?._id || shift?.branch || '';
+  document.getElementById('sh_category').value         = shift?.category?._id || shift?.category || '';
+  document.getElementById('sh_resumeTime').value       = shift?.resumeTime || '';
+  document.getElementById('sh_lateAfterMinutes').value = shift?.lateAfterMinutes ?? '';
+  document.getElementById('sh_closingTime').value      = shift?.closingTime || '';
+  document.getElementById('sh_overtimeAfterMinutes').value = shift?.overtimeAfterMinutes ?? '';
+  document.getElementById('sh_workPattern').value      = shift?.workPattern || '';
+  document.getElementById('sh_daysOn').value           = shift?.daysOn || 1;
+  document.getElementById('sh_daysOff').value          = shift?.daysOff || 1;
+  document.getElementById('sh_referenceDate').value    = shift?.referenceDate ? shift.referenceDate.slice(0,10) : '';
+
+  // off days checkboxes
+  document.querySelectorAll('.sh-offday').forEach(cb => {
+    cb.checked = (shift?.offDays || []).includes(parseInt(cb.value));
+  });
+
+  document.getElementById('shiftModalTitle').textContent = shift ? 'Edit Shift' : 'New Shift';
+  toggleShiftPattern();
+  openModal('shiftModal');
+}
+
+function editShift(id) {
+  const s = allShifts.find(x => x._id === id);
+  if (s) openShiftModal(s);
+}
+
+function toggleShiftPattern() {
+  const val = document.getElementById('sh_workPattern').value;
+  document.getElementById('sh_alternatingRow').style.display = val === 'alternating' ? 'flex' : 'none';
+  document.getElementById('sh_refDateRow').style.display     = val === 'alternating' ? 'block' : 'none';
+  document.getElementById('sh_offDaysRow').style.display     = val === 'custom' ? 'block' : 'none';
+}
+
+async function saveShift() {
+  const id   = document.getElementById('sh_id').value;
+  const name = document.getElementById('sh_name').value.trim();
+  if (!name) { showToast('Shift name is required', 'error'); return; }
+
+  const pattern = document.getElementById('sh_workPattern').value;
+  const offDays = pattern === 'custom'
+    ? [...document.querySelectorAll('.sh-offday:checked')].map(cb => parseInt(cb.value))
+    : [];
+
+  const body = {
+    name,
+    supervisorName:        document.getElementById('sh_supervisorName').value.trim(),
+    branch:                document.getElementById('sh_branch').value || null,
+    category:              document.getElementById('sh_category').value || null,
+    resumeTime:            document.getElementById('sh_resumeTime').value || null,
+    lateAfterMinutes:      numOrNull('sh_lateAfterMinutes'),
+    closingTime:           document.getElementById('sh_closingTime').value || null,
+    overtimeAfterMinutes:  numOrNull('sh_overtimeAfterMinutes'),
+    workPattern:           pattern || null,
+    offDays,
+    daysOn:                parseInt(document.getElementById('sh_daysOn').value) || 1,
+    daysOff:               parseInt(document.getElementById('sh_daysOff').value) || 1,
+    referenceDate:         document.getElementById('sh_referenceDate').value || null
+  };
+
+  const btn = document.getElementById('sh_saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    if (id) {
+      await API.updateShift(id, body);
+      showToast('Shift updated');
+    } else {
+      await API.createShift(body);
+      showToast('Shift created');
+    }
+    closeModal('shiftModal');
+    await loadShifts();
+    loadSummary();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Shift';
+  }
+}
+
+async function deleteShift(id, name) {
+  if (!confirm(`Delete shift "${name}"? This cannot be undone.`)) return;
+  try {
+    await API.deleteShift(id);
+    showToast('Shift deleted');
+    await loadShifts();
+    loadSummary();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Category Modal ─────────────────────────────────────────────────────────────
+function openCategoryModal(cat = null) {
+  document.getElementById('cat_id').value                 = cat?._id || '';
+  document.getElementById('cat_name').value               = cat?.name || '';
+  document.getElementById('cat_color').value              = cat?.color || '#6366f1';
+  document.getElementById('cat_description').value        = cat?.description || '';
+  document.getElementById('cat_resumeTime').value         = cat?.resumeTime || '08:00';
+  document.getElementById('cat_lateAfterMinutes').value   = cat?.lateAfterMinutes ?? 0;
+  document.getElementById('cat_closingTime').value        = cat?.closingTime || '17:00';
+  document.getElementById('cat_overtimeAfterMinutes').value = cat?.overtimeAfterMinutes ?? 60;
+  document.getElementById('cat_workPattern').value        = cat?.workPattern || 'all_week';
+  document.getElementById('cat_daysOn').value             = cat?.daysOn || 1;
+  document.getElementById('cat_daysOff').value            = cat?.daysOff || 1;
+
+  document.querySelectorAll('.cat-offday').forEach(cb => {
+    cb.checked = (cat?.offDays || []).includes(parseInt(cb.value));
+  });
+
+  document.getElementById('catModalTitle').textContent = cat ? 'Edit Category' : 'New Category';
+  toggleCatPattern();
+  openModal('categoryModal');
+}
+
+function editCategory(id) {
+  const c = allCategories.find(x => x._id === id);
+  if (c) openCategoryModal(c);
+}
+
+function toggleCatPattern() {
+  const val = document.getElementById('cat_workPattern').value;
+  document.getElementById('cat_alternatingRow').style.display = val === 'alternating' ? 'flex' : 'none';
+  document.getElementById('cat_offDaysRow').style.display     = val === 'custom' ? 'block' : 'none';
+}
+
+async function saveCategory() {
+  const id   = document.getElementById('cat_id').value;
+  const name = document.getElementById('cat_name').value.trim();
+  if (!name) { showToast('Category name is required', 'error'); return; }
+
+  const pattern = document.getElementById('cat_workPattern').value;
+  const offDays = pattern === 'custom'
+    ? [...document.querySelectorAll('.cat-offday:checked')].map(cb => parseInt(cb.value))
+    : [];
+
+  const body = {
+    name,
+    color:                 document.getElementById('cat_color').value,
+    description:           document.getElementById('cat_description').value.trim(),
+    resumeTime:            document.getElementById('cat_resumeTime').value,
+    lateAfterMinutes:      parseInt(document.getElementById('cat_lateAfterMinutes').value) || 0,
+    closingTime:           document.getElementById('cat_closingTime').value,
+    overtimeAfterMinutes:  parseInt(document.getElementById('cat_overtimeAfterMinutes').value) || 60,
+    workPattern:           pattern,
+    offDays,
+    daysOn:                parseInt(document.getElementById('cat_daysOn').value) || 1,
+    daysOff:               parseInt(document.getElementById('cat_daysOff').value) || 1
+  };
+
+  const btn = document.getElementById('cat_saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    if (id) {
+      await API.updateCategory(id, body);
+      showToast('Category updated');
+    } else {
+      await API.createCategory(body);
+      showToast('Category created');
+    }
+    closeModal('categoryModal');
+    await loadCategories();
+    populateCategoryDropdowns();
+    loadSummary();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Category';
+  }
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm(`Delete category "${name}"? Workers assigned to it will become uncategorized.`)) return;
+  try {
+    await API.deleteCategory(id);
+    showToast('Category deleted');
+    await loadCategories();
+    populateCategoryDropdowns();
+    loadSummary();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function formatOffDays(days) {
+  if (!days?.length) return '';
+  return days.map(d => DAY_NAMES[d]).join(', ');
+}
+function formatPattern(p) {
+  const map = { all_week: 'All week', weekdays: 'Mon–Fri', alternating: 'Alternating', custom: 'Custom' };
+  return map[p] || '';
+}
+function numOrNull(id) {
+  const v = document.getElementById(id).value;
+  return v === '' ? null : parseInt(v);
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open');  }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast toast-${type}`;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+</script>
+</body>
+</html>

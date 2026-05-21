@@ -7,6 +7,50 @@ const SecurityAlert  = require('../models/SecurityAlert');
 const { haversineDistance } = require('../utils/geo');
 const { toMidnightUTC, parseTimeOnDate, minutesDiff, monthYear } = require('../utils/time');
 
+// ── Schedule resolution helpers ───────────────────────────────────────────────
+
+// Returns 'HH:MM' resumption time — shift override → category → branch legacy
+function resolveResumeTime(worker, branch) {
+  if (worker.shiftRef?.resumeTime) return worker.shiftRef.resumeTime;
+  if (worker.category?.resumeTime) return worker.category.resumeTime;
+  return worker.shift === 'B' ? (branch.resumptionTimeB || '08:00') : (branch.resumptionTimeA || '08:00');
+}
+
+// Returns grace period in minutes — shift → category → 0
+function resolveGraceMinutes(worker) {
+  if (worker.shiftRef?.lateAfterMinutes != null) return worker.shiftRef.lateAfterMinutes;
+  if (worker.category?.lateAfterMinutes != null)  return worker.category.lateAfterMinutes;
+  return 0;
+}
+
+// Returns true if the worker should be working on `date` (a JS Date object).
+// Priority: shift pattern → category pattern → all_week (never off)
+function isScheduledToWork(worker, date) {
+  const dayOfWeek = date.getDay(); // 0=Sun … 6=Sat
+
+  const shift    = worker.shiftRef;
+  const category = worker.category;
+
+  const pattern  = shift?.workPattern || category?.workPattern || 'all_week';
+  const offDays  = (shift?.offDays?.length ? shift.offDays : null) ?? category?.offDays ?? [];
+  const daysOn   = shift?.daysOn  ?? category?.daysOn  ?? 1;
+  const daysOff  = shift?.daysOff ?? category?.daysOff ?? 1;
+
+  switch (pattern) {
+    case 'all_week':   return true;
+    case 'weekdays':   return dayOfWeek !== 0 && dayOfWeek !== 6;
+    case 'custom':     return !offDays.includes(dayOfWeek);
+    case 'alternating': {
+      const refDate = shift?.referenceDate ?? new Date('2025-01-06'); // arbitrary Mon anchor
+      const diffDays = Math.floor((date - new Date(refDate)) / 86400000);
+      const cycle = daysOn + daysOff;
+      const pos = ((diffDays % cycle) + cycle) % cycle; // always positive
+      return pos < daysOn;
+    }
+    default: return true;
+  }
+}
+
 // ── Deduction helpers ──────────────────────────────────────────────────────────
 
 async function applyLatenessDeduction(worker, attendance, latenessMinutes, performedBy, companyId) {
@@ -49,7 +93,11 @@ async function applyAbsenceDeduction(worker, attendance, performedBy, companyId)
 
 // ── Clock In (worker self-service) ────────────────────────────────────────────
 const workerClockIn = async (req, res) => {
-  const worker = req.worker;
+  // Populate category + shiftRef so helpers can resolve schedule/times
+  const worker = await Worker.findById(req.worker._id)
+    .populate('category')
+    .populate('shiftRef');
+
   const { lat, lng, deviceFingerprint, deviceInfo } = req.body;
   const selfieFile = req.file; // from selfieUpload middleware (optional)
 
@@ -67,6 +115,14 @@ const workerClockIn = async (req, res) => {
   }
 
   const branch = await Branch.findById(worker.branch._id || worker.branch);
+
+  // Check if worker is scheduled to work today
+  if (!isScheduledToWork(worker, today)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Today is your day off based on your shift schedule. Contact your supervisor if this is an error.'
+    });
+  }
   const now = new Date();
 
   // ── GPS Verification (hard block if branch has GPS configured) ──────────────
@@ -117,10 +173,12 @@ const workerClockIn = async (req, res) => {
     }
   }
 
-  // ── Late detection ─────────────────────────────────────────────────────────
-  const resumptionStr = worker.shift === 'B' ? branch.resumptionTimeB : branch.resumptionTimeA;
-  const resumptionTime = parseTimeOnDate(resumptionStr || '08:00');
-  const latenessMinutes = Math.max(0, minutesDiff(resumptionTime, now));
+  // ── Late detection (uses shift → category → branch priority chain) ─────────
+  const resumptionStr  = resolveResumeTime(worker, branch);
+  const graceMinutes   = resolveGraceMinutes(worker);
+  const resumptionTime = parseTimeOnDate(resumptionStr);
+  const rawLate        = Math.max(0, minutesDiff(resumptionTime, now));
+  const latenessMinutes = Math.max(0, rawLate - graceMinutes);
   const isLate = latenessMinutes > 0;
 
   // ── Device change detection ────────────────────────────────────────────────
@@ -177,6 +235,8 @@ const workerClockIn = async (req, res) => {
   const attendanceData = {
     worker: worker._id, branch: branch._id,
     date: today, shift: worker.shift,
+    shiftRef: worker.shiftRef?._id || null,
+    category: worker.category?._id || null,
     clockInTime: now,
     status: isLate ? 'late' : 'present',
     latenessMinutes, isLocationVerified, clockInDistance,
@@ -241,7 +301,8 @@ const adminClockIn = async (req, res) => {
     const { workerId, date: dateStr, clockInTime: timeStr, notes } = req.body;
     const workerFilter = { _id: workerId };
     if (req.companyId) workerFilter.company = req.companyId;
-    const worker = await Worker.findOne(workerFilter).populate('branch');
+    const worker = await Worker.findOne(workerFilter)
+      .populate('branch').populate('category').populate('shiftRef');
     if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
     if (!worker.branch) return res.status(400).json({ success: false, message: 'Worker has no branch' });
     if (worker.allowClockIn === false) {
@@ -265,13 +326,18 @@ const adminClockIn = async (req, res) => {
       clockInTime = new Date();
     }
 
-    const resumptionStr = worker.shift === 'B' ? branch.resumptionTimeB : branch.resumptionTimeA;
-    const resumptionTime = parseTimeOnDate(resumptionStr || '08:00', clockInTime);
-    const latenessMinutes = Math.max(0, minutesDiff(resumptionTime, clockInTime));
+    const resumptionStr   = resolveResumeTime(worker, branch);
+    const graceMinutes    = resolveGraceMinutes(worker);
+    const resumptionTime  = parseTimeOnDate(resumptionStr, clockInTime);
+    const rawLate         = Math.max(0, minutesDiff(resumptionTime, clockInTime));
+    const latenessMinutes = Math.max(0, rawLate - graceMinutes);
 
     const attendanceData = {
       worker: worker._id, branch: branch._id, date,
-      shift: worker.shift, clockInTime,
+      shift: worker.shift,
+      shiftRef: worker.shiftRef?._id || null,
+      category: worker.category?._id || null,
+      clockInTime,
       status: latenessMinutes > 0 ? 'late' : 'present',
       latenessMinutes,
       isManual: true, markedBy: req.user._id,

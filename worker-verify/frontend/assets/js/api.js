@@ -118,6 +118,20 @@ const API = {
   getStaffLoginHistory:(id)     => apiFetch(`/staff/${id}/login-history`),
   assignStaffBranch:  (id, b)   => apiFetch(`/staff/${id}/assign-branch`,    { method: 'PUT', body: JSON.stringify(b) }),
 
+  // Shifts & Categories
+  getCategories:       (qs='')    => apiFetch(`/shifts/categories${qs}`),
+  getCategory:         (id)       => apiFetch(`/shifts/categories/${id}`),
+  createCategory:      (body)     => apiFetch('/shifts/categories',    { method: 'POST',   body: JSON.stringify(body) }),
+  updateCategory:      (id, body) => apiFetch(`/shifts/categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteCategory:      (id)       => apiFetch(`/shifts/categories/${id}`, { method: 'DELETE' }),
+  getShifts:           (qs='')    => apiFetch(`/shifts${qs}`),
+  getShift:            (id)       => apiFetch(`/shifts/${id}`),
+  getShiftSummary:     ()         => apiFetch('/shifts/summary'),
+  createShift:         (body)     => apiFetch('/shifts',    { method: 'POST',   body: JSON.stringify(body) }),
+  updateShift:         (id, body) => apiFetch(`/shifts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteShift:         (id)       => apiFetch(`/shifts/${id}`, { method: 'DELETE' }),
+  assignWorkersToShift:(body)     => apiFetch('/shifts/assign-workers', { method: 'POST', body: JSON.stringify(body) }),
+
   // Activity logs (super_admin only)
   getActivityLogs: (qs = '') => apiFetch(`/activity-logs${qs}`),
 

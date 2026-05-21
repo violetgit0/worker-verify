@@ -48,6 +48,7 @@ app.use('/api/payroll',     require('./routes/payroll'));
 app.use('/api/alerts',      require('./routes/alerts'));
 app.use('/api/activity-logs', require('./routes/activityLog'));
 app.use('/api/billing',     require('./routes/billing'));
+app.use('/api/shifts',      require('./routes/shifts'));
 
 // Platform super admin
 app.use('/api/superadmin',  require('./routes/superadmin'));
@@ -195,11 +196,26 @@ app.get('/api/resolve-maps', async (req, res) => {
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
-  console.error(err.stack);
+  console.error('[Global Error Handler]', err.stack);
+  if (res.headersSent) return;
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error'
   });
+});
+
+// ── Prevent unhandled rejections from crashing Render ────────────────────────
+// Express 4 does NOT auto-catch unhandled promise rejections in route handlers.
+// Without this, any async route without try-catch causes a 502 on Render.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection] at:', promise, 'reason:', reason);
+  // Do NOT exit — let the request time out gracefully instead of crashing.
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  // Only exit for truly unrecoverable errors (syntax errors, etc.)
+  // For async/operational errors we log and keep running.
 });
 
 const PORT = process.env.PORT || 5000;

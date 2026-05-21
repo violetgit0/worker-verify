@@ -65,6 +65,7 @@ const processSignature = async (dataUrl, sigType) => {
 };
 
 const registerWorker = async (req, res) => {
+  try {
   const {
     fullName, phone, gender, dateOfBirth, nin, occupation,
     homeAddress, landmark,
@@ -91,7 +92,7 @@ const registerWorker = async (req, res) => {
   const files = req.files || {};
 
   const {
-    branch: branchId, shift, dateEmployed
+    branch: branchId, shift, category, shiftRef, dateEmployed
   } = req.body;
 
   const housePhotosArr  = filePaths(files, 'housePhotos');
@@ -112,6 +113,8 @@ const registerWorker = async (req, res) => {
   if (req.companyId) workerData.company = req.companyId;
   if (branchId)    workerData.branch = branchId;
   if (shift && ['A','B'].includes(shift)) workerData.shift = shift;
+  if (category)    workerData.category = category;
+  if (shiftRef)    workerData.shiftRef = shiftRef;
   if (dateEmployed) workerData.dateEmployed = dateEmployed;
   if (req.body.verificationStatus === 'incomplete') workerData.verificationStatus = 'incomplete';
 
@@ -185,6 +188,20 @@ const registerWorker = async (req, res) => {
   logActivity('register_worker', req.user, worker._id, worker.fullName, { nin: worker.nin }, ip);
 
   res.status(201).json({ success: true, message: 'Worker registered successfully', workerId: worker._id });
+
+  } catch (err) {
+    console.error('[registerWorker] ERROR:', err.name, err.message, err.code || '');
+    if (res.headersSent) return;
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(400).json({ success: false, message: `A worker with this ${field} already exists.` });
+    }
+    if (err.name === 'ValidationError') {
+      const msg = Object.values(err.errors).map(e => e.message).join('. ');
+      return res.status(400).json({ success: false, message: msg });
+    }
+    res.status(500).json({ success: false, message: err.message || 'Failed to register worker. Please try again.' });
+  }
 };
 
 const getAllWorkers = async (req, res) => {
@@ -271,60 +288,116 @@ const getWorkerById = async (req, res) => {
 
 // ── Quick register (minimal fields, no full verification required) ─────────────
 const quickRegisterWorker = async (req, res) => {
-  const {
-    fullName, phone, gender, nin, occupation,
-    branch: branchId, shift, monthlySalary, dailyRate, dateEmployed,
-    workerType   // 'temporary' | 'legacy' | 'incomplete' (default: 'incomplete')
-  } = req.body;
+  try {
+    const {
+      fullName, phone, gender, nin, occupation,
+      branch: branchId, shift, category, shiftRef,
+      monthlySalary, dailyRate, dateEmployed,
+      workerType,   // 'temporary' | 'legacy' | 'incomplete'
+      allowClockIn, allowPayroll
+    } = req.body;
 
-  if (!fullName || !phone) {
-    return res.status(400).json({ success: false, message: 'Full name and phone number are required' });
+    console.log('[quickRegister] body:', {
+      fullName, phone, gender, nin: nin ? '***' : undefined,
+      branchId, shift, monthlySalary, workerType
+    });
+
+    if (!fullName || !phone) {
+      return res.status(400).json({ success: false, message: 'Full name and phone number are required' });
+    }
+
+    if (!branchId) {
+      return res.status(400).json({ success: false, message: 'Branch is required' });
+    }
+
+    // Validate branch exists and belongs to this company
+    const branchFilter = { _id: branchId };
+    if (req.companyId) branchFilter.company = req.companyId;
+    const branch = await Branch.findOne(branchFilter);
+    if (!branch) {
+      return res.status(400).json({ success: false, message: 'Selected branch not found. Please refresh and try again.' });
+    }
+
+    if (nin) {
+      const ninFilter = { nin };
+      if (req.companyId) ninFilter.company = req.companyId;
+      const existing = await Worker.findOne(ninFilter);
+      if (existing) {
+        return res.status(400).json({ success: false, message: `A worker with NIN "${nin}" already exists.` });
+      }
+    }
+
+    const validTypes = ['incomplete', 'temporary', 'legacy'];
+    const verificationStatus = validTypes.includes(workerType) ? workerType : 'incomplete';
+
+    const workerData = {
+      fullName:     fullName.trim(),
+      phone:        String(phone).trim(),
+      gender:       gender || 'Male',
+      dateOfBirth:  req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : new Date('2000-01-01'),
+      nin:          nin || `QUICK-${Date.now()}`,
+      occupation:   occupation || 'General',
+      homeAddress:  req.body.homeAddress || 'Not Provided',
+      verificationStatus,
+      registeredBy: req.user._id,
+      allowClockIn: allowClockIn !== false && allowClockIn !== 'false',
+      allowPayroll: allowPayroll !== false && allowPayroll !== 'false'
+    };
+
+    if (req.companyId) workerData.company = req.companyId;
+    workerData.branch = branch._id;
+    if (shift && ['A', 'B'].includes(shift)) workerData.shift = shift;
+    if (category)     workerData.category = category;
+    if (shiftRef)     workerData.shiftRef = shiftRef;
+    if (dateEmployed) workerData.dateEmployed = new Date(dateEmployed);
+    if (monthlySalary) {
+      workerData.monthlySalary = parseFloat(monthlySalary) || 0;
+      workerData.dailyRate     = parseFloat(dailyRate) || workerData.monthlySalary / 26;
+    }
+
+    console.log('[quickRegister] creating worker for company:', req.companyId);
+    const worker = await Worker.create(workerData);
+    console.log('[quickRegister] worker created:', worker._id);
+
+    // Log verification — non-fatal if it fails
+    VerificationLog.create({
+      worker: worker._id, action: 'registered',
+      performedBy: req.user._id, newStatus: verificationStatus,
+      notes: `Quick-registered by ${req.user.fullName} (${verificationStatus})`
+    }).catch(e => console.warn('[quickRegister] VerificationLog failed:', e.message));
+
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+    logActivity('quick_register_worker', req.user, worker._id, worker.fullName,
+      { nin: worker.nin, workerType: verificationStatus }, ip);
+
+    res.status(201).json({
+      success: true,
+      message: 'Worker quick-registered successfully',
+      workerId: worker._id,
+      workerName: worker.fullName
+    });
+
+  } catch (err) {
+    console.error('[quickRegister] ERROR:', err.name, err.message, err.code || '');
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(400).json({
+        success: false,
+        message: `A worker with this ${field} already exists in your company.`
+      });
+    }
+    if (err.name === 'ValidationError') {
+      const msg = Object.values(err.errors).map(e => e.message).join('. ');
+      return res.status(400).json({ success: false, message: msg });
+    }
+    if (err.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid value for field "${err.path}". Please check your inputs.`
+      });
+    }
+    res.status(500).json({ success: false, message: err.message || 'Failed to register worker. Please try again.' });
   }
-
-  if (nin) {
-    const ninF2 = { nin };
-    if (req.companyId) ninF2.company = req.companyId;
-    const existing = await Worker.findOne(ninF2);
-    if (existing) return res.status(400).json({ success: false, message: 'A worker with this NIN already exists' });
-  }
-
-  const validTypes = ['incomplete', 'temporary', 'legacy'];
-  const verificationStatus = validTypes.includes(workerType) ? workerType : 'incomplete';
-
-  const workerData = {
-    fullName: fullName.trim(),
-    phone,
-    gender:      gender      || 'Male',
-    dateOfBirth: req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : new Date('2000-01-01'),
-    nin:         nin         || `QUICK-${Date.now()}`,
-    occupation:  occupation  || 'General',
-    homeAddress: req.body.homeAddress || 'Not Provided',
-    verificationStatus,
-    registeredBy: req.user._id
-  };
-
-  if (req.companyId) workerData.company = req.companyId;
-  if (branchId)    workerData.branch = branchId;
-  if (shift && ['A', 'B'].includes(shift)) workerData.shift = shift;
-  if (dateEmployed) workerData.dateEmployed = dateEmployed;
-  if (monthlySalary) {
-    workerData.monthlySalary = parseFloat(monthlySalary) || 0;
-    workerData.dailyRate = parseFloat(dailyRate) || workerData.monthlySalary / 26;
-  }
-
-  const worker = await Worker.create(workerData);
-
-  await VerificationLog.create({
-    worker: worker._id, action: 'registered',
-    performedBy: req.user._id, newStatus: verificationStatus,
-    notes: `Quick-registered by ${req.user.fullName} (${verificationStatus})`
-  });
-
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-  logActivity('quick_register_worker', req.user, worker._id, worker.fullName,
-    { nin: worker.nin, workerType: verificationStatus }, ip);
-
-  res.status(201).json({ success: true, message: 'Worker quick-registered successfully', workerId: worker._id });
 };
 
 // ── Get verification completion for a worker ───────────────────────────────────
