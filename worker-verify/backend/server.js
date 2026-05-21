@@ -63,27 +63,17 @@ app.get('/api/resolve-maps', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ success: false, message: 'url query param required' });
 
-  // Browser-like UA — Google returns richer redirects to desktop browsers
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
+  // Extract coordinates from any string — handles URL-encoded chars, all known Google Maps formats
   const extractCoords = (text) => {
-    // Normalise URL-encoded characters so all patterns work on encoded text too
     const t = text.replace(/%2C/gi, ',').replace(/%3D/gi, '=').replace(/&amp;/g, '&');
-
-    // @lat,lng,zoom  (most common full Maps URL)
     const m1 = t.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
-
-    // !3d<lat>!4d<lng>  (place data format)
     const m2 = t.match(/!3d(-?\d+\.?\d+)!4d(-?\d+\.?\d+)/);
     if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
-
-    // center=lat,lng  (staticmap URLs — coordinates appear here when Google
-    // returns a place-ID redirect that has no @lat,lng in the path)
     const m3 = t.match(/[?&]center=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if (m3) return { lat: parseFloat(m3[1]), lng: parseFloat(m3[2]) };
-
-    // query params: q=lat,lng  ll=lat,lng  query=lat,lng
     try {
       const u = new URL(t.startsWith('http') ? t : 'https://x.invalid/?' + t);
       for (const p of ['q', 'll', 'center', 'query']) {
@@ -97,9 +87,53 @@ app.get('/api/resolve-maps', async (req, res) => {
     return null;
   };
 
+  // Extract place name from a Google Maps place URL path segment
+  const extractPlaceName = (mapUrl) => {
+    try {
+      const u = new URL(mapUrl);
+      const parts = u.pathname.split('/');
+      const pi = parts.indexOf('place');
+      if (pi !== -1 && parts[pi + 1]) {
+        return decodeURIComponent(parts[pi + 1].replace(/\+/g, ' '));
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  // Geocode via Nominatim (OSM) — tries progressively simpler queries
+  // so specific business names that OSM doesn't know still resolve via address
+  const nominatimGeocode = async (placeName) => {
+    const parts = placeName.split(',').map(p => p.trim()).filter(Boolean);
+    // Remove pure 6-digit postcodes from parts list
+    const noPc = parts.filter(p => !/^\d{5,6}$/.test(p));
+    const queries = [
+      placeName,
+      parts.slice(1).join(', '),                     // no business name
+      noPc.slice(1).join(', '),                       // no business, no postcode
+      [noPc[1], noPc[noPc.length - 2], noPc[noPc.length - 1]].filter(Boolean).join(', '), // street + city + state
+      noPc.slice(-2).join(', '),                      // just city + state
+    ].filter((q, i, a) => q && q.length > 3 && a.indexOf(q) === i);
+
+    for (const q of queries) {
+      try {
+        console.log('[resolve-maps] Nominatim query:', q);
+        const nomRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+          { headers: { 'User-Agent': 'WorkerVerify/2.0 contact:violet.okomi@miva.edu.ng' },
+            signal: AbortSignal.timeout(8000) }
+        );
+        const data = await nomRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('[resolve-maps] Nominatim hit on query:', q);
+          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        }
+      } catch (_) {}
+    }
+    return null;
+  };
+
   try {
-    // Use GET — maps.app.goo.gl short links (esp. with ?g_st=ac from mobile sharing)
-    // do NOT follow through to the coordinate-bearing URL with HEAD requests.
+    // Step 1: GET with redirect:follow — captures final URL after all redirects
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     let getRes;
@@ -114,20 +148,22 @@ app.get('/api/resolve-maps', async (req, res) => {
     }
 
     const finalUrl = getRes.url;
+    console.log('[resolve-maps] finalUrl:', finalUrl.slice(0, 120));
 
-    // Try the final redirected URL first — usually contains @lat,lng
+    // Step 2: coords in the redirected URL itself (@lat,lng or !3d!4d)
     const fromUrl = extractCoords(finalUrl);
     if (fromUrl) {
-      return res.json({ success: true, lat: fromUrl.lat, lng: fromUrl.lng, finalUrl });
+      console.log('[resolve-maps] coords from URL:', fromUrl);
+      return res.json({ success: true, ...fromUrl, finalUrl });
     }
 
-    // Fallback: read first 10KB of HTML body — coords appear in og:url / canonical / JS
+    // Step 3: scan first 12KB of HTML body (staticmap center=, og:image, canonical)
     let chunk = '';
     try {
       const reader = getRes.body.getReader();
       const decoder = new TextDecoder();
       let totalRead = 0;
-      while (totalRead < 10240) {
+      while (totalRead < 12288) {
         const { done, value } = await reader.read();
         if (done) break;
         chunk += decoder.decode(value, { stream: true });
@@ -136,27 +172,39 @@ app.get('/api/resolve-maps', async (req, res) => {
       reader.cancel().catch(() => {});
     } catch (_) {}
 
-    // Try raw body text
     const fromBody = extractCoords(chunk);
     if (fromBody) {
-      return res.json({ success: true, lat: fromBody.lat, lng: fromBody.lng, finalUrl });
+      console.log('[resolve-maps] coords from body:', fromBody);
+      return res.json({ success: true, ...fromBody, finalUrl });
     }
 
-    // Try og:url, canonical, and og:image / itemprop="image" (staticmap URLs live here)
-    const metaUrls = [
+    for (const mu of [
       ...[...chunk.matchAll(/(?:og:url|og:image|canonical)[^>]+?(?:content|href)="([^"]+)"/g)].map(m => m[1]),
-      ...[...chunk.matchAll(/itemprop="image"[^>]*content="([^"]+)"/g)].map(m => m[1]),
       ...[...chunk.matchAll(/content="([^"]*staticmap[^"]+)"/g)].map(m => m[1])
-    ];
-    for (const mu of metaUrls) {
+    ]) {
       const fromMeta = extractCoords(mu);
       if (fromMeta) {
-        return res.json({ success: true, lat: fromMeta.lat, lng: fromMeta.lng, finalUrl });
+        console.log('[resolve-maps] coords from meta:', fromMeta);
+        return res.json({ success: true, ...fromMeta, finalUrl });
       }
     }
 
+    // Step 4: extract place name from URL path, geocode with Nominatim (OSM)
+    // This works even when Google blocks HTML scraping from cloud server IPs
+    const placeName = extractPlaceName(finalUrl);
+    if (placeName) {
+      console.log('[resolve-maps] trying Nominatim for:', placeName);
+      const fromNominatim = await nominatimGeocode(placeName);
+      if (fromNominatim) {
+        console.log('[resolve-maps] coords from Nominatim:', fromNominatim);
+        return res.json({ success: true, ...fromNominatim, finalUrl });
+      }
+    }
+
+    console.log('[resolve-maps] all methods failed, finalUrl:', finalUrl.slice(0, 200));
     return res.json({ success: false, finalUrl, message: 'Could not extract coordinates from this link' });
   } catch (err) {
+    console.error('[resolve-maps] error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });
