@@ -41,33 +41,7 @@
 <body>
 <div class="app-layout">
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand">
-      <div class="brand-logo"><div class="brand-icon">⚡</div> <span id="sidebarBrandName">WorkerSave</span></div>
-    </div>
-    <div class="sidebar-user">
-      <img id="sidebarAvatar" src="../assets/img/avatar.png" alt="Avatar" class="sidebar-avatar" onerror="this.style.display='none'" />
-      <div class="sidebar-user-info">
-        <div class="user-name" id="sidebarUserName">Loading…</div>
-        <div class="user-role" id="sidebarUserRole"></div>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section-title">Main</div>
-      <a href="dashboard.html"  class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
-      <a href="workers.html"    class="nav-link"><span class="nav-icon">👷</span> Workers</a>
-      <a href="branches.html"   class="nav-link"><span class="nav-icon">🏢</span> Branches</a>
-      <a href="attendance.html" class="nav-link"><span class="nav-icon">🕐</span> Attendance</a>
-      <a href="payroll.html"    class="nav-link"><span class="nav-icon">💰</span> Payroll</a>
-      <a href="staff.html"      class="nav-link"><span class="nav-icon">👤</span> Staff Accounts</a>
-      <div class="nav-section-title">Worker Entry</div>
-      <a href="../staff/register-worker.html" class="nav-link"><span class="nav-icon">📋</span> Full Registration</a>
-      <a href="quick-register.html" class="nav-link active"><span class="nav-icon">⚡</span> Quick Register</a>
-    </nav>
-    <div class="sidebar-footer">
-      <button class="logout-btn" onclick="logout()">🚪 Sign Out</button>
-    </div>
-  </aside>
+  <aside class="sidebar" id="sidebar"></aside>
 
   <div class="main-content">
     <header class="app-header">
@@ -221,7 +195,7 @@
       </div>
     </main>
   </div>
-</div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
 
 <!-- Success Modal -->
 <div class="modal-overlay" id="successModal">
@@ -241,9 +215,9 @@
 
 <div id="toastContainer" class="toast-container"></div>
 
-<script src="../assets/js/config.js?v=3"></script>
-<script src="../assets/js/api.js?v=3"></script>
-<script src="../assets/js/auth.js?v=3"></script>
+<script src="../assets/js/config.js?v=4"></script>
+<script src="../assets/js/api.js?v=4"></script>
+<script src="../assets/js/auth.js?v=4"></script>
 <script>
   const user = requireAuth(['super_admin', 'company_admin', 'branch_manager', 'hr_staff']);
   let selectedType = 'incomplete';
@@ -359,5 +333,6 @@
   }
 </script>
 <script src="../assets/js/theme.js"></script>
+<script src="../assets/js/sidebar.js?v=4"></script>
 </body>
 </html>

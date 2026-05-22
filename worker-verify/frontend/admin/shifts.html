@@ -3,622 +3,467 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shifts & Roles – WorkerSave</title>
+  <title>Shifts – WorkerSave</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="../assets/css/style.css" />
   <style>
-    /* ── Tabs ── */
-    .tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:24px; }
-    .tab-btn {
-      padding:11px 24px; font-size:13px; font-weight:600; border:none;
-      background:none; color:var(--gray-500); cursor:pointer;
-      border-bottom:3px solid transparent; margin-bottom:-2px;
-      transition:color .15s, border-color .15s;
+    /* ── Page toolbar ── */
+    .page-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
     }
-    .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
-    .tab-btn:hover:not(.active) { color:var(--gray-700); }
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
+    .page-toolbar-left h2 { font-size: 19px; font-weight: 700; color: var(--gray-900); letter-spacing: -.02em; }
+    .page-toolbar-left p  { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
 
-    /* ── Cards grid ── */
-    .card-grid {
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-      gap:16px;
+    /* ── Section separator ── */
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--gray-400); margin: 28px 0 12px; display: flex; align-items: center; gap: 10px;
     }
-    .item-card {
-      background:var(--white); border:1px solid var(--gray-200);
-      border-radius:12px; padding:18px; position:relative;
-      transition:box-shadow .15s;
+    .section-label::after {
+      content: ''; flex: 1; height: 1px; background: var(--gray-200);
     }
-    .item-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.07); }
-    .item-card-header {
-      display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
-      margin-bottom:10px;
-    }
-    .item-card-title { font-size:15px; font-weight:700; color:var(--gray-900); }
-    .item-card-sub   { font-size:12px; color:var(--gray-500); margin-top:2px; }
-    .chip-row        { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
-    .chip {
-      font-size:11px; font-weight:600; padding:3px 10px; border-radius:99px;
-      background:var(--gray-100); color:var(--gray-600);
-    }
-    .chip.blue   { background:#dbeafe; color:#1d4ed8; }
-    .chip.green  { background:#d1fae5; color:#065f46; }
-    .chip.red    { background:#fee2e2; color:#b91c1c; }
-    .chip.purple { background:#ede9fe; color:#6d28d9; }
-    .chip.amber  { background:#fef3c7; color:#92400e; }
-    .card-actions { display:flex; gap:8px; margin-top:12px; }
-
-    /* ── Role color dot ── */
-    .role-dot {
-      width:14px; height:14px; border-radius:50%; flex-shrink:0; margin-top:2px;
-    }
-    .role-header { display:flex; align-items:flex-start; gap:10px; }
 
     /* ── Day pills ── */
-    .day-pills { display:flex; gap:4px; flex-wrap:wrap; }
+    .day-pills { display: flex; gap: 3px; flex-wrap: wrap; }
     .day-pill {
-      width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
-      justify-content:center; font-size:10px; font-weight:700;
-      background:var(--gray-100); color:var(--gray-600);
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700;
+      background: var(--primary-light); color: var(--primary-dark);
     }
-    .day-pill.on  { background:var(--primary); color:#fff; }
-    .day-pill.off { background:#fee2e2; color:#b91c1c; text-decoration:line-through; opacity:.6; }
-
-    /* ── Day checkboxes in form ── */
-    .days-grid {
-      display:grid; grid-template-columns:repeat(7,1fr); gap:4px;
-    }
-    .day-check { display:flex; flex-direction:column; align-items:center; gap:4px; }
-    .day-check input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
-    .day-check label { font-size:11px; font-weight:600; color:var(--gray-600); cursor:pointer; }
-
-    /* ── Dashboard ── */
-    .dash-stat-grid {
-      display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;
-      margin-bottom:24px;
-    }
-    .dash-stat {
-      background:var(--white); border:1px solid var(--gray-200); border-radius:10px;
-      padding:16px 14px; text-align:center;
-    }
-    .dash-stat-value { font-size:28px; font-weight:800; color:var(--primary); line-height:1; }
-    .dash-stat-label { font-size:12px; color:var(--gray-500); margin-top:4px; }
-    .dash-stat.green .dash-stat-value { color:#10b981; }
-    .dash-stat.red   .dash-stat-value { color:#ef4444; }
-    .dash-stat.amber .dash-stat-value { color:#f59e0b; }
-    .dash-stat.gray  .dash-stat-value { color:var(--gray-400); }
-
-    .dash-worker-table { width:100%; border-collapse:collapse; font-size:13px; }
-    .dash-worker-table th {
-      text-align:left; padding:8px 12px; font-size:11px; font-weight:700;
-      color:var(--gray-500); border-bottom:2px solid var(--gray-200); white-space:nowrap;
-    }
-    .dash-worker-table td { padding:10px 12px; border-bottom:1px solid var(--gray-100); }
-    .dash-worker-table tr:last-child td { border-bottom:none; }
-    .worker-name-cell { display:flex; align-items:center; gap:10px; }
-    .worker-avatar-sm {
-      width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0;
-      background:var(--gray-200);
+    .day-pill.off {
+      background: var(--gray-100); color: var(--gray-400);
+      text-decoration: line-through;
     }
 
-    /* ── Empty state ── */
-    .empty-state {
-      text-align:center; padding:48px 20px; color:var(--gray-400);
-    }
-    .empty-state-icon { font-size:48px; margin-bottom:12px; }
-    .empty-state-title { font-size:15px; font-weight:600; color:var(--gray-600); margin-bottom:6px; }
-    .empty-state-sub { font-size:13px; }
+    /* ── Day checkboxes ── */
+    .days-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+    .day-check { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .day-check input[type=checkbox] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary); }
+    .day-check label { font-size: 10px; font-weight: 700; color: var(--gray-600); cursor: pointer; text-transform: uppercase; }
 
-    /* ── Color swatch picker ── */
-    .color-swatches { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    /* ── Dashboard stat cards ── */
+    .dash-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px; margin-bottom: 20px;
+    }
+    .dash-stat-card {
+      background: var(--white); border: 1px solid var(--gray-100);
+      border-radius: var(--radius-md); padding: 16px 14px; text-align: center;
+      box-shadow: var(--shadow-xs);
+    }
+    .dash-stat-card .val { font-size: 28px; font-weight: 800; line-height: 1; }
+    .dash-stat-card .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--gray-500); margin-top: 4px; }
+    .dash-stat-card.stat-blue   .val { color: var(--primary-dark); }
+    .dash-stat-card.stat-green  .val { color: var(--success-dark); }
+    .dash-stat-card.stat-amber  .val { color: var(--warning-dark); }
+    .dash-stat-card.stat-red    .val { color: var(--danger); }
+    .dash-stat-card.stat-gray   .val { color: var(--gray-400); }
+
+    /* ── Attendance table ── */
+    .att-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .att-table th {
+      text-align: left; padding: 10px 14px;
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--gray-500); background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+    }
+    .att-table td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+    .att-table tr:last-child td { border-bottom: none; }
+    .att-table tbody tr:hover td { background: var(--primary-light); }
+
+    .worker-cell { display: flex; align-items: center; gap: 10px; }
+    .worker-thumb {
+      width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+      background: var(--gray-200); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .worker-thumb img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+
+    /* ── Status chips ── */
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: var(--radius-full);
+      font-size: 11px; font-weight: 700;
+    }
+    .chip-present { background: var(--success-light); color: var(--success-dark); }
+    .chip-late    { background: var(--warning-light);  color: var(--warning-dark); }
+    .chip-absent  { background: var(--danger-light);   color: var(--danger-dark);  }
+    .chip-leave   { background: var(--accent-light);   color: var(--accent-dark);  }
+    .chip-half    { background: var(--warning-light);  color: var(--warning-dark); }
+    .chip-off     { background: var(--gray-100);       color: var(--gray-500);     }
+
+    /* ── Shift status ── */
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+    }
+    .status-dot.active   { background: var(--success); }
+    .status-dot.inactive { background: var(--gray-400); }
+
+    /* ── Schedule chips in table ── */
+    .schedule-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--primary-light); color: var(--primary-dark);
+      font-size: 11.5px; font-weight: 600; padding: 3px 9px;
+      border-radius: var(--radius-full);
+    }
+
+    /* ── Color swatch ── */
+    .color-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
     .color-swatch {
-      width:28px; height:28px; border-radius:6px; cursor:pointer;
-      border:3px solid transparent; transition:border-color .1s, transform .1s;
+      width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+      border: 3px solid transparent; transition: border-color .12s, transform .12s;
     }
-    .color-swatch.selected { border-color:#111; transform:scale(1.15); }
+    .color-swatch.selected { border-color: var(--gray-900); transform: scale(1.12); }
 
-    .inactive-badge {
-      font-size:10px; font-weight:700; padding:2px 7px; border-radius:99px;
-      background:#fee2e2; color:#b91c1c; display:inline-block; margin-left:6px;
+    /* ── Empty/loading ── */
+    .empty-pane {
+      padding: 56px 20px; text-align: center;
+    }
+    .empty-pane svg { color: var(--gray-300); margin: 0 auto 14px; display: block; }
+    .empty-pane h3 { font-size: 15px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px; }
+    .empty-pane p  { font-size: 13px; color: var(--gray-400); }
+
+    /* ── Dashboard selector bar ── */
+    .dash-selector {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 16px 20px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+    }
+    .dash-selector label { font-size: 13px; font-weight: 600; color: var(--gray-700); white-space: nowrap; }
+    .dash-selector select { max-width: 300px; flex: 1; }
+
+    /* ── Dashboard shift info header ── */
+    .dash-shift-header {
+      padding: 20px; border-bottom: 1px solid var(--gray-100);
+    }
+    .dash-shift-name { font-size: 17px; font-weight: 700; color: var(--gray-900); }
+    .dash-shift-meta { font-size: 12.5px; color: var(--gray-500); margin-top: 4px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    @media (max-width: 640px) {
+      .hide-sm { display: none; }
+      .days-grid { grid-template-columns: repeat(4,1fr); }
+    }
+    @media (max-width: 480px) {
+      .dash-stats { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
-<div class="layout">
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <div class="sidebar-brand-icon">⚡</div>
-        <span class="sidebar-brand-name" id="sidebarBrandName">WorkerSave</span>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="dashboard.html"       class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
-      <a href="workers.html"         class="nav-item"><span class="nav-icon">👷</span> Workers</a>
-      <a href="shifts.html"          class="nav-item active"><span class="nav-icon">🕐</span> Shifts &amp; Roles</a>
-      <a href="attendance.html"      class="nav-item"><span class="nav-icon">✅</span> Attendance</a>
-      <a href="payroll.html"         class="nav-item"><span class="nav-icon">💰</span> Payroll</a>
-      <a href="branches.html"        class="nav-item"><span class="nav-icon">🏢</span> Branches</a>
-      <a href="staff.html"           class="nav-item"><span class="nav-icon">👥</span> Staff</a>
-    </nav>
-    <div class="sidebar-user">
-      <img src="" alt="" class="sidebar-avatar" id="sidebarAvatar" style="display:none;" />
-      <div>
-        <div class="sidebar-user-name" id="sidebarUserName">—</div>
-        <div class="sidebar-user-role" id="sidebarUserRole">—</div>
-      </div>
-      <button class="btn-icon" onclick="logout()" title="Logout" style="margin-left:auto;">⏻</button>
-    </div>
-  </aside>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
 
-  <!-- Main -->
-  <main class="main-content">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Shifts &amp; Roles</h1>
-        <p class="page-sub">Manage what workers do (roles) and when they work (shifts)</p>
+  <div class="main-content">
+    <header class="app-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="header-title">Shifts</h1>
       </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('roles')">👷 Worker Roles</button>
-      <button class="tab-btn"        onclick="switchTab('shifts')">🕐 Shifts</button>
-      <button class="tab-btn"        onclick="switchTab('dashboard')">📊 Shift Dashboard</button>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════════════════════
-         TAB 1: WORKER ROLES
-    ═══════════════════════════════════════════════════════════════════════ -->
-    <div class="tab-panel active" id="tab-roles">
-      <div class="page-actions" style="margin-bottom:16px;">
-        <p style="font-size:13px;color:var(--gray-500);margin:0;">
-          A role defines <strong>what</strong> the worker does — e.g. Pump Attendant, Security, Manager.
-        </p>
-        <button class="btn btn-primary" onclick="openRoleModal()">+ Add Role</button>
+      <div class="header-right">
+        <button class="btn btn-primary btn-sm" onclick="openShiftModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Shift
+        </button>
       </div>
-      <div class="card-grid" id="rolesGrid">
-        <div class="empty-state">
-          <div class="empty-state-icon">👷</div>
-          <div class="empty-state-title">Loading roles…</div>
+    </header>
+
+    <main class="page-body">
+
+      <!-- ══ SHIFTS TABLE ══════════════════════════════════════════════════════ -->
+      <div class="page-toolbar">
+        <div class="page-toolbar-left">
+          <h2>Shifts</h2>
+          <p>Each shift defines when workers work — supervisor, clock times, and working days</p>
+        </div>
+        <button class="btn btn-primary" onclick="openShiftModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Shift
+        </button>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:0;">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Shift Name</th>
+                <th class="hide-sm">Supervisor</th>
+                <th>Schedule</th>
+                <th class="hide-sm">Working Days</th>
+                <th>Workers</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="shiftsBody">
+              <tr><td colspan="7"><div class="empty-pane">
+                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <h3>Loading shifts…</h3>
+              </div></td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════════════════════════════════════════════════════════════
-         TAB 2: SHIFTS
-    ═══════════════════════════════════════════════════════════════════════ -->
-    <div class="tab-panel" id="tab-shifts">
-      <div class="page-actions" style="margin-bottom:16px;">
-        <p style="font-size:13px;color:var(--gray-500);margin:0;">
-          A shift defines <strong>when</strong> workers work — supervisor, clock-in/out times, and working days.
-        </p>
-        <button class="btn btn-primary" onclick="openShiftModal()">+ Add Shift</button>
-      </div>
-      <div class="card-grid" id="shiftsGrid">
-        <div class="empty-state">
-          <div class="empty-state-icon">🕐</div>
-          <div class="empty-state-title">Loading shifts…</div>
-        </div>
-      </div>
-    </div>
+      <!-- ══ SHIFT DASHBOARD ═══════════════════════════════════════════════════ -->
+      <div class="section-label">Shift Dashboard</div>
 
-    <!-- ══════════════════════════════════════════════════════════════════════
-         TAB 3: SHIFT DASHBOARD
-    ═══════════════════════════════════════════════════════════════════════ -->
-    <div class="tab-panel" id="tab-dashboard">
-      <div class="card" style="padding:20px;margin-bottom:20px;">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <label style="font-weight:600;font-size:14px;white-space:nowrap;">Select Shift:</label>
-          <select id="dashShiftSelect" class="form-control" style="max-width:300px;" onchange="loadShiftDashboard()">
-            <option value="">— choose a shift —</option>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <!-- Shift selector bar -->
+        <div class="dash-selector">
+          <label for="dashShiftSelect">View shift:</label>
+          <select id="dashShiftSelect" class="form-control" onchange="loadShiftDashboard()">
+            <option value="">— Select a shift —</option>
           </select>
-          <button class="btn btn-secondary btn-sm" onclick="loadShiftDashboard()">Refresh</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadShiftDashboard()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Dashboard content -->
+        <div id="dashboardContent" style="padding:20px;">
+          <div class="empty-pane" style="padding:40px 20px;">
+            <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <h3>Select a shift above</h3>
+            <p>View today's attendance breakdown for any shift</p>
+          </div>
         </div>
       </div>
-      <div id="dashboardContent">
-        <div class="empty-state">
-          <div class="empty-state-icon">📊</div>
-          <div class="empty-state-title">Select a shift above to see its dashboard</div>
-        </div>
-      </div>
-    </div>
-  </main>
-</div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════
-     ROLE MODAL
-═══════════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="roleModal" style="display:none;">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-header">
-      <h3 class="modal-title" id="roleModalTitle">Add Worker Role</h3>
-      <button class="btn-icon" onclick="closeRoleModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="roleId" />
-
-      <div class="form-group">
-        <label class="form-label">Role Name <span class="text-danger">*</span></label>
-        <input id="roleName" type="text" class="form-control" placeholder="e.g. Pump Attendant, Security, Manager" />
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Description <span class="text-muted">(optional)</span></label>
-        <input id="roleDesc" type="text" class="form-control" placeholder="Brief description of this role" />
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Badge Color</label>
-        <div class="color-swatches" id="roleColorSwatches"></div>
-        <input type="hidden" id="roleColor" value="#6366f1" />
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeRoleModal()">Cancel</button>
-      <button class="btn btn-primary"   onclick="saveRole()" id="roleSaveBtn">Save Role</button>
-    </div>
+    </main>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
      SHIFT MODAL
 ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="shiftModal" style="display:none;">
-  <div class="modal" style="max-width:540px;">
+<div class="modal-overlay" id="shiftModal">
+  <div class="modal-box" style="max-width:560px;">
     <div class="modal-header">
       <h3 class="modal-title" id="shiftModalTitle">Add Shift</h3>
-      <button class="btn-icon" onclick="closeShiftModal()">✕</button>
+      <button class="btn-icon" onclick="closeShiftModal()" aria-label="Close">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="shiftId" />
 
       <div class="form-group">
-        <label class="form-label">Shift Name <span class="text-danger">*</span></label>
+        <label class="form-label">Shift Name <span class="required">*</span></label>
         <input id="shiftName" type="text" class="form-control" placeholder="e.g. Morning Shift – Mr. John" />
       </div>
 
       <div class="form-group">
         <label class="form-label">Supervisor Name</label>
-        <input id="shiftSupervisor" type="text" class="form-control" placeholder="Name of the supervisor" />
+        <input id="shiftSupervisor" type="text" class="form-control" placeholder="Supervisor's name" />
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Clock-in Time <span class="text-danger">*</span></label>
+          <label class="form-label">Clock-in Time <span class="required">*</span></label>
           <input id="shiftResumeTime" type="time" class="form-control" value="08:00" />
         </div>
         <div class="form-group">
-          <label class="form-label">Clock-out Time <span class="text-danger">*</span></label>
+          <label class="form-label">Clock-out Time <span class="required">*</span></label>
           <input id="shiftClosingTime" type="time" class="form-control" value="17:00" />
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Late after (minutes)</label>
+          <label class="form-label">Late grace (minutes)</label>
           <input id="shiftLate" type="number" class="form-control" value="0" min="0" max="120" />
-          <div class="form-hint">Grace period before marking late</div>
+          <div class="form-hint">Minutes after clock-in before marking late</div>
         </div>
         <div class="form-group">
           <label class="form-label">Overtime after (minutes)</label>
           <input id="shiftOvertime" type="number" class="form-control" value="60" min="0" />
+          <div class="form-hint">Minutes after clock-out to count overtime</div>
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Working Days</label>
-        <div class="days-grid" id="shiftDaysGrid">
-          <!-- Injected by JS -->
-        </div>
-        <div class="form-hint" style="margin-top:8px;">Check the days this shift works</div>
+        <div class="days-grid" id="shiftDaysGrid"></div>
+        <div class="form-hint" style="margin-top:6px;">Check the days workers in this shift are scheduled</div>
       </div>
 
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="shiftCustomSched" />
-          <span style="font-size:13px;font-weight:600;">Allow custom schedules for workers in this shift</span>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;">
+          <input type="checkbox" id="shiftCustomSched" style="margin-top:2px;accent-color:var(--primary);" />
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Allow custom schedules</div>
+            <div class="form-hint" style="margin-top:2px;">For supervisors, security, or managers with irregular hours</div>
+          </div>
         </label>
-        <div class="form-hint">For Outside Supervisors, Security, or Managers who work irregular hours</div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeShiftModal()">Cancel</button>
-      <button class="btn btn-primary"   onclick="saveShift()" id="shiftSaveBtn">Save Shift</button>
+      <button class="btn btn-primary" onclick="saveShift()" id="shiftSaveBtn">Save Shift</button>
     </div>
   </div>
 </div>
 
-<script src="../assets/js/config.js?v=3"></script>
-<script src="../assets/js/api.js?v=3"></script>
-<script src="../assets/js/auth.js?v=3"></script>
+<script src="../assets/js/config.js?v=4"></script>
+<script src="../assets/js/api.js?v=4"></script>
+<script src="../assets/js/auth.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=4"></script>
 <script>
 const user = requireAuth(['super_admin','company_admin','branch_manager','hr_staff']);
 if (user) populateSidebarUser();
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DAYS = [
-  { idx: 1, label: 'Mon', short: 'M' },
-  { idx: 2, label: 'Tue', short: 'T' },
-  { idx: 3, label: 'Wed', short: 'W' },
-  { idx: 4, label: 'Thu', short: 'T' },
-  { idx: 5, label: 'Fri', short: 'F' },
-  { idx: 6, label: 'Sat', short: 'S' },
-  { idx: 0, label: 'Sun', short: 'S' },
+  { idx:1, label:'Mon', s:'M' },
+  { idx:2, label:'Tue', s:'T' },
+  { idx:3, label:'Wed', s:'W' },
+  { idx:4, label:'Thu', s:'T' },
+  { idx:5, label:'Fri', s:'F' },
+  { idx:6, label:'Sat', s:'S' },
+  { idx:0, label:'Sun', s:'S' },
 ];
 
-const ROLE_COLORS = [
-  '#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316',
-  '#f59e0b','#10b981','#14b8a6','#3b82f6','#6b7280'
-];
-
-const STATUS_MAP = {
-  present:  { label: 'Present',  cls: 'green' },
-  late:     { label: 'Late',     cls: 'amber' },
-  absent:   { label: 'Absent',   cls: 'red'   },
-  on_leave: { label: 'On Leave', cls: 'blue'  },
-  half_day: { label: 'Half Day', cls: 'amber' },
-  off_shift:{ label: 'Off',      cls: 'gray'  },
+const STATUS = {
+  present:   { label:'Present',  cls:'chip-present' },
+  late:      { label:'Late',     cls:'chip-late'    },
+  absent:    { label:'Absent',   cls:'chip-absent'  },
+  on_leave:  { label:'On Leave', cls:'chip-leave'   },
+  half_day:  { label:'Half Day', cls:'chip-half'    },
+  off_shift: { label:'Off',      cls:'chip-off'     },
 };
 
-// ── State ──────────────────────────────────────────────────────────────────────
-let allRoles  = [];
 let allShifts = [];
 
-// ── Tab switching ──────────────────────────────────────────────────────────────
-function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['roles','shifts','dashboard'][i] === name);
-  });
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(`tab-${name}`).classList.add('active');
-
-  if (name === 'roles'     && !allRoles.length)  loadRoles();
-  if (name === 'shifts'    && !allShifts.length) loadShifts();
-  if (name === 'dashboard') populateDashShiftSelect();
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function offDaysFromChecks() {
-  const off = [];
-  DAYS.forEach(d => {
-    const cb = document.getElementById(`day_${d.idx}`);
-    if (cb && !cb.checked) off.push(d.idx);
-  });
-  return off;
-}
-
-function workPatternFromOffDays(off) {
-  if (!off || off.length === 0) return 'all_week';
-  if (off.length === 2 && off.includes(0) && off.includes(6)) return 'weekdays';
-  return 'custom';
-}
-
-function renderDayPills(offDays = []) {
-  return DAYS.map(d => {
-    const isOff = (offDays || []).includes(d.idx);
-    return `<div class="day-pill ${isOff ? 'off' : 'on'}" title="${d.label}">${d.short}</div>`;
-  }).join('');
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// ROLES
-// ════════════════════════════════════════════════════════════════════════════
-
-async function loadRoles() {
-  try {
-    const data = await API.getCategories();
-    allRoles = data.categories || [];
-    renderRoles();
-  } catch (err) {
-    document.getElementById('rolesGrid').innerHTML =
-      `<div class="empty-state"><div class="empty-state-icon">⚠️</div>
-       <div class="empty-state-title">Failed to load roles</div>
-       <div class="empty-state-sub">${esc(err.message)}</div>
-       <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="loadRoles()">Retry</button></div>`;
-  }
-}
-
-function renderRoles() {
-  const grid = document.getElementById('rolesGrid');
-  if (!allRoles.length) {
-    grid.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">👷</div>
-      <div class="empty-state-title">No roles yet</div>
-      <div class="empty-state-sub">Add roles like "Pump Attendant", "Security", "Manager"</div>
-    </div>`;
-    return;
-  }
-
-  grid.innerHTML = allRoles.map(r => `
-    <div class="item-card">
-      <div class="item-card-header">
-        <div class="role-header">
-          <div class="role-dot" style="background:${esc(r.color || '#6366f1')};"></div>
-          <div>
-            <div class="item-card-title">${esc(r.name)}${!r.isActive ? '<span class="inactive-badge">Inactive</span>' : ''}</div>
-            ${r.description ? `<div class="item-card-sub">${esc(r.description)}</div>` : ''}
-          </div>
-        </div>
-      </div>
-      <div class="chip-row">
-        <span class="chip green">${r.workerCount || 0} worker${r.workerCount === 1 ? '' : 's'}</span>
-      </div>
-      <div class="card-actions">
-        <button class="btn btn-secondary btn-sm" onclick="openRoleModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">Edit</button>
-        <button class="btn btn-danger btn-sm"    onclick="deleteRole('${r._id}','${esc(r.name)}')">Delete</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function openRoleModal(role) {
-  document.getElementById('roleModalTitle').textContent = role ? 'Edit Role' : 'Add Worker Role';
-  document.getElementById('roleId').value    = role?._id  || '';
-  document.getElementById('roleName').value  = role?.name || '';
-  document.getElementById('roleDesc').value  = role?.description || '';
-
-  const selectedColor = role?.color || '#6366f1';
-  document.getElementById('roleColor').value = selectedColor;
-
-  // Render color swatches
-  document.getElementById('roleColorSwatches').innerHTML = ROLE_COLORS.map(c => `
-    <div class="color-swatch ${c === selectedColor ? 'selected' : ''}"
-         style="background:${c};" title="${c}"
-         onclick="selectRoleColor('${c}')"></div>
-  `).join('');
-
-  document.getElementById('roleModal').style.display = 'flex';
-  document.getElementById('roleName').focus();
-}
-
-function selectRoleColor(color) {
-  document.getElementById('roleColor').value = color;
-  document.querySelectorAll('#roleColorSwatches .color-swatch').forEach(s => {
-    s.classList.toggle('selected', s.style.background === color || s.style.backgroundColor === color);
-  });
-}
-
-function closeRoleModal() { document.getElementById('roleModal').style.display = 'none'; }
-
-async function saveRole() {
-  const id   = document.getElementById('roleId').value;
-  const name = document.getElementById('roleName').value.trim();
-  if (!name) { showToast('Role name is required', 'error'); return; }
-
-  const body = {
-    name,
-    description: document.getElementById('roleDesc').value.trim(),
-    color:       document.getElementById('roleColor').value || '#6366f1'
-  };
-
-  const btn = document.getElementById('roleSaveBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    if (id) {
-      await API.updateCategory(id, body);
-      showToast('Role updated', 'success');
-    } else {
-      await API.createCategory(body);
-      showToast('Role created', 'success');
-    }
-    closeRoleModal();
-    allRoles = []; // force reload
-    loadRoles();
-  } catch (err) {
-    showToast(err.message || 'Failed to save', 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save Role';
-  }
-}
-
-async function deleteRole(id, name) {
-  if (!confirm(`Delete role "${name}"?\n\nThis cannot be undone. Workers must be unassigned first.`)) return;
-  try {
-    await API.deleteCategory(id);
-    showToast('Role deleted', 'success');
-    allRoles = [];
-    loadRoles();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// SHIFTS
-// ════════════════════════════════════════════════════════════════════════════
+// ── Shifts ─────────────────────────────────────────────────────────────────────
 
 async function loadShifts() {
   try {
     const data = await API.getShifts();
     allShifts = data.shifts || [];
     renderShifts();
+    populateDashSelect();
   } catch (err) {
-    document.getElementById('shiftsGrid').innerHTML =
-      `<div class="empty-state"><div class="empty-state-icon">⚠️</div>
-       <div class="empty-state-title">Failed to load shifts</div>
-       <div class="empty-state-sub">${esc(err.message)}</div>
-       <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="loadShifts()">Retry</button></div>`;
+    document.getElementById('shiftsBody').innerHTML = `<tr><td colspan="7">
+      <div class="empty-pane">
+        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3>Failed to load shifts</h3>
+        <p>${esc(err.message)}</p>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="loadShifts()">Retry</button>
+      </div></td></tr>`;
   }
 }
 
-function renderShifts() {
-  const grid = document.getElementById('shiftsGrid');
-  if (!allShifts.length) {
-    grid.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">🕐</div>
-      <div class="empty-state-title">No shifts yet</div>
-      <div class="empty-state-sub">Create your first shift to group workers by supervisor and schedule</div>
-    </div>`;
-    return;
-  }
-
-  grid.innerHTML = allShifts.map(s => {
-    const patternLabel = s.workPattern === 'all_week' ? 'All week'
-      : s.workPattern === 'weekdays' ? 'Mon – Fri'
-      : 'Custom days';
-
-    return `
-    <div class="item-card">
-      <div class="item-card-header">
-        <div>
-          <div class="item-card-title">${esc(s.name)}${!s.isActive ? '<span class="inactive-badge">Inactive</span>' : ''}</div>
-          ${s.supervisorName ? `<div class="item-card-sub">👤 ${esc(s.supervisorName)}</div>` : ''}
-        </div>
-      </div>
-      <div class="chip-row">
-        <span class="chip blue">🕐 ${esc(s.resumeTime)} – ${esc(s.closingTime)}</span>
-        <span class="chip green">${s.workerCount || 0} worker${s.workerCount === 1 ? '' : 's'}</span>
-        ${s.lateAfterMinutes > 0 ? `<span class="chip amber">Late: +${s.lateAfterMinutes}m</span>` : ''}
-        ${s.allowCustomSchedule ? `<span class="chip purple">Custom OK</span>` : ''}
-      </div>
-      <div style="margin-bottom:12px;">
-        <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px;font-weight:600;">${esc(patternLabel)}</div>
-        <div class="day-pills">${renderDayPills(s.offDays)}</div>
-      </div>
-      <div class="card-actions">
-        <button class="btn btn-secondary btn-sm" onclick="openShiftModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">Edit</button>
-        <button class="btn btn-danger btn-sm"    onclick="deleteShift('${s._id}','${esc(s.name)}')">Delete</button>
-      </div>
-    </div>
-  `;
+function renderDayPills(offDays) {
+  return DAYS.map(d => {
+    const off = (offDays||[]).includes(d.idx);
+    return `<div class="day-pill ${off ? 'off' : ''}" title="${d.label}">${d.s}</div>`;
   }).join('');
 }
 
-function buildDaysGrid(offDays = []) {
+function renderShifts() {
+  const body = document.getElementById('shiftsBody');
+  if (!allShifts.length) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-pane">
+      <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <h3>No shifts yet</h3>
+      <p>Create your first shift to group workers by supervisor and schedule</p>
+      <button class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="openShiftModal()">Add First Shift</button>
+    </div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = allShifts.map(s => {
+    const data = esc(JSON.stringify(s));
+    const active = s.isActive !== false;
+    return `<tr>
+      <td style="font-weight:600;color:var(--gray-900);font-size:14px;">${esc(s.name)}</td>
+      <td class="hide-sm" style="color:var(--gray-600);font-size:13px;">
+        ${s.supervisorName ? esc(s.supervisorName) : '<span style="color:var(--gray-300);">—</span>'}
+      </td>
+      <td>
+        <span class="schedule-chip">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${esc(s.resumeTime)} – ${esc(s.closingTime)}
+        </span>
+      </td>
+      <td class="hide-sm">
+        <div class="day-pills">${renderDayPills(s.offDays)}</div>
+      </td>
+      <td>
+        <span style="font-size:13px;font-weight:700;color:var(--gray-700);">
+          ${s.workerCount || 0}
+          <span style="font-weight:400;color:var(--gray-400);font-size:12px;">workers</span>
+        </span>
+      </td>
+      <td>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${active ? 'var(--success-dark)' : 'var(--gray-500)'};">
+          <span class="status-dot ${active ? 'active' : 'inactive'}"></span>
+          ${active ? 'Active' : 'Inactive'}
+        </span>
+      </td>
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-secondary btn-xs" onclick='openShiftModal(${data})'>Edit</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteShift('${s._id}','${esc(s.name)}')">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Shift modal ────────────────────────────────────────────────────────────────
+
+function buildDaysGrid(offDays) {
   return DAYS.map(d => `
     <div class="day-check">
-      <input type="checkbox" id="day_${d.idx}" ${offDays.includes(d.idx) ? '' : 'checked'} />
+      <input type="checkbox" id="day_${d.idx}" ${(offDays||[]).includes(d.idx) ? '' : 'checked'} />
       <label for="day_${d.idx}">${d.label}</label>
     </div>
   `).join('');
 }
 
-function openShiftModal(shift) {
-  document.getElementById('shiftModalTitle').textContent = shift ? 'Edit Shift' : 'Add Shift';
-  document.getElementById('shiftId').value          = shift?._id           || '';
-  document.getElementById('shiftName').value        = shift?.name          || '';
-  document.getElementById('shiftSupervisor').value  = shift?.supervisorName || '';
-  document.getElementById('shiftResumeTime').value  = shift?.resumeTime    || '08:00';
-  document.getElementById('shiftClosingTime').value = shift?.closingTime   || '17:00';
-  document.getElementById('shiftLate').value        = shift?.lateAfterMinutes     ?? 0;
-  document.getElementById('shiftOvertime').value    = shift?.overtimeAfterMinutes ?? 60;
-  document.getElementById('shiftCustomSched').checked = shift?.allowCustomSchedule || false;
-
-  document.getElementById('shiftDaysGrid').innerHTML = buildDaysGrid(shift?.offDays || []);
-  document.getElementById('shiftModal').style.display = 'flex';
-  document.getElementById('shiftName').focus();
+function offDaysFromChecks() {
+  return DAYS.filter(d => !document.getElementById(`day_${d.idx}`)?.checked).map(d => d.idx);
 }
 
-function closeShiftModal() { document.getElementById('shiftModal').style.display = 'none'; }
+function workPatternFromOffDays(off) {
+  if (!off.length) return 'all_week';
+  if (off.length === 2 && off.includes(0) && off.includes(6)) return 'weekdays';
+  return 'custom';
+}
+
+function openShiftModal(s) {
+  document.getElementById('shiftModalTitle').textContent = s ? 'Edit Shift' : 'Add Shift';
+  document.getElementById('shiftId').value           = s?._id             || '';
+  document.getElementById('shiftName').value         = s?.name            || '';
+  document.getElementById('shiftSupervisor').value   = s?.supervisorName  || '';
+  document.getElementById('shiftResumeTime').value   = s?.resumeTime      || '08:00';
+  document.getElementById('shiftClosingTime').value  = s?.closingTime     || '17:00';
+  document.getElementById('shiftLate').value         = s?.lateAfterMinutes     ?? 0;
+  document.getElementById('shiftOvertime').value     = s?.overtimeAfterMinutes ?? 60;
+  document.getElementById('shiftCustomSched').checked= s?.allowCustomSchedule  || false;
+  document.getElementById('shiftDaysGrid').innerHTML = buildDaysGrid(s?.offDays || []);
+  document.getElementById('shiftModal').classList.add('open');
+  setTimeout(() => document.getElementById('shiftName').focus(), 80);
+}
+
+function closeShiftModal() { document.getElementById('shiftModal').classList.remove('open'); }
+document.getElementById('shiftModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeShiftModal();
+});
 
 async function saveShift() {
   const id   = document.getElementById('shiftId').value;
@@ -651,7 +496,6 @@ async function saveShift() {
     closeShiftModal();
     allShifts = [];
     loadShifts();
-    populateDashShiftSelect();
   } catch (err) {
     showToast(err.message || 'Failed to save', 'error');
   } finally {
@@ -660,33 +504,29 @@ async function saveShift() {
 }
 
 async function deleteShift(id, name) {
-  if (!confirm(`Delete shift "${name}"?\n\nWorkers must be unassigned first.`)) return;
+  if (!confirm(`Delete shift "${name}"?\n\nWorkers must be unassigned from this shift first.`)) return;
   try {
     await API.deleteShift(id);
     showToast('Shift deleted', 'success');
     allShifts = [];
     loadShifts();
-    populateDashShiftSelect();
   } catch (err) {
     showToast(err.message, 'error');
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// DASHBOARD
-// ════════════════════════════════════════════════════════════════════════════
+// ── Dashboard ──────────────────────────────────────────────────────────────────
 
-async function populateDashShiftSelect() {
-  if (!allShifts.length) {
-    try {
-      const data = await API.getShifts();
-      allShifts = data.shifts || [];
-    } catch (_) {}
-  }
+function populateDashSelect() {
   const sel = document.getElementById('dashShiftSelect');
   const current = sel.value;
-  sel.innerHTML = '<option value="">— choose a shift —</option>' +
-    allShifts.map(s => `<option value="${s._id}" ${s._id === current ? 'selected' : ''}>${esc(s.name)}${s.supervisorName ? ` (${esc(s.supervisorName)})` : ''}</option>`).join('');
+  sel.innerHTML = '<option value="">— Select a shift —</option>' +
+    allShifts.map(s =>
+      `<option value="${s._id}" ${s._id === current ? 'selected' : ''}>
+        ${esc(s.name)}${s.supervisorName ? ` (${esc(s.supervisorName)})` : ''}
+      </option>`
+    ).join('');
+  if (current) loadShiftDashboard();
 }
 
 async function loadShiftDashboard() {
@@ -694,111 +534,138 @@ async function loadShiftDashboard() {
   const content = document.getElementById('dashboardContent');
 
   if (!id) {
-    content.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">📊</div>
-      <div class="empty-state-title">Select a shift above to see its dashboard</div>
+    content.innerHTML = `<div class="empty-pane" style="padding:40px 20px;">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <h3>Select a shift above</h3>
+      <p>View today's attendance breakdown for any shift</p>
     </div>`;
     return;
   }
 
-  content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Loading…</div></div>`;
+  content.innerHTML = `<div class="empty-pane" style="padding:30px 20px;">
+    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <h3>Loading dashboard…</h3>
+  </div>`;
 
   try {
-    const data = await apiFetch(`/shifts/${id}/dashboard`);
-    const { shift, stats, workers } = data;
-
-    const today = new Date().toLocaleDateString('en-NG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    const { shift, stats, workers } = await apiFetch(`/shifts/${id}/dashboard`);
+    const today = new Date().toLocaleDateString('en-NG', {
+      weekday:'long', year:'numeric', month:'long', day:'numeric'
+    });
 
     content.innerHTML = `
-      <div style="margin-bottom:16px;">
-        <div style="font-size:18px;font-weight:700;color:var(--gray-900);">${esc(shift.name)}</div>
-        ${shift.supervisorName ? `<div style="font-size:13px;color:var(--gray-500);">Supervisor: ${esc(shift.supervisorName)}</div>` : ''}
-        <div style="font-size:12px;color:var(--gray-400);margin-top:2px;">${today} · ${esc(shift.resumeTime)} – ${esc(shift.closingTime)}</div>
-      </div>
-
-      <div class="dash-stat-grid">
-        <div class="dash-stat">
-          <div class="dash-stat-value">${stats.total}</div>
-          <div class="dash-stat-label">Total Workers</div>
-        </div>
-        <div class="dash-stat green">
-          <div class="dash-stat-value">${stats.present}</div>
-          <div class="dash-stat-label">Present Today</div>
-        </div>
-        <div class="dash-stat">
-          <div class="dash-stat-value">${stats.onTime}</div>
-          <div class="dash-stat-label">On Time</div>
-        </div>
-        <div class="dash-stat amber">
-          <div class="dash-stat-value">${stats.late}</div>
-          <div class="dash-stat-label">Late</div>
-        </div>
-        <div class="dash-stat red">
-          <div class="dash-stat-value">${stats.absent}</div>
-          <div class="dash-stat-label">Absent</div>
+      <div class="dash-shift-header">
+        <div class="dash-shift-name">${esc(shift.name)}</div>
+        <div class="dash-shift-meta">
+          ${shift.supervisorName ? `<span>Supervisor: ${esc(shift.supervisorName)}</span>` : ''}
+          <span>
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:inline;vertical-align:-2px;margin-right:3px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            ${esc(shift.resumeTime)} – ${esc(shift.closingTime)}
+          </span>
+          <span style="color:var(--gray-400);">${today}</span>
         </div>
       </div>
 
-      ${workers.length === 0 ? `<div class="empty-state">
-        <div class="empty-state-icon">👷</div>
-        <div class="empty-state-title">No workers in this shift yet</div>
-        <div class="empty-state-sub">Assign workers to this shift from the Workers page</div>
-      </div>` : `
-      <div class="card" style="padding:0;overflow:hidden;">
-        <table class="dash-worker-table">
-          <thead>
-            <tr>
-              <th>Worker</th>
-              <th>Role</th>
-              <th>Clock In</th>
-              <th>Clock Out</th>
-              <th>Status</th>
-              <th>Late By</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${workers.map(w => {
-              const st = STATUS_MAP[w.status] || { label: w.status, cls: 'gray' };
-              const roleColor = w.category?.color || '#6b7280';
-              const clockIn  = w.clockIn  ? new Date(w.clockIn).toLocaleTimeString('en-NG',  { hour:'2-digit', minute:'2-digit' }) : '—';
-              const clockOut = w.clockOut ? new Date(w.clockOut).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' }) : '—';
-              return `<tr>
-                <td>
-                  <div class="worker-name-cell">
-                    ${w.passportPhoto
-                      ? `<img src="${esc(w.passportPhoto)}" class="worker-avatar-sm" alt="" />`
-                      : `<div class="worker-avatar-sm" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--gray-200);">👷</div>`}
-                    <span style="font-weight:600;">${esc(w.fullName)}</span>
-                  </div>
-                </td>
-                <td>
-                  ${w.category
-                    ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:${esc(roleColor)}22;color:${esc(roleColor)};">${esc(w.category.name)}</span>`
-                    : '<span style="color:var(--gray-400);font-size:12px;">No role</span>'}
-                </td>
-                <td style="font-size:13px;">${clockIn}</td>
-                <td style="font-size:13px;">${clockOut}</td>
-                <td><span class="chip ${st.cls}">${st.label}</span></td>
-                <td style="font-size:12px;color:var(--gray-500);">${w.latenessMinutes > 0 ? `${w.latenessMinutes} min` : '—'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`}
+      <div style="padding:20px;">
+        <div class="dash-stats">
+          <div class="dash-stat-card stat-blue">
+            <div class="val">${stats.total}</div>
+            <div class="lbl">Total</div>
+          </div>
+          <div class="dash-stat-card stat-green">
+            <div class="val">${stats.present}</div>
+            <div class="lbl">Present</div>
+          </div>
+          <div class="dash-stat-card stat-blue">
+            <div class="val">${stats.onTime}</div>
+            <div class="lbl">On Time</div>
+          </div>
+          <div class="dash-stat-card stat-amber">
+            <div class="val">${stats.late}</div>
+            <div class="lbl">Late</div>
+          </div>
+          <div class="dash-stat-card stat-red">
+            <div class="val">${stats.absent}</div>
+            <div class="lbl">Absent</div>
+          </div>
+        </div>
+
+        ${workers.length === 0
+          ? `<div class="empty-pane" style="padding:28px 20px;">
+              <svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <h3>No workers in this shift</h3>
+              <p>Assign workers to this shift from the Workers page</p>
+            </div>`
+          : `<div class="table-wrapper">
+              <table class="att-table">
+                <thead>
+                  <tr>
+                    <th>Worker</th>
+                    <th>Role</th>
+                    <th>Clock In</th>
+                    <th>Clock Out</th>
+                    <th>Status</th>
+                    <th>Late By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${workers.map(w => {
+                    const st = STATUS[w.status] || { label: w.status, cls: 'chip-off' };
+                    const rc = w.category?.color || '#6b7280';
+                    const ci = w.clockIn  ? new Date(w.clockIn).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' }) : '—';
+                    const co = w.clockOut ? new Date(w.clockOut).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' }) : '—';
+                    return `<tr>
+                      <td>
+                        <div class="worker-cell">
+                          <div class="worker-thumb">
+                            ${w.passportPhoto
+                              ? `<img src="${esc(w.passportPhoto)}" alt="${esc(w.fullName)}" />`
+                              : `<svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`}
+                          </div>
+                          <span style="font-weight:600;font-size:13.5px;">${esc(w.fullName)}</span>
+                        </div>
+                      </td>
+                      <td>
+                        ${w.category
+                          ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:${esc(rc)}1a;color:${esc(rc)};">${esc(w.category.name)}</span>`
+                          : '<span style="color:var(--gray-400);font-size:12px;">No role</span>'}
+                      </td>
+                      <td style="font-size:13px;color:var(--gray-700);">${ci}</td>
+                      <td style="font-size:13px;color:var(--gray-700);">${co}</td>
+                      <td><span class="chip ${st.cls}">${st.label}</span></td>
+                      <td style="font-size:12.5px;color:var(--gray-500);">${w.latenessMinutes > 0 ? `${w.latenessMinutes} min` : '—'}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>`}
+      </div>
     `;
   } catch (err) {
-    content.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">⚠️</div>
-      <div class="empty-state-title">Failed to load dashboard</div>
-      <div class="empty-state-sub">${esc(err.message)}</div>
+    content.innerHTML = `<div class="empty-pane" style="padding:36px 20px;">
+      <svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <h3>Failed to load dashboard</h3>
+      <p>${esc(err.message)}</p>
       <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="loadShiftDashboard()">Retry</button>
     </div>`;
   }
 }
 
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const shiftOpen = document.getElementById('shiftModal').classList.contains('open');
+  if (shiftOpen) {
+    if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') saveShift();
+    if (e.key === 'Escape') closeShiftModal();
+  }
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────────
-loadRoles();
+loadShifts();
 </script>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 <script src="../assets/js/theme.js"></script>
 </body>
 </html>
