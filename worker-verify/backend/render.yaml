@@ -18,4 +18,4 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: FRONTEND_URL
-        value: https://worker-verify.vercel.app
+        value: https://worker-flow.netlify.app
