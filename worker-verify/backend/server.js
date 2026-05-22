@@ -21,6 +21,7 @@ app.use(cors({
       /\.vercel\.app$/.test(origin) ||
       /\.onrender\.com$/.test(origin) ||
       /\.netlify\.app$/.test(origin) ||
+      /\.railway\.app$/.test(origin) ||
       /localhost/.test(origin)
     ) {
       cb(null, true);

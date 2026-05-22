@@ -398,7 +398,7 @@ function openLocationPicker(fieldPrefix, labelText = 'Pin Location') {
     setMapsStatus('Resolving link…', '');
 
     try {
-      const apiBase = (window.CONFIG?.API_URL || 'https://worker-verify.onrender.com/api').replace(/\/api$/, '');
+      const apiBase = (window.CONFIG?.API_URL || 'https://worker-verify-production.up.railway.app/api').replace(/\/api$/, '');
       const proxyUrl = `${apiBase}/api/resolve-maps?url=${encodeURIComponent(raw)}`;
       console.log('[Maps Link] Sending to proxy:', proxyUrl);
 
