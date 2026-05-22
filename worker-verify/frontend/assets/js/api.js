@@ -8,10 +8,41 @@ function getAuthHeaders(isFormData = false) {
   return headers;
 }
 
+// Show/hide the global "server warming up" banner
+function _showWakeUpBanner(show) {
+  let banner = document.getElementById('_serverWakeUpBanner');
+  if (show) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = '_serverWakeUpBanner';
+      banner.style.cssText = [
+        'position:fixed','top:0','left:0','width:100%','z-index:99999',
+        'background:#f59e0b','color:#fff','text-align:center',
+        'padding:10px 16px','font-size:14px','font-weight:600',
+        'box-shadow:0 2px 8px rgba(0,0,0,.2)'
+      ].join(';');
+      banner.textContent = '⏳ Server is starting up — please wait up to 90 seconds…';
+      document.body.prepend(banner);
+    }
+  } else if (banner) {
+    banner.remove();
+  }
+}
+
+let _activeRequests = 0;
+let _wakeUpTimer    = null;
+
 async function apiFetch(path, options = {}) {
   const isFormData = options.body instanceof FormData;
+
+  // Show "warming up" banner if server takes >5s
+  _activeRequests++;
+  _wakeUpTimer = _wakeUpTimer || setTimeout(() => _showWakeUpBanner(true), 5000);
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  // 100s timeout — longer than Render's worst-case 90s cold start
+  const timer = setTimeout(() => controller.abort(), 100000);
+
   let res;
   try {
     res = await fetch(CONFIG.API_URL + path, {
@@ -21,10 +52,12 @@ async function apiFetch(path, options = {}) {
     });
   } catch (err) {
     clearTimeout(timer);
-    if (err.name === 'AbortError') throw new Error('Request timed out. Please check your connection and try again.');
-    throw err;
+    if (--_activeRequests === 0) { clearTimeout(_wakeUpTimer); _wakeUpTimer = null; _showWakeUpBanner(false); }
+    if (err.name === 'AbortError') throw new Error('Server did not respond in time. Please reload the page and try again.');
+    throw new Error('Cannot connect to server. Please check your connection.');
   }
   clearTimeout(timer);
+  if (--_activeRequests === 0) { clearTimeout(_wakeUpTimer); _wakeUpTimer = null; _showWakeUpBanner(false); }
 
   const data = await res.json().catch(() => ({}));
 
@@ -37,7 +70,7 @@ async function apiFetch(path, options = {}) {
     }
     const err = new Error(data.message || `HTTP ${res.status}`);
     err.status = res.status;
-    err.data   = data;  // attach full response body for structured error handling
+    err.data   = data;
     throw err;
   }
   return data;
