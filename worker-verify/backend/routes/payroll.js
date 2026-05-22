@@ -1,23 +1,14 @@
 const express = require('express');
-const router = express.Router();
-const {
-  generatePayroll, getPayroll, getWorkerPayroll,
-  updatePayrollStatus, getPayrollSummary
-} = require('../controllers/payrollController');
+const router  = express.Router();
 const { protect } = require('../middleware/auth');
 const { companyScope } = require('../middleware/companyScope');
-const { hasPermission } = require('../middleware/roleCheck');
-const { workerProtect } = require('../middleware/workerAuth');
-
-// Worker self-service route (uses worker JWT, must be before protect middleware)
-router.get('/my-payroll', workerProtect, getWorkerPayroll);
+const { generatePayroll, getPayroll, getWorkerPayroll, updatePayrollStatus, addManualDeduction } = require('../controllers/payrollController');
 
 router.use(protect, companyScope);
-
-router.get('/summary',          getPayrollSummary);
-router.get('/',                 hasPermission('canViewPayroll'), getPayroll);
-router.get('/worker/:workerId', hasPermission('canViewPayroll'), getWorkerPayroll);
-router.post('/generate',        hasPermission('canEditPayroll'), generatePayroll);
-router.put('/:id/status',       hasPermission('canEditPayroll'), updatePayrollStatus);
+router.get('/',                  getPayroll);
+router.get('/worker/:workerId',  getWorkerPayroll);
+router.post('/generate',         generatePayroll);
+router.post('/manual-deduction', addManualDeduction);
+router.put('/:id/status',        updatePayrollStatus);
 
 module.exports = router;

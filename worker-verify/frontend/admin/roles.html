@@ -1,341 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Worker Roles – WorkerSave</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../assets/css/style.css" />
-  <style>
-    .page-toolbar {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
-    }
-    .page-toolbar-left h2 { font-size: 19px; font-weight: 700; color: var(--gray-900); letter-spacing: -.02em; }
-    .page-toolbar-left p  { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
-
-    /* Color dot */
-    .role-color-dot {
-      width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; display: inline-block;
-    }
-    .role-name-cell { display: flex; align-items: center; gap: 10px; }
-    .role-name-text { font-weight: 600; color: var(--gray-900); font-size: 14px; }
-
-    /* Role badge pill */
-    .role-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px; border-radius: var(--radius-full);
-      font-size: 12px; font-weight: 600;
-    }
-
-    .status-dot {
-      width: 7px; height: 7px; border-radius: 50%; display: inline-block;
-    }
-    .status-dot.active  { background: var(--success); }
-    .status-dot.inactive{ background: var(--gray-400); }
-
-    /* Color swatches */
-    .color-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-    .color-swatch {
-      width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
-      border: 3px solid transparent; transition: border-color .12s, transform .12s;
-    }
-    .color-swatch.selected { border-color: var(--gray-900); transform: scale(1.12); }
-    .color-swatch:hover:not(.selected) { transform: scale(1.06); }
-
-    /* Empty/loading state */
-    .empty-pane {
-      padding: 56px 20px; text-align: center;
-    }
-    .empty-pane svg { color: var(--gray-300); margin: 0 auto 14px; display: block; }
-    .empty-pane h3 { font-size: 15px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px; }
-    .empty-pane p  { font-size: 13px; color: var(--gray-400); }
-
-    /* Worker count pill */
-    .count-pill {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: var(--primary-light); color: var(--primary-dark);
-      font-size: 12px; font-weight: 700;
-      padding: 3px 10px; border-radius: var(--radius-full);
-    }
-
-    @media (max-width: 640px) {
-      .hide-mobile { display: none; }
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roles — Sage Energy</title>
+  <link rel="stylesheet" href="/assets/css/style.css?v=6">
 </head>
 <body>
 <div class="app-layout">
-  <aside class="sidebar" id="sidebar"></aside>
-
+  <aside id="sidebar" class="sidebar"></aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="main-content">
     <header class="app-header">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
-        <h1 class="header-title">Worker Roles</h1>
-      </div>
-      <div class="header-right">
-        <button class="btn btn-primary btn-sm" onclick="openRoleModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Role
-        </button>
+      <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="page-title">Roles</h1>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" onclick="openModal()">+ Add Role</button>
       </div>
     </header>
-
-    <main class="page-body">
-      <div class="page-toolbar">
-        <div class="page-toolbar-left">
-          <h2>Worker Roles</h2>
-          <p>Define what each worker does — job titles and role categories</p>
-        </div>
-        <button class="btn btn-primary" onclick="openRoleModal()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Role
-        </button>
-      </div>
-
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="table-wrapper">
-          <table id="rolesTable">
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th class="hide-mobile">Description</th>
-                <th>Workers</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="rolesBody">
-              <tr><td colspan="5"><div class="empty-pane">
-                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                <h3>Loading roles…</h3>
-              </div></td></tr>
-            </tbody>
-          </table>
-        </div>
+    <main class="page-content">
+      <div class="card">
+        <div id="roles-list" class="card-body p-0"></div>
       </div>
     </main>
   </div>
 </div>
 
-<!-- Sidebar overlay -->
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
-
 <!-- Role Modal -->
-<div class="modal-overlay" id="roleModal">
-  <div class="modal-box" style="max-width:440px;">
+<div id="role-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-sm">
     <div class="modal-header">
-      <h3 class="modal-title" id="roleModalTitle">Add Worker Role</h3>
-      <button class="btn-icon" onclick="closeRoleModal()" aria-label="Close">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <h3 class="modal-title" id="modal-title">Add Role</h3>
+      <button class="btn btn-icon btn-ghost" onclick="closeModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="roleId" />
-
+      <input type="hidden" id="role-id">
       <div class="form-group">
         <label class="form-label">Role Name <span class="required">*</span></label>
-        <input id="roleName" type="text" class="form-control"
-          placeholder="e.g. Pump Attendant, Security, Manager" />
+        <input id="role-name" class="form-control" type="text" placeholder="e.g. Pump Attendant">
       </div>
-
       <div class="form-group">
-        <label class="form-label">Description <span style="color:var(--gray-400);font-weight:400;">(optional)</span></label>
-        <input id="roleDesc" type="text" class="form-control"
-          placeholder="Brief description of this role" />
+        <label class="form-label">Description</label>
+        <input id="role-desc" class="form-control" type="text" placeholder="Optional description">
       </div>
-
       <div class="form-group">
-        <label class="form-label">Badge Color</label>
-        <div class="color-swatches" id="roleColorSwatches"></div>
-        <input type="hidden" id="roleColor" value="#6366f1" />
+        <label class="form-label">Color</label>
+        <input id="role-color" class="form-control" type="color" value="#2563EB" style="height:40px;padding:4px">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeRoleModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveRole()" id="roleSaveBtn">Save Role</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveRole()">Save</button>
     </div>
   </div>
 </div>
 
-<script src="../assets/js/config.js?v=5"></script>
-<script src="../assets/js/api.js?v=5"></script>
-<script src="../assets/js/auth.js?v=5"></script>
-<script src="../assets/js/sidebar.js?v=5"></script>
+<script src="/assets/js/config.js?v=6"></script>
+<script src="/assets/js/api.js?v=6"></script>
+<script src="/assets/js/auth.js?v=6"></script>
+<script src="/assets/js/sidebar.js?v=6"></script>
 <script>
-const user = requireAuth(['super_admin','company_admin','branch_manager','hr_staff']);
-if (user) populateSidebarUser();
+  if (!Auth.requireAuth()) throw '';
+  populateSidebarUser();
 
-const ROLE_COLORS = [
-  '#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316',
-  '#f59e0b','#10b981','#14b8a6','#3b82f6','#6b7280'
-];
-
-let allRoles = [];
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── Load & render ──────────────────────────────────────────────────────────────
-
-async function loadRoles() {
-  try {
-    const data = await API.getCategories();
-    allRoles = data.categories || [];
-    renderRoles();
-  } catch (err) {
-    document.getElementById('rolesBody').innerHTML = `<tr><td colspan="5">
-      <div class="empty-pane">
-        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <h3>Failed to load roles</h3>
-        <p>${esc(err.message)}</p>
-        <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="loadRoles()">Retry</button>
-      </div></td></tr>`;
-  }
-}
-
-function renderRoles() {
-  const body = document.getElementById('rolesBody');
-  if (!allRoles.length) {
-    body.innerHTML = `<tr><td colspan="5"><div class="empty-pane">
-      <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.3" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-      <h3>No roles yet</h3>
-      <p>Add roles like "Pump Attendant", "Security", "Manager"</p>
-      <button class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="openRoleModal()">Add First Role</button>
-    </div></td></tr>`;
-    return;
+  async function loadRoles() {
+    try {
+      const data = await API.roles.list();
+      const roles = data.roles || [];
+      if (!roles.length) {
+        document.getElementById('roles-list').innerHTML = '<div class="empty-state">No roles yet. Add your first role.</div>';
+        return;
+      }
+      const rows = roles.map(r => `
+        <div class="list-item">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="role-dot" style="background:${r.color}"></div>
+            <div>
+              <div class="fw-600">${r.name}</div>
+              ${r.description ? `<div class="text-muted text-sm">${r.description}</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="text-muted text-sm">${r.workerCount || 0} workers</span>
+            <button class="btn btn-ghost btn-xs" onclick="editRole(${JSON.stringify(r).replace(/"/g,'&quot;')})">Edit</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteRole('${r._id}')">Delete</button>
+          </div>
+        </div>`).join('');
+      document.getElementById('roles-list').innerHTML = rows;
+    } catch(e) { showToast(e.message, 'error'); }
   }
 
-  body.innerHTML = allRoles.map(r => {
-    const color = esc(r.color || '#6366f1');
-    const dataAttr = esc(JSON.stringify(r));
-    return `<tr>
-      <td>
-        <div class="role-name-cell">
-          <span class="role-color-dot" style="background:${color};box-shadow:0 0 0 2px ${color}33;"></span>
-          <span class="role-name-text">${esc(r.name)}</span>
-        </div>
-      </td>
-      <td class="hide-mobile" style="color:var(--gray-500);font-size:13px;">
-        ${r.description ? esc(r.description) : '<span style="color:var(--gray-300);">—</span>'}
-      </td>
-      <td>
-        <span class="count-pill">
-          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          ${r.workerCount || 0}
-        </span>
-      </td>
-      <td>
-        <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${r.isActive !== false ? 'var(--success-dark)' : 'var(--gray-500)'}">
-          <span class="status-dot ${r.isActive !== false ? 'active' : 'inactive'}"></span>
-          ${r.isActive !== false ? 'Active' : 'Inactive'}
-        </span>
-      </td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-secondary btn-xs" onclick='openRoleModal(${dataAttr})'>Edit</button>
-          <button class="btn btn-danger btn-xs" onclick="deleteRole('${r._id}','${esc(r.name)}')">Delete</button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-// ── Modal ──────────────────────────────────────────────────────────────────────
-
-function openRoleModal(role) {
-  document.getElementById('roleModalTitle').textContent = role ? 'Edit Role' : 'Add Worker Role';
-  document.getElementById('roleId').value   = role?._id  || '';
-  document.getElementById('roleName').value = role?.name || '';
-  document.getElementById('roleDesc').value = role?.description || '';
-
-  const selectedColor = role?.color || '#6366f1';
-  document.getElementById('roleColor').value = selectedColor;
-
-  document.getElementById('roleColorSwatches').innerHTML = ROLE_COLORS.map(c => `
-    <div class="color-swatch ${c === selectedColor ? 'selected' : ''}"
-         style="background:${c};"
-         onclick="selectRoleColor('${c}')" title="${c}"></div>
-  `).join('');
-
-  document.getElementById('roleModal').classList.add('open');
-  setTimeout(() => document.getElementById('roleName').focus(), 80);
-}
-
-function selectRoleColor(color) {
-  document.getElementById('roleColor').value = color;
-  document.querySelectorAll('#roleColorSwatches .color-swatch').forEach(s => {
-    const matches = s.style.background === color || s.style.backgroundColor === color;
-    s.classList.toggle('selected', matches);
-  });
-}
-
-function closeRoleModal() {
-  document.getElementById('roleModal').classList.remove('open');
-}
-
-document.getElementById('roleModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeRoleModal();
-});
-
-async function saveRole() {
-  const id   = document.getElementById('roleId').value;
-  const name = document.getElementById('roleName').value.trim();
-  if (!name) { showToast('Role name is required', 'error'); return; }
-
-  const body = {
-    name,
-    description: document.getElementById('roleDesc').value.trim(),
-    color: document.getElementById('roleColor').value || '#6366f1'
-  };
-
-  const btn = document.getElementById('roleSaveBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    if (id) {
-      await API.updateCategory(id, body);
-      showToast('Role updated successfully', 'success');
-    } else {
-      await API.createCategory(body);
-      showToast('Role created successfully', 'success');
-    }
-    closeRoleModal();
-    allRoles = [];
-    loadRoles();
-  } catch (err) {
-    showToast(err.message || 'Failed to save', 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save Role';
+  function openModal(role) {
+    document.getElementById('modal-title').textContent = role ? 'Edit Role' : 'Add Role';
+    document.getElementById('role-id').value    = role?._id || '';
+    document.getElementById('role-name').value  = role?.name || '';
+    document.getElementById('role-desc').value  = role?.description || '';
+    document.getElementById('role-color').value = role?.color || '#2563EB';
+    document.getElementById('role-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('role-name').focus(), 100);
   }
-}
+  function editRole(r) { openModal(r); }
+  function closeModal() { document.getElementById('role-modal').style.display = 'none'; }
 
-async function deleteRole(id, name) {
-  if (!confirm(`Delete role "${name}"?\n\nWorkers assigned to this role must be reassigned first.`)) return;
-  try {
-    await API.deleteCategory(id);
-    showToast('Role deleted', 'success');
-    allRoles = [];
-    loadRoles();
-  } catch (err) {
-    showToast(err.message, 'error');
+  async function saveRole() {
+    const id    = document.getElementById('role-id').value;
+    const name  = document.getElementById('role-name').value.trim();
+    const desc  = document.getElementById('role-desc').value.trim();
+    const color = document.getElementById('role-color').value;
+    if (!name) return showToast('Role name is required', 'warning');
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    try {
+      if (id) await API.roles.update(id, { name, description: desc, color });
+      else    await API.roles.create({ name, description: desc, color });
+      showToast('Role saved', 'success');
+      closeModal();
+      loadRoles();
+    } catch(e) { showToast(e.message, 'error'); }
+    btn.disabled = false;
   }
-}
 
-// Keyboard: Enter saves, Escape closes
-document.addEventListener('keydown', e => {
-  if (document.getElementById('roleModal').classList.contains('open')) {
-    if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') saveRole();
-    if (e.key === 'Escape') closeRoleModal();
+  async function deleteRole(id) {
+    if (!confirm('Delete this role? Workers assigned to it will lose their role.')) return;
+    try {
+      await API.roles.delete(id);
+      showToast('Role deleted', 'success');
+      loadRoles();
+    } catch(e) { showToast(e.message, 'error'); }
   }
-});
 
-loadRoles();
+  loadRoles();
 </script>
-<script src="../assets/js/theme.js"></script>
 </body>
 </html>

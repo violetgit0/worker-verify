@@ -1,1014 +1,362 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Attendance – WorkerSave</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../assets/css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance — Sage Energy</title>
+  <link rel="stylesheet" href="/assets/css/style.css?v=6">
 </head>
 <body>
 <div class="app-layout">
-
-  <aside class="sidebar" id="sidebar"></aside>
-
+  <aside id="sidebar" class="sidebar"></aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="main-content">
     <header class="app-header">
-      <div class="flex items-center gap-2">
-        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-        <h1 class="header-title">Attendance</h1>
-      </div>
-      <div class="header-right">
-        <button class="btn btn-outline btn-sm" onclick="openReportModal()">📊 Generate Report</button>
+      <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="page-title">Attendance</h1>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" onclick="openClockInModal()">Clock In Worker</button>
+        <button class="btn btn-ghost btn-sm"   onclick="openAbsentModal()">Mark Absent</button>
       </div>
     </header>
-
-    <main class="page-body">
-
-      <!-- Tab Navigation -->
-      <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
-        <button class="tab-btn active" id="tabToday"   onclick="switchTab('today')">Today</button>
-        <button class="tab-btn"        id="tabHistory" onclick="switchTab('history')">History</button>
-        <button class="tab-btn"        id="tabReport"  onclick="switchTab('report')">Report</button>
-        <button class="tab-btn"        id="tabAlerts"  onclick="switchTab('alerts')">
-          🚨 Alerts<span class="alert-badge" id="alertCountBadge" style="display:none;">0</span>
-        </button>
-      </div>
-
-      <!-- ── TODAY TAB ── -->
-      <div id="panelToday">
-
-        <!-- Branch & Date selector -->
-        <div class="card" style="margin-bottom:16px;">
-          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px;">
-            <div>
-              <label class="form-label" style="margin-bottom:4px;">Branch</label>
-              <select id="todayBranchSel" class="filter-select" onchange="loadToday()" style="min-width:180px;">
-                <option value="">— Select Branch —</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:4px;">Date</label>
-              <input type="date" id="todayDate" class="filter-select" onchange="loadToday()" />
-            </div>
-            <div style="margin-top:20px;">
-              <button class="btn btn-primary btn-sm" onclick="loadToday()">Load</button>
-            </div>
-          </div>
+    <main class="page-content">
+      <!-- Today snapshot tabs by branch -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <h3 class="card-title">Today's Snapshot</h3>
+          <select id="today-branch" class="form-control form-control-sm" onchange="loadToday()" style="max-width:200px">
+            <option value="">Select Branch</option>
+          </select>
         </div>
-
-        <!-- Today Stats Cards -->
-        <div class="att-today-grid" id="todayStats" style="margin-bottom:20px;">
-          <div class="att-today-card present">
-            <div style="font-size:1.8rem;font-weight:700;" id="statPresent">—</div>
-            <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px;">Present</div>
-          </div>
-          <div class="att-today-card late">
-            <div style="font-size:1.8rem;font-weight:700;" id="statLate">—</div>
-            <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px;">Late</div>
-          </div>
-          <div class="att-today-card absent">
-            <div style="font-size:1.8rem;font-weight:700;" id="statAbsent">—</div>
-            <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px;">Absent</div>
-          </div>
-          <div class="att-today-card" style="border-top-color:var(--primary);">
-            <div style="font-size:1.8rem;font-weight:700;" id="statTotalToday">—</div>
-            <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px;">Total Workers</div>
-          </div>
-        </div>
-
-        <!-- Mark Absent Bulk -->
-        <div class="card" style="margin-bottom:16px;display:none;" id="markAbsentBar">
-          <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
-            <span class="text-sm"><strong id="selectedCount">0</strong> workers selected</span>
-            <div class="flex items-center gap-2">
-              <button class="btn btn-outline btn-sm" onclick="selectAllUnclocked()">Select Unclocked</button>
-              <button class="btn btn-danger btn-sm" onclick="bulkMarkAbsent()">Mark Absent</button>
-              <button class="btn btn-outline btn-sm" onclick="clearSelection()">Clear</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Today Workers Table -->
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title" id="todayTableTitle">Today's Workers</h2>
-            <button class="btn btn-sm btn-outline" onclick="loadToday()">↻ Refresh</button>
-          </div>
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" /></th>
-                  <th>Worker</th>
-                  <th>Shift</th>
-                  <th>Status</th>
-                  <th>Clock In</th>
-                  <th>Clock Out</th>
-                  <th>Lateness</th>
-                  <th>Selfie</th>
-                  <th>GPS</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="todayTable">
-                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400);">
-                  Select a branch to view attendance
-                </td></tr>
-              </tbody>
-            </table>
-          </div>
+        <div id="today-content" class="card-body p-0">
+          <div class="empty-state">Select a branch to view today's attendance</div>
         </div>
       </div>
 
-      <!-- ── HISTORY TAB ── -->
-      <div id="panelHistory" style="display:none;">
-        <div class="card">
-          <!-- Filters -->
-          <div class="search-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Branch</label>
-              <select id="histBranch" class="filter-select">
-                <option value="">All Branches</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Shift</label>
-              <select id="histShift" class="filter-select">
-                <option value="">All Shifts</option>
-                <option value="A">Shift A</option>
-                <option value="B">Shift B</option>
-                <option value="unassigned">Unassigned</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Status</label>
-              <select id="histStatus" class="filter-select">
-                <option value="">All Statuses</option>
-                <option value="present">Present</option>
-                <option value="late">Late</option>
-                <option value="absent">Absent</option>
-                <option value="on_leave">On Leave</option>
-                <option value="half_day">Half Day</option>
-                <option value="off_shift">Off Shift</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">From</label>
-              <input type="date" id="histFrom" class="filter-select" />
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">To</label>
-              <input type="date" id="histTo" class="filter-select" />
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="loadHistory(1)">Search</button>
-              <button class="btn btn-outline btn-sm" onclick="clearHistFilters()">Reset</button>
-            </div>
-          </div>
-
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Worker</th>
-                  <th>Branch</th>
-                  <th>Date</th>
-                  <th>Shift</th>
-                  <th>Status</th>
-                  <th>Clock In</th>
-                  <th>Clock Out</th>
-                  <th>Late (min)</th>
-                  <th>Selfie</th>
-                  <th>Deduction</th>
-                </tr>
-              </thead>
-              <tbody id="histTable">
-                <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400);">Use filters above to search attendance records</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="histPagination" class="pagination"></div>
-          <div id="histSummary" class="text-xs text-muted mt-2"></div>
+      <!-- History -->
+      <div class="card">
+        <div class="card-header filter-bar">
+          <h3 class="card-title" style="flex-shrink:0">History</h3>
+          <select id="h-branch" class="form-control form-control-sm" onchange="loadHistory(1)"><option value="">All Branches</option></select>
+          <select id="h-status" class="form-control form-control-sm" onchange="loadHistory(1)">
+            <option value="">All Status</option>
+            <option value="present">Present</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+            <option value="off_day">Off Day</option>
+          </select>
+          <input id="h-from" class="form-control form-control-sm" type="date" onchange="loadHistory(1)">
+          <input id="h-to"   class="form-control form-control-sm" type="date" onchange="loadHistory(1)">
         </div>
+        <div id="history-table" class="card-body p-0"></div>
+        <div id="history-pagination" class="card-footer"></div>
       </div>
-
-      <!-- ── ALERTS TAB ── -->
-      <div id="panelAlerts" style="display:none;">
-
-        <!-- Filters -->
-        <div class="card" style="margin-bottom:14px;">
-          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Type</label>
-              <select id="alertType" class="filter-select">
-                <option value="">All Types</option>
-                <option value="location_mismatch">Location Mismatch</option>
-                <option value="face_mismatch">Face Mismatch</option>
-                <option value="device_change">Device Change</option>
-                <option value="repeated_late">Repeated Late</option>
-                <option value="suspicious_attempt">Suspicious Attempt</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Severity</label>
-              <select id="alertSeverity" class="filter-select">
-                <option value="">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Status</label>
-              <select id="alertResolved" class="filter-select">
-                <option value="false">Unresolved</option>
-                <option value="true">Resolved</option>
-                <option value="">All</option>
-              </select>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="loadAlerts(1)">Search</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Security Alerts</h2>
-            <button class="btn btn-sm btn-outline" onclick="loadAlerts(1)">↻ Refresh</button>
-          </div>
-          <div id="alertsList">
-            <div class="empty-state"><div class="empty-icon">🚨</div><p class="text-muted">Loading alerts…</p></div>
-          </div>
-          <div id="alertsPagination" class="pagination"></div>
-        </div>
-      </div>
-
-      <!-- ── REPORT TAB ── -->
-      <div id="panelReport" style="display:none;">
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-header"><h2 class="card-title">Generate Attendance Report</h2></div>
-          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px;">
-            <div>
-              <label class="form-label">Branch</label>
-              <select id="rptBranch" class="filter-select" style="min-width:180px;">
-                <option value="">All Branches</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label">From Date</label>
-              <input type="date" id="rptFrom" class="filter-select" />
-            </div>
-            <div>
-              <label class="form-label">To Date</label>
-              <input type="date" id="rptTo" class="filter-select" />
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary" onclick="runReport()">Generate Report</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="reportResults"></div>
-      </div>
-
     </main>
-  </div>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
-
-<!-- Face Review Modal -->
-<div id="faceReviewModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:520px;">
-    <div class="modal-header">
-      <h3 class="modal-title">Face Verification Review</h3>
-      <button class="modal-close" onclick="closeModal('faceReviewModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p class="text-sm text-muted" style="margin-bottom:12px;">
-        Compare the worker's registered passport photo (left) with today's attendance selfie (right).
-      </p>
-      <div class="face-compare-grid">
-        <div>
-          <img id="frPassportPhoto" src="" alt="Passport Photo" class="face-compare-img"
-               onerror="this.style.display='none'" />
-          <div class="face-compare-label">Registered Photo</div>
-        </div>
-        <div>
-          <img id="frSelfiePhoto" src="" alt="Attendance Selfie" class="face-compare-img"
-               onerror="this.src='';this.parentElement.innerHTML=`<div style=\'background:var(--gray-100);aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:2rem;\'>📸</div>`" />
-          <div class="face-compare-label">Today's Selfie <span id="frCurrentStatus"></span></div>
-        </div>
-      </div>
-      <div class="form-group" style="margin-top:12px;">
-        <label class="form-label">Notes (optional)</label>
-        <input type="text" id="frNotes" class="form-control" placeholder="Add a note about this review" />
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('faceReviewModal')">Cancel</button>
-      <button class="btn btn-success" onclick="submitFaceReview('matched')">✓ Face Matched</button>
-      <button class="btn btn-danger"  onclick="submitFaceReview('mismatched')">✕ Face Mismatch</button>
-    </div>
-  </div>
-</div>
-
-<!-- Resolve Alert Modal -->
-<div id="resolveAlertModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:400px;">
-    <div class="modal-header">
-      <h3 class="modal-title">Resolve Alert</h3>
-      <button class="modal-close" onclick="closeModal('resolveAlertModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p class="text-sm" id="resolveAlertMsg"></p>
-      <div class="form-group" style="margin-top:12px;">
-        <label class="form-label">Resolution Notes</label>
-        <input type="text" id="resolveNotes" class="form-control" placeholder="e.g. Confirmed legitimate, worker was at branch" />
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('resolveAlertModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitResolve()">Mark Resolved</button>
-    </div>
   </div>
 </div>
 
 <!-- Clock In Modal -->
-<div id="clockInModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:420px;">
+<div id="clockin-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-sm">
     <div class="modal-header">
-      <h3 class="modal-title">Manual Clock In</h3>
-      <button class="modal-close" onclick="closeModal('clockInModal')">×</button>
+      <h3 class="modal-title">Clock In Worker</h3>
+      <button class="btn btn-icon btn-ghost" onclick="closeModal('clockin-modal')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="modal-body">
-      <p class="text-sm text-muted" style="margin-bottom:12px;">Worker: <strong id="ciWorkerName"></strong></p>
       <div class="form-group">
-        <label class="form-label">Clock In Time</label>
-        <input type="time" id="ciTime" class="form-control" />
+        <label class="form-label">Search Worker</label>
+        <input id="ci-search" class="form-control" type="text" placeholder="Name or phone…" oninput="searchWorkersCi()">
+        <div id="ci-results" class="search-dropdown"></div>
+        <input type="hidden" id="ci-worker-id">
+        <div id="ci-worker-name" class="text-muted text-sm" style="margin-top:4px;"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input id="ci-date" class="form-control" type="date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clock In Time (leave blank = now)</label>
+          <input id="ci-time" class="form-control" type="time">
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Notes (optional)</label>
-        <input type="text" id="ciNotes" class="form-control" placeholder="e.g. forgot to clock in" />
+        <input id="ci-notes" class="form-control" type="text">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('clockInModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitClockIn()">Clock In</button>
+      <button class="btn btn-ghost" onclick="closeModal('clockin-modal')">Cancel</button>
+      <button class="btn btn-primary" id="ci-btn" onclick="doClockIn()">Clock In</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Absent Modal -->
+<div id="absent-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">Mark Workers Absent</h3>
+      <button class="btn btn-icon btn-ghost" onclick="closeModal('absent-modal')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input id="ab-date" class="form-control" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="ab-branch" class="form-control" onchange="loadAbsentWorkers()"><option value="">Select Branch</option></select>
+      </div>
+      <div id="ab-workers-list" class="workers-check-list"></div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Notes (optional)</label>
+        <input id="ab-notes" class="form-control" type="text">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('absent-modal')">Cancel</button>
+      <button class="btn btn-danger" id="ab-btn" onclick="doMarkAbsent()">Mark Absent</button>
     </div>
   </div>
 </div>
 
 <!-- Clock Out Modal -->
-<div id="clockOutModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:420px;">
+<div id="clockout-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-sm">
     <div class="modal-header">
-      <h3 class="modal-title">Manual Clock Out</h3>
-      <button class="modal-close" onclick="closeModal('clockOutModal')">×</button>
+      <h3 class="modal-title">Clock Out Worker</h3>
+      <button class="btn btn-icon btn-ghost" onclick="closeModal('clockout-modal')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="modal-body">
-      <p class="text-sm text-muted" style="margin-bottom:12px;">Worker: <strong id="coWorkerName"></strong></p>
-      <div class="form-group">
-        <label class="form-label">Clock Out Time</label>
-        <input type="time" id="coTime" class="form-control" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes (optional)</label>
-        <input type="text" id="coNotes" class="form-control" placeholder="e.g. early closing" />
+      <input type="hidden" id="co-worker-id">
+      <div id="co-worker-name" class="fw-600" style="margin-bottom:12px;"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input id="co-date" class="form-control" type="date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clock Out Time (blank = now)</label>
+          <input id="co-time" class="form-control" type="time">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('clockOutModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitClockOut()">Clock Out</button>
+      <button class="btn btn-ghost" onclick="closeModal('clockout-modal')">Cancel</button>
+      <button class="btn btn-primary" id="co-btn" onclick="doClockOut()">Clock Out</button>
     </div>
   </div>
 </div>
 
-<script src="../assets/js/config.js?v=5"></script>
-<script src="../assets/js/api.js?v=5"></script>
-<script src="../assets/js/auth.js?v=5"></script>
-<script src="../assets/js/sidebar.js?v=5"></script>
+<script src="/assets/js/config.js?v=6"></script>
+<script src="/assets/js/api.js?v=6"></script>
+<script src="/assets/js/auth.js?v=6"></script>
+<script src="/assets/js/sidebar.js?v=6"></script>
 <script>
-  const user = requireAuth(['super_admin', 'company_admin']);
-  let todayWorkerMap = {};
-  let selectedWorkerIds = new Set();
-  let ciWorkerId = null, coWorkerId = null, coAttendanceId = null;
-  let histPage = 1, alertsPage = 1;
-  let frAttendanceId = null, resolveAlertId = null;
+  if (!Auth.requireAuth()) throw '';
+  populateSidebarUser();
 
-  if (user) {
-    populateSidebarUser();
-    initDateDefaults();
-    loadBranchOptions();
-    loadAlertBadge();
-    if (location.hash === '#alerts') switchTab('alerts');
-  }
-
-  async function loadAlertBadge() {
-    try {
-      const res = await API.getAlertStats();
-      const badge = document.getElementById('alertCountBadge');
-      if (res.unresolved > 0) {
-        badge.textContent = res.unresolved > 99 ? '99+' : res.unresolved;
-        badge.style.display = 'inline-flex';
-      } else {
-        badge.style.display = 'none';
-      }
-    } catch(_) {}
-  }
-
-  function initDateDefaults() {
-    const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('todayDate').value = today;
-    document.getElementById('histFrom').value  = today.slice(0,7) + '-01';
-    document.getElementById('histTo').value    = today;
-    document.getElementById('rptFrom').value   = today.slice(0,7) + '-01';
-    document.getElementById('rptTo').value     = today;
-  }
-
-  async function loadBranchOptions() {
-    try {
-      const res = await API.getBranches();
-      const branches = res.branches || [];
-      ['todayBranchSel','histBranch','rptBranch'].forEach(id => {
-        const sel = document.getElementById(id);
-        branches.forEach(b => {
-          const opt = document.createElement('option');
-          opt.value = b._id;
-          opt.textContent = `${b.name} (${b.code})`;
-          sel.appendChild(opt);
-        });
-      });
-    } catch(_) {}
-  }
-
-  // ── TAB SWITCHING ──────────────────────────────────────────────────────────
-
-  function switchTab(tab) {
-    ['today','history','report','alerts'].forEach(t => {
-      const btn   = document.getElementById('tab' + cap(t));
-      const panel = document.getElementById('panel' + cap(t));
-      if (btn)   btn.classList.toggle('active', t === tab);
-      if (panel) panel.style.display = t === tab ? '' : 'none';
-    });
-    if (tab === 'alerts') loadAlerts(1);
-  }
-
-  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-  // ── TODAY TAB ─────────────────────────────────────────────────────────────
+  const today = new Date().toISOString().split('T')[0];
 
   async function loadToday() {
-    const branchId = document.getElementById('todayBranchSel').value;
-    const date     = document.getElementById('todayDate').value;
+    const branchId = document.getElementById('today-branch').value;
     if (!branchId) return;
-
-    document.getElementById('todayTable').innerHTML =
-      `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--gray-400);">Loading…</td></tr>`;
-
     try {
-      const res = await API.getTodayAttendance(branchId + (date ? `?date=${date}` : ''));
-      renderTodayStats(res);
-      renderTodayTable(res);
-    } catch (err) {
-      showToast('Failed to load attendance: ' + err.message, 'error');
-    }
-  }
-
-  function renderTodayStats(res) {
-    const { summary = {}, workers = [] } = res;
-    document.getElementById('statPresent').textContent   = (summary.present || 0) + (summary.late || 0);
-    document.getElementById('statLate').textContent      = summary.late    || 0;
-    document.getElementById('statAbsent').textContent    = summary.absent  || 0;
-    document.getElementById('statTotalToday').textContent = workers.length;
-    document.getElementById('todayTableTitle').textContent =
-      `Workers on ${document.getElementById('todayDate').value || 'Today'} (${workers.length})`;
-  }
-
-  function renderTodayTable(res) {
-    const { workers = [], attendance = {} } = res;
-    todayWorkerMap = {};
-    selectedWorkerIds.clear();
-    document.getElementById('selectAll').checked = false;
-    updateSelectionBar();
-
-    if (!workers.length) {
-      document.getElementById('todayTable').innerHTML =
-        `<tr><td colspan="10" style="text-align:center;padding:40px;"><div class="empty-icon">👷</div><p class="text-muted">No workers assigned to this branch</p></td></tr>`;
-      return;
-    }
-
-    workers.forEach(w => { todayWorkerMap[w._id] = w; });
-
-    document.getElementById('todayTable').innerHTML = workers.map(w => {
-      const att  = attendance[w._id];
-      const status = att ? att.status : 'not_clocked';
-      const canIn  = !att || !att.clockInTime;
-      const canOut = att && att.clockInTime && !att.clockOutTime;
-
-      return `
-        <tr id="row-${w._id}">
-          <td><input type="checkbox" class="worker-check" data-id="${w._id}" onchange="toggleWorkerSelect('${w._id}', this.checked)" /></td>
+      const data = await API.attendance.today(branchId);
+      const s = data.summary;
+      const summaryHtml = `<div class="att-summary"><span class="badge badge-green">Present: ${s.present}</span><span class="badge badge-amber">Late: ${s.late}</span><span class="badge badge-red">Absent: ${s.absent}</span><span class="badge badge-gray">Off Day: ${s.offDay}</span></div>`;
+      const rows = (data.workers || []).map(w => `
+        <tr>
           <td>
-            <div class="flex items-center gap-2">
-              ${w.passportPhoto
-                ? `<img src="${w.passportPhoto}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">`
-                : `<div style="width:30px;height:30px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:0.75rem;">👤</div>`}
-              <div>
-                <div class="font-semibold text-sm">${w.fullName}</div>
-                <div class="text-xs text-muted">${w.phone}</div>
-              </div>
+            <div class="worker-cell">
+              ${workerAvatar(w)}
+              <div class="worker-name">${w.fullName}</div>
             </div>
           </td>
-          <td>${shiftBadge(w.shift)}</td>
-          <td>${attBadge(status)}</td>
-          <td class="text-sm">${att?.clockInTime ? formatTime(att.clockInTime) : '<span class="text-muted">—</span>'}</td>
-          <td class="text-sm">${att?.clockOutTime ? formatTime(att.clockOutTime) : '<span class="text-muted">—</span>'}</td>
+          <td>${statusBadge(w.status)}</td>
+          <td>${w.clockIn ? formatTime(w.clockIn) : '—'}</td>
+          <td>${w.clockOut ? formatTime(w.clockOut) : '—'}</td>
+          <td>${w.latenessMinutes ? formatMinutes(w.latenessMinutes) : '—'}</td>
           <td>
-            ${att?.latenessMinutes > 0
-              ? `<span class="lateness-pill">${att.latenessMinutes} min</span>`
-              : '<span class="text-muted text-xs">—</span>'}
+            ${w.status === 'absent' || w.status === 'off_day' ? `<button class="btn btn-success btn-xs" onclick="openClockInForWorker('${w._id}','${w.fullName}')">Clock In</button>` : ''}
+            ${(w.status === 'present' || w.status === 'late') && !w.clockOut ? `<button class="btn btn-ghost btn-xs" onclick="openClockOutForWorker('${w._id}','${w.fullName}')">Clock Out</button>` : ''}
           </td>
+        </tr>`).join('');
+      document.getElementById('today-content').innerHTML = summaryHtml + `<table class="table"><thead><tr><th>Worker</th><th>Status</th><th>In</th><th>Out</th><th>Late</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  let histPage = 1;
+  async function loadHistory(p = 1) {
+    histPage = p;
+    const from = document.getElementById('h-from').value || '';
+    const to   = document.getElementById('h-to').value   || '';
+    if (!from) {
+      const d = new Date(); d.setDate(1);
+      document.getElementById('h-from').value = d.toISOString().split('T')[0];
+      document.getElementById('h-to').value   = today;
+    }
+    const params = {
+      branch: document.getElementById('h-branch').value,
+      status: document.getElementById('h-status').value,
+      from: document.getElementById('h-from').value,
+      to:   document.getElementById('h-to').value,
+      page: histPage, limit: 30
+    };
+    Object.keys(params).forEach(k => !params[k] && delete params[k]);
+    try {
+      const data = await API.attendance.list(params);
+      const rows = (data.attendance || []).map(a => `
+        <tr>
           <td>
-            ${att
-              ? `<span class="gps-dot ${att.isManual ? 'manual' : att.isLocationVerified ? 'verified' : 'unverified'}"
-                  title="${att.isManual ? 'Manual entry' : att.isLocationVerified ? 'GPS verified' : (att.clockInDistance ? att.clockInDistance+'m away' : 'GPS not verified')}"></span>
-                 ${att.clockInDistance !== null && att.clockInDistance !== undefined && !att.isManual
-                   ? `<span class="text-xs text-muted" style="margin-left:3px;">${att.clockInDistance}m</span>` : ''}`
-              : '<span class="text-muted text-xs">—</span>'}
-          </td>
-          <td>
-            ${att?.selfieUrl
-              ? `<img src="${att.selfieUrl}" class="selfie-thumb ${att.faceMatchStatus}"
-                   title="Face: ${att.faceMatchStatus}" onclick="openFaceReview('${att._id}','${w.passportPhoto || ''}','${att.selfieUrl}','${att.faceMatchStatus}')" />`
-              : '<span class="text-muted text-xs">—</span>'}
-          </td>
-          <td>
-            <div class="flex items-center gap-1">
-              ${canIn
-                ? `<button class="btn btn-xs btn-primary clock-btn clock-in"
-                     onclick="openClockIn('${w._id}','${w.fullName.replace(/'/g,"\\'")}')">In</button>`
-                : ''}
-              ${canOut
-                ? `<button class="btn btn-xs btn-outline clock-btn clock-out"
-                     onclick="openClockOut('${w._id}','${w.fullName.replace(/'/g,"\\'")}','${att._id}')">Out</button>`
-                : ''}
-              ${!canIn && !canOut
-                ? `<span class="text-xs text-muted">Done</span>`
-                : ''}
+            <div class="worker-cell">
+              ${workerAvatar(a.worker)}
+              <div class="worker-name">${a.worker?.fullName || '—'}</div>
             </div>
           </td>
-        </tr>`;
-    }).join('');
+          <td>${a.branch?.name || '—'}</td>
+          <td>${formatDate(a.date)}</td>
+          <td>${statusBadge(a.status)}</td>
+          <td>${a.clockInTime ? formatTime(a.clockInTime) : '—'}</td>
+          <td>${a.clockOutTime ? formatTime(a.clockOutTime) : '—'}</td>
+          <td>${a.latenessMinutes ? formatMinutes(a.latenessMinutes) : '—'}</td>
+        </tr>`).join('');
+      document.getElementById('history-table').innerHTML = rows ? `<table class="table"><thead><tr><th>Worker</th><th>Branch</th><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Late</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty-state">No records found</div>';
+      renderPagination('history-pagination', histPage, data.pages, 'loadHistory');
+    } catch(e) { showToast(e.message, 'error'); }
   }
 
-  // ── SELECTION & BULK ABSENT ────────────────────────────────────────────────
-
-  function toggleWorkerSelect(id, checked) {
-    if (checked) selectedWorkerIds.add(id);
-    else         selectedWorkerIds.delete(id);
-    updateSelectionBar();
+  // Clock In
+  function openClockInModal() {
+    document.getElementById('ci-worker-id').value = '';
+    document.getElementById('ci-worker-name').textContent = '';
+    document.getElementById('ci-search').value = '';
+    document.getElementById('ci-results').innerHTML = '';
+    document.getElementById('ci-date').value = today;
+    document.getElementById('ci-time').value = '';
+    document.getElementById('ci-notes').value = '';
+    document.getElementById('clockin-modal').style.display = 'flex';
+  }
+  function openClockInForWorker(id, name) {
+    openClockInModal();
+    document.getElementById('ci-worker-id').value = id;
+    document.getElementById('ci-worker-name').textContent = '→ ' + name;
+    document.getElementById('ci-search').value = name;
   }
 
-  function toggleSelectAll(checked) {
-    document.querySelectorAll('.worker-check').forEach(cb => {
-      cb.checked = checked;
-      toggleWorkerSelect(cb.dataset.id, checked);
-    });
-  }
-
-  function selectAllUnclocked() {
-    document.querySelectorAll('.worker-check').forEach(cb => {
-      const row = document.getElementById('row-' + cb.dataset.id);
-      const statusCell = row ? row.cells[3] : null;
-      const isUnclocked = statusCell && statusCell.textContent.trim().toLowerCase().includes('not clocked');
-      cb.checked = isUnclocked;
-      if (isUnclocked) selectedWorkerIds.add(cb.dataset.id);
-      else             selectedWorkerIds.delete(cb.dataset.id);
-    });
-    updateSelectionBar();
-  }
-
-  function clearSelection() {
-    selectedWorkerIds.clear();
-    document.querySelectorAll('.worker-check').forEach(cb => { cb.checked = false; });
-    document.getElementById('selectAll').checked = false;
-    updateSelectionBar();
-  }
-
-  function updateSelectionBar() {
-    const bar = document.getElementById('markAbsentBar');
-    const cnt = document.getElementById('selectedCount');
-    const n   = selectedWorkerIds.size;
-    bar.style.display = n > 0 ? '' : 'none';
-    cnt.textContent   = n;
-  }
-
-  async function bulkMarkAbsent() {
-    if (!selectedWorkerIds.size) return;
-    const date = document.getElementById('todayDate').value;
-    if (!confirm(`Mark ${selectedWorkerIds.size} worker(s) absent for ${date || 'today'}?`)) return;
+  const searchWorkersCi = debounce(async () => {
+    const q = document.getElementById('ci-search').value.trim();
+    if (q.length < 2) { document.getElementById('ci-results').innerHTML = ''; return; }
     try {
-      await API.markAbsent({ workerIds: [...selectedWorkerIds], date });
-      showToast(`${selectedWorkerIds.size} worker(s) marked absent`, 'success');
-      clearSelection();
+      const data = await API.workers.search(q);
+      const html = (data.workers || []).map(w => `<div class="dropdown-item" onclick="selectWorkerCi('${w._id}','${w.fullName.replace(/'/g,"\\'")}')">
+        ${workerAvatar(w)} <span>${w.fullName}</span> <span class="text-muted text-sm">${w.branch?.name || ''}</span></div>`).join('');
+      document.getElementById('ci-results').innerHTML = html || '<div class="dropdown-empty">No workers found</div>';
+    } catch(e) {}
+  });
+  function selectWorkerCi(id, name) {
+    document.getElementById('ci-worker-id').value = id;
+    document.getElementById('ci-worker-name').textContent = '→ ' + name;
+    document.getElementById('ci-results').innerHTML = '';
+    document.getElementById('ci-search').value = name;
+  }
+
+  async function doClockIn() {
+    const workerId = document.getElementById('ci-worker-id').value;
+    if (!workerId) return showToast('Select a worker', 'warning');
+    const btn = document.getElementById('ci-btn');
+    btn.disabled = true;
+    try {
+      await API.attendance.clockIn({ workerId, date: document.getElementById('ci-date').value, clockInTime: document.getElementById('ci-time').value || null, notes: document.getElementById('ci-notes').value });
+      showToast('Clocked in!', 'success');
+      closeModal('clockin-modal');
       loadToday();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
+    } catch(e) { showToast(e.message, 'error'); }
+    btn.disabled = false;
   }
 
-  // ── CLOCK IN / OUT MODALS ─────────────────────────────────────────────────
-
-  function openClockIn(workerId, workerName) {
-    ciWorkerId = workerId;
-    document.getElementById('ciWorkerName').textContent = workerName;
-    const now = new Date();
-    document.getElementById('ciTime').value  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    document.getElementById('ciNotes').value = '';
-    openModal('clockInModal');
+  // Clock Out
+  function openClockOutForWorker(id, name) {
+    document.getElementById('co-worker-id').value = id;
+    document.getElementById('co-worker-name').textContent = name;
+    document.getElementById('co-date').value = today;
+    document.getElementById('co-time').value = '';
+    document.getElementById('clockout-modal').style.display = 'flex';
   }
-
-  function openClockOut(workerId, workerName, attendanceId) {
-    coWorkerId      = workerId;
-    coAttendanceId  = attendanceId;
-    document.getElementById('coWorkerName').textContent = workerName;
-    const now = new Date();
-    document.getElementById('coTime').value  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    document.getElementById('coNotes').value = '';
-    openModal('clockOutModal');
-  }
-
-  async function submitClockIn() {
-    const time  = document.getElementById('ciTime').value;
-    const notes = document.getElementById('ciNotes').value;
-    const date  = document.getElementById('todayDate').value;
-    if (!time) { showToast('Please enter clock-in time', 'error'); return; }
+  async function doClockOut() {
+    const workerId = document.getElementById('co-worker-id').value;
+    const btn = document.getElementById('co-btn');
+    btn.disabled = true;
     try {
-      await API.adminClockIn({ workerId: ciWorkerId, date, clockInTime: time, notes });
-      showToast('Clocked in successfully', 'success');
-      closeModal('clockInModal');
+      await API.attendance.clockOut({ workerId, date: document.getElementById('co-date').value, clockOutTime: document.getElementById('co-time').value || null });
+      showToast('Clocked out!', 'success');
+      closeModal('clockout-modal');
       loadToday();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
+    } catch(e) { showToast(e.message, 'error'); }
+    btn.disabled = false;
   }
 
-  async function submitClockOut() {
-    const time  = document.getElementById('coTime').value;
-    const notes = document.getElementById('coNotes').value;
-    const date  = document.getElementById('todayDate').value;
-    if (!time) { showToast('Please enter clock-out time', 'error'); return; }
+  // Mark Absent
+  function openAbsentModal() {
+    document.getElementById('ab-date').value = today;
+    document.getElementById('absent-modal').style.display = 'flex';
+  }
+  async function loadAbsentWorkers() {
+    const branchId = document.getElementById('ab-branch').value;
+    if (!branchId) return;
     try {
-      await API.adminClockOut({ workerId: coWorkerId, date, clockOutTime: time, notes });
-      showToast('Clocked out successfully', 'success');
-      closeModal('clockOutModal');
+      const data = await API.workers.list({ branch: branchId, status: 'active', limit: 100 });
+      document.getElementById('ab-workers-list').innerHTML = (data.workers || []).map(w => `
+        <label class="worker-check-item">
+          <input type="checkbox" value="${w._id}" class="ab-worker-cb"> ${w.fullName}
+        </label>`).join('') || '<div class="text-muted text-sm">No active workers</div>';
+    } catch(e) {}
+  }
+  async function doMarkAbsent() {
+    const workerIds = [...document.querySelectorAll('.ab-worker-cb:checked')].map(cb => cb.value);
+    if (!workerIds.length) return showToast('Select at least one worker', 'warning');
+    const btn = document.getElementById('ab-btn');
+    btn.disabled = true;
+    try {
+      await API.attendance.markAbsent({ workerIds, date: document.getElementById('ab-date').value, notes: document.getElementById('ab-notes').value });
+      showToast('Marked absent', 'success');
+      closeModal('absent-modal');
       loadToday();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
+    } catch(e) { showToast(e.message, 'error'); }
+    btn.disabled = false;
   }
 
-  // ── HISTORY TAB ───────────────────────────────────────────────────────────
-
-  async function loadHistory(page = 1) {
-    histPage = page;
-    const branch = document.getElementById('histBranch').value;
-    const shift  = document.getElementById('histShift').value;
-    const status = document.getElementById('histStatus').value;
-    const from   = document.getElementById('histFrom').value;
-    const to     = document.getElementById('histTo').value;
-
-    let qs = `?page=${page}&limit=25`;
-    if (branch) qs += `&branch=${branch}`;
-    if (shift)  qs += `&shift=${shift}`;
-    if (status) qs += `&status=${status}`;
-    if (from)   qs += `&from=${from}`;
-    if (to)     qs += `&to=${to}`;
-
-    try {
-      const res = await API.getAttendance(qs);
-      renderHistTable(res.attendance || []);
-      renderHistPagination(res.pagination || {});
-    } catch (err) {
-      showToast('Failed to load history: ' + err.message, 'error');
-    }
-  }
-
-  function renderHistTable(records) {
-    const tbody = document.getElementById('histTable');
-    if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:40px;"><div class="empty-icon">🕐</div><p class="text-muted">No records found</p></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = records.map((a, i) => `
-      <tr>
-        <td>${((histPage - 1) * 25) + i + 1}</td>
-        <td>
-          <div class="font-semibold text-sm">${a.worker?.fullName || '—'}</div>
-          <div class="text-xs text-muted">${a.worker?.phone || ''}</div>
-        </td>
-        <td>
-          <div class="text-sm">${a.branch?.name || '—'}</div>
-          ${a.branch?.code ? `<span class="branch-card-code">${a.branch.code}</span>` : ''}
-        </td>
-        <td class="text-sm">${formatDate(a.date)}</td>
-        <td>${shiftBadge(a.shift)}</td>
-        <td>${attBadge(a.status)}</td>
-        <td class="text-sm">${a.clockInTime ? formatTime(a.clockInTime) : '<span class="text-muted">—</span>'}</td>
-        <td class="text-sm">${a.clockOutTime ? formatTime(a.clockOutTime) : '<span class="text-muted">—</span>'}</td>
-        <td>${a.latenessMinutes > 0 ? `<span class="lateness-pill">${a.latenessMinutes} min</span>` : '—'}</td>
-        <td>
-          ${a.selfieUrl
-            ? `<img src="${a.selfieUrl}" class="selfie-thumb ${a.faceMatchStatus || 'skipped'}"
-                 title="Face: ${a.faceMatchStatus || '—'}" style="cursor:pointer;"
-                 onclick="openFaceReview('${a._id}','${a.worker?.passportPhoto||''}','${a.selfieUrl}','${a.faceMatchStatus||'skipped'}')" />`
-            : '<span class="text-muted text-xs">—</span>'}
-        </td>
-        <td class="text-sm">
-          ${a.deductionAmount > 0
-            ? `<span style="color:var(--danger);font-weight:600;">₦${a.deductionAmount.toLocaleString()}</span>`
-            : '<span class="text-muted">—</span>'}
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  function renderHistPagination(p) {
-    const el = document.getElementById('histPagination');
-    const sm = document.getElementById('histSummary');
-    if (p.total !== undefined) {
-      sm.textContent = `Showing ${Math.min((p.page-1)*p.limit+1,p.total)}–${Math.min(p.page*p.limit,p.total)} of ${p.total} records`;
-    }
-    if (!p.pages || p.pages <= 1) { el.innerHTML = ''; return; }
-    let html = `<button class="page-btn" onclick="loadHistory(${p.page-1})" ${p.page===1?'disabled':''}>‹</button>`;
-    for (let pg = Math.max(1,p.page-2); pg <= Math.min(p.pages,p.page+2); pg++) {
-      html += `<button class="page-btn ${pg===p.page?'active':''}" onclick="loadHistory(${pg})">${pg}</button>`;
-    }
-    html += `<button class="page-btn" onclick="loadHistory(${p.page+1})" ${p.page===p.pages?'disabled':''}>›</button>`;
-    el.innerHTML = html;
-  }
-
-  function clearHistFilters() {
-    document.getElementById('histBranch').value = '';
-    document.getElementById('histShift').value  = '';
-    document.getElementById('histStatus').value = '';
-    const today = new Date().toISOString().slice(0,10);
-    document.getElementById('histFrom').value   = today.slice(0,7) + '-01';
-    document.getElementById('histTo').value     = today;
-    loadHistory(1);
-  }
-
-  // ── REPORT TAB ────────────────────────────────────────────────────────────
-
-  function openReportModal() { switchTab('report'); }
-
-  async function runReport() {
-    const branch = document.getElementById('rptBranch').value;
-    const from   = document.getElementById('rptFrom').value;
-    const to     = document.getElementById('rptTo').value;
-    if (!from || !to) { showToast('Select a date range', 'error'); return; }
-
-    const el = document.getElementById('reportResults');
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);">Generating report…</div>';
-
-    let qs = `?from=${from}&to=${to}`;
-    if (branch) qs += `&branch=${branch}`;
-
-    try {
-      const res = await API.getAttendanceReport(qs);
-      renderReport(res.report || [], from, to);
-    } catch (err) {
-      showToast('Report failed: ' + err.message, 'error');
-      el.innerHTML = '';
-    }
-  }
-
-  function renderReport(rows, from, to) {
-    const el = document.getElementById('reportResults');
-    if (!rows.length) {
-      el.innerHTML = '<div class="card"><div class="empty-state"><div class="empty-icon">📊</div><p class="text-muted">No attendance data for this period</p></div></div>';
-      return;
-    }
-
-    const totalPresent    = rows.reduce((s,r) => s + (r.daysPresent || 0), 0);
-    const totalLate       = rows.reduce((s,r) => s + (r.daysLate   || 0), 0);
-    const totalAbsent     = rows.reduce((s,r) => s + (r.daysAbsent || 0), 0);
-    const totalDeductions = rows.reduce((s,r) => s + (r.totalDeductions || 0), 0);
-
-    el.innerHTML = `
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-header">
-          <h2 class="card-title">Report: ${formatDate(from)} – ${formatDate(to)}</h2>
-          <span class="text-sm text-muted">${rows.length} workers</span>
-        </div>
-
-        <!-- Summary cards -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-          <div class="branch-stat" style="text-align:center;">
-            <div class="branch-stat-value" style="color:var(--success);">${totalPresent}</div>
-            <div class="branch-stat-label">Total Present Days</div>
-          </div>
-          <div class="branch-stat" style="text-align:center;">
-            <div class="branch-stat-value" style="color:var(--warning);">${totalLate}</div>
-            <div class="branch-stat-label">Late Occurrences</div>
-          </div>
-          <div class="branch-stat" style="text-align:center;">
-            <div class="branch-stat-value" style="color:var(--danger);">${totalAbsent}</div>
-            <div class="branch-stat-label">Total Absent Days</div>
-          </div>
-          <div class="branch-stat" style="text-align:center;">
-            <div class="branch-stat-value" style="color:var(--danger);">₦${totalDeductions.toLocaleString()}</div>
-            <div class="branch-stat-label">Total Deductions</div>
-          </div>
-        </div>
-
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Worker</th>
-                <th>Branch</th>
-                <th>Present</th>
-                <th>Late</th>
-                <th>Absent</th>
-                <th>On Leave</th>
-                <th>Deductions</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map((r, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td>
-                    <div class="font-semibold text-sm">${r.workerName || '—'}</div>
-                    <div class="text-xs text-muted">${r.phone || ''}</div>
-                  </td>
-                  <td class="text-sm">${r.branchName || '—'}</td>
-                  <td><span style="color:var(--success);font-weight:600;">${r.daysPresent || 0}</span></td>
-                  <td><span style="color:var(--warning);font-weight:600;">${r.daysLate    || 0}</span></td>
-                  <td><span style="color:var(--danger);font-weight:600;">${r.daysAbsent  || 0}</span></td>
-                  <td>${r.daysOnLeave || 0}</td>
-                  <td>
-                    ${(r.totalDeductions || 0) > 0
-                      ? `<span style="color:var(--danger);font-weight:600;">₦${r.totalDeductions.toLocaleString()}</span>`
-                      : '<span class="text-muted">—</span>'}
-                  </td>
-                  <td>
-                    <a href="worker-detail.html?id=${r.workerId}" class="btn btn-sm btn-outline">View</a>
-                  </td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-  }
-
-  // ── ALERTS TAB ────────────────────────────────────────────────────────────
-
-  async function loadAlerts(page = 1) {
-    alertsPage = page;
-    const type     = document.getElementById('alertType').value;
-    const severity = document.getElementById('alertSeverity').value;
-    const resolved = document.getElementById('alertResolved').value;
-
-    let qs = `?page=${page}&limit=20`;
-    if (type)     qs += `&type=${type}`;
-    if (severity) qs += `&severity=${severity}`;
-    if (resolved !== '') qs += `&resolved=${resolved}`;
-
-    const el = document.getElementById('alertsList');
-    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);">Loading…</div>';
-
-    try {
-      const res = await API.getAlerts(qs);
-      renderAlerts(res.alerts || []);
-      renderAlertsPagination(res.pagination || {});
-      loadAlertBadge();
-    } catch (err) {
-      showToast('Failed to load alerts: ' + err.message, 'error');
-    }
-  }
-
-  function renderAlerts(alerts) {
-    const el = document.getElementById('alertsList');
-    if (!alerts.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p class="text-muted">No alerts found</p></div>';
-      return;
-    }
-    el.innerHTML = alerts.map(a => `
-      <div class="security-alert-row">
-        <div class="alert-severity-dot ${a.severity}" style="margin-top:3px;"></div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-            <span class="alert-type-chip ${a.type}">${a.type.replace(/_/g,' ')}</span>
-            <span class="text-xs text-muted">${formatDate(a.createdAt)}</span>
-            ${a.isResolved ? '<span class="badge badge-success" style="font-size:.65rem;">Resolved</span>' : ''}
-          </div>
-          <div class="font-semibold text-sm">${a.worker?.fullName || '—'}</div>
-          <div class="text-xs text-muted" style="margin-top:2px;">${a.message}</div>
-          ${a.details?.selfieUrl
-            ? `<img src="${a.details.selfieUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-top:6px;border:2px solid var(--danger);" title="Attempt selfie" />`
-            : ''}
-          ${a.notes ? `<div class="text-xs text-muted mt-1">Note: ${a.notes}</div>` : ''}
-        </div>
-        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
-          ${!a.isResolved
-            ? `<button class="btn btn-sm btn-outline" onclick="openResolveAlert('${a._id}','${a.message.replace(/'/g,"\\'")}')">Resolve</button>`
-            : `<span class="text-xs text-muted">By ${a.resolvedBy?.fullName||'—'}</span>`}
-          ${a.attendance
-            ? `<button class="btn btn-xs btn-outline" onclick="openFaceReview('${a.attendance}','${a.worker?.passportPhoto||''}','${a.details?.selfieUrl||''}','pending')" style="font-size:.72rem;">Review Face</button>`
-            : ''}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function renderAlertsPagination(p) {
-    const el = document.getElementById('alertsPagination');
-    if (!p.pages || p.pages <= 1) { el.innerHTML = ''; return; }
-    let html = `<button class="page-btn" onclick="loadAlerts(${p.page-1})" ${p.page===1?'disabled':''}>‹</button>`;
-    for (let pg = Math.max(1,p.page-2); pg <= Math.min(p.pages,p.page+2); pg++) {
-      html += `<button class="page-btn ${pg===p.page?'active':''}" onclick="loadAlerts(${pg})">${pg}</button>`;
-    }
-    html += `<button class="page-btn" onclick="loadAlerts(${p.page+1})" ${p.page===p.pages?'disabled':''}>›</button>`;
-    el.innerHTML = html;
-  }
-
-  // ── Face Review ───────────────────────────────────────────────────────────
-
-  function openFaceReview(attendanceId, passportUrl, selfieUrl, currentStatus) {
-    frAttendanceId = attendanceId;
-    document.getElementById('frPassportPhoto').src = passportUrl || '';
-    document.getElementById('frSelfiePhoto').src   = selfieUrl   || '';
-    document.getElementById('frNotes').value       = '';
-    document.getElementById('frCurrentStatus').innerHTML =
-      currentStatus ? `<span class="face-status-badge ${currentStatus}" style="margin-left:4px;">${currentStatus}</span>` : '';
-    openModal('faceReviewModal');
-  }
-
-  async function submitFaceReview(status) {
-    if (!frAttendanceId) return;
-    const notes = document.getElementById('frNotes').value.trim();
-    try {
-      await API.reviewFace(frAttendanceId, { status, notes });
-      showToast(`Face marked as ${status}`, status === 'mismatched' ? 'error' : 'success');
-      closeModal('faceReviewModal');
-      if (document.getElementById('panelToday').style.display !== 'none') loadToday();
-      if (document.getElementById('panelHistory').style.display !== 'none') loadHistory(histPage);
-      if (document.getElementById('panelAlerts').style.display !== 'none')  loadAlerts(alertsPage);
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
-  }
-
-  // ── Resolve Alert ─────────────────────────────────────────────────────────
-
-  function openResolveAlert(id, msg) {
-    resolveAlertId = id;
-    document.getElementById('resolveAlertMsg').textContent = msg;
-    document.getElementById('resolveNotes').value = '';
-    openModal('resolveAlertModal');
-  }
-
-  async function submitResolve() {
-    if (!resolveAlertId) return;
-    const notes = document.getElementById('resolveNotes').value.trim();
-    try {
-      await API.resolveAlert(resolveAlertId, { notes });
-      showToast('Alert resolved', 'success');
-      closeModal('resolveAlertModal');
-      loadAlerts(alertsPage);
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
-  }
-
-  // ── HELPERS ───────────────────────────────────────────────────────────────
-
-  function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
   function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-  document.querySelectorAll('.modal-overlay').forEach(o => {
-    o.addEventListener('click', e => { if (e.target === o) o.style.display = 'none'; });
-  });
-
-  function formatTime(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+  async function init() {
+    try {
+      const data = await API.branches.list();
+      const branches = data.branches || [];
+      const todaySel = document.getElementById('today-branch');
+      const hSel = document.getElementById('h-branch');
+      const abSel = document.getElementById('ab-branch');
+      branches.forEach(b => {
+        todaySel.innerHTML += `<option value="${b._id}">${b.name}</option>`;
+        hSel.innerHTML     += `<option value="${b._id}">${b.name}</option>`;
+        abSel.innerHTML    += `<option value="${b._id}">${b.name}</option>`;
+      });
+      if (branches.length) {
+        todaySel.value = branches[0]._id;
+        loadToday();
+      }
+    } catch(e) {}
+    loadHistory();
   }
-
-  function attBadge(status) {
-    return `<span class="att-badge ${status}">${status.replace('_',' ')}</span>`;
-  }
-
-  function shiftBadge(shift) {
-    if (!shift || shift === 'unassigned') return '<span class="shift-badge unassigned">—</span>';
-    return `<span class="shift-badge ${shift}">Shift ${shift}</span>`;
-  }
+  init();
 </script>
-<script src="../assets/js/theme.js"></script>
 </body>
 </html>

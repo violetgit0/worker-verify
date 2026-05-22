@@ -1,669 +1,116 @@
-const Worker = require('../models/Worker');
-const Guarantor = require('../models/Guarantor');
-const VerificationLog = require('../models/VerificationLog');
-const Branch = require('../models/Branch');
-const TransferLog = require('../models/TransferLog');
-const ActivityLog = require('../models/ActivityLog');
-const { uploadDataUrl } = require('../config/cloudinary');
+const Worker   = require('../models/Worker');
+const Branch   = require('../models/Branch');
 
-// Scoped worker lookup — enforces company isolation
-const findWorker = (id, req, populate = null) => {
-  const filter = { _id: id };
-  if (req.companyId) filter.company = req.companyId;
-  let q = Worker.findOne(filter);
-  if (populate) q = q.populate(populate);
-  return q;
-};
-
-const logActivity = (action, by, targetId, targetName, details = {}, ip = '') =>
-  ActivityLog.create({
-    company: by.company || null,
-    action,
-    performedBy: by._id,
-    performedByName: by.fullName,
-    performedByRole: by.role,
-    targetType: 'worker',
-    targetId,
-    targetName,
-    details,
-    ip
-  }).catch(() => {});
-
-const parseLocation = (lat, lng, addr, plusCode = '', mapsLink = '', method = 'map') => ({
-  lat:         lat ? parseFloat(lat) : null,
-  lng:         lng ? parseFloat(lng) : null,
-  address:     addr      || '',
-  plusCode:    plusCode   || '',
-  mapsLink:    mapsLink   || '',
-  inputMethod: method     || 'map'
-});
-
-const buildIdentityDoc = (docType, docNumber, file) => {
-  if (!docType && !file) return undefined;
-  return {
-    docType:   docType   || 'nin_slip',
-    docNumber: docNumber || '',
-    fileUrl:   file?.path   || '',
-    fileType:  file ? (file.mimetype === 'application/pdf' ? 'pdf' : 'image') : '',
-    docStatus: 'pending',
-    reviewNotes: ''
-  };
-};
-
-const filePaths = (files, field) => (files[field] || []).map(f => f.path);
-
-// Upload a signature data URL to Cloudinary. Returns { sigType, url, signedAt } or null.
-const processSignature = async (dataUrl, sigType) => {
-  if (!dataUrl || !dataUrl.startsWith('data:image/')) return null;
+const getWorkers = async (req, res) => {
   try {
-    const result = await uploadDataUrl(dataUrl);
-    if (!result?.secure_url) return null;
-    return { sigType: sigType || 'drawn', url: result.secure_url, signedAt: new Date() };
-  } catch (_) {
-    return null;
-  }
+    const { branch, role, schedule, status, search, page = 1, limit = 30 } = req.query;
+    const q = { company: req.companyId };
+    if (branch)   q.branch   = branch;
+    if (role)     q.role     = role;
+    if (schedule) q.schedule = schedule;
+    if (status && status !== 'all') q.status = status;
+    if (search)   q.$text = { $search: search };
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [workers, total] = await Promise.all([
+      Worker.find(q)
+        .populate('branch',   'name code')
+        .populate('role',     'name color')
+        .populate('schedule', 'name type clockIn clockOut')
+        .sort({ createdAt: -1 })
+        .skip(skip).limit(parseInt(limit)),
+      Worker.countDocuments(q)
+    ]);
+    res.json({ success: true, workers, total, pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-const registerWorker = async (req, res) => {
+const getWorker = async (req, res) => {
   try {
-  const {
-    fullName, phone, gender, dateOfBirth, nin, occupation,
-    homeAddress, landmark,
-    locationLat, locationLng, locationAddress, locationPlusCode, locationMapsLink, locationMethod,
-    workerIdDocType, workerIdDocNumber,
-    workerSigData, workerSigType,
-    g1FullName, g1Phone, g1Nin, g1Relationship, g1HomeAddress, g1Landmark,
-    g1LocationLat, g1LocationLng, g1LocationAddress, g1LocationPlusCode, g1LocationMapsLink, g1LocationMethod,
-    g1IdDocType, g1IdDocNumber,
-    g1SigData, g1SigType,
-    g2FullName, g2Phone, g2Nin, g2Relationship, g2HomeAddress, g2Landmark,
-    g2LocationLat, g2LocationLng, g2LocationAddress, g2LocationPlusCode, g2LocationMapsLink, g2LocationMethod,
-    g2IdDocType, g2IdDocNumber,
-    g2SigData, g2SigType
-  } = req.body;
-
-  const ninFilter = { nin };
-  if (req.companyId) ninFilter.company = req.companyId;
-  const existingWorker = await Worker.findOne(ninFilter);
-  if (existingWorker) {
-    return res.status(400).json({ success: false, message: 'A worker with this NIN already exists' });
-  }
-
-  const files = req.files || {};
-
-  const {
-    branch: branchId, shift, category, shiftRef, dateEmployed
-  } = req.body;
-
-  const housePhotosArr  = filePaths(files, 'housePhotos');
-  const streetPhotosArr = filePaths(files, 'streetPhotos');
-
-  const workerData = {
-    fullName, phone, gender, dateOfBirth, nin, occupation,
-    homeAddress,
-    landmark:      landmark     || '',
-    location: parseLocation(locationLat, locationLng, locationAddress, locationPlusCode, locationMapsLink, locationMethod),
-    passportPhoto: files.passportPhoto?.[0]?.path || '',
-    housePhoto:    housePhotosArr[0] || files.housePhoto?.[0]?.path || '',
-    housePhotos:   housePhotosArr,
-    streetPhotos:  streetPhotosArr,
-    registeredBy:  req.user._id
-  };
-
-  if (req.companyId) workerData.company = req.companyId;
-  if (branchId)    workerData.branch = branchId;
-  if (shift && ['A','B'].includes(shift)) workerData.shift = shift;
-  if (category)    workerData.category = category;
-  if (shiftRef)    workerData.shiftRef = shiftRef;
-  if (dateEmployed) workerData.dateEmployed = dateEmployed;
-  if (req.body.verificationStatus === 'incomplete') workerData.verificationStatus = 'incomplete';
-
-  const workerIdDoc = buildIdentityDoc(workerIdDocType, workerIdDocNumber, files.workerIdDoc?.[0]);
-  if (workerIdDoc) workerData.identityDoc = workerIdDoc;
-
-  // Upload signatures in parallel
-  const [workerSig, g1Sig, g2Sig] = await Promise.all([
-    processSignature(workerSigData, workerSigType),
-    processSignature(g1SigData, g1SigType),
-    processSignature(g2SigData, g2SigType)
-  ]);
-  if (workerSig) workerData.workerSignature = workerSig;
-
-  const worker = await Worker.create(workerData);
-
-  const guarantorIds = [];
-
-  if (g1FullName) {
-    const g1HousePhotos  = filePaths(files, 'g1HousePhotos');
-    const g1StreetPhotos = filePaths(files, 'g1StreetPhotos');
-    const g1Data = {
-      worker: worker._id, guarantorNumber: 1,
-      fullName: g1FullName, phone: g1Phone, nin: g1Nin,
-      relationship: g1Relationship, homeAddress: g1HomeAddress,
-      landmark:  g1Landmark || '',
-      location: parseLocation(g1LocationLat, g1LocationLng, g1LocationAddress, g1LocationPlusCode, g1LocationMapsLink, g1LocationMethod),
-      passportPhoto: files.g1PassportPhoto?.[0]?.path || '',
-      housePhoto:    g1HousePhotos[0] || files.g1HousePhoto?.[0]?.path || '',
-      housePhotos:   g1HousePhotos,
-      streetPhotos:  g1StreetPhotos
-    };
-    const g1IdDoc = buildIdentityDoc(g1IdDocType, g1IdDocNumber, files.g1IdDoc?.[0]);
-    if (g1IdDoc) g1Data.identityDoc = g1IdDoc;
-    if (g1Sig) g1Data.signature = g1Sig;
-    const g1 = await Guarantor.create(g1Data);
-    guarantorIds.push(g1._id);
-  }
-
-  if (g2FullName) {
-    const g2HousePhotos  = filePaths(files, 'g2HousePhotos');
-    const g2StreetPhotos = filePaths(files, 'g2StreetPhotos');
-    const g2Data = {
-      worker: worker._id, guarantorNumber: 2,
-      fullName: g2FullName, phone: g2Phone, nin: g2Nin,
-      relationship: g2Relationship, homeAddress: g2HomeAddress,
-      landmark:  g2Landmark || '',
-      location: parseLocation(g2LocationLat, g2LocationLng, g2LocationAddress, g2LocationPlusCode, g2LocationMapsLink, g2LocationMethod),
-      passportPhoto: files.g2PassportPhoto?.[0]?.path || '',
-      housePhoto:    g2HousePhotos[0] || files.g2HousePhoto?.[0]?.path || '',
-      housePhotos:   g2HousePhotos,
-      streetPhotos:  g2StreetPhotos
-    };
-    const g2IdDoc = buildIdentityDoc(g2IdDocType, g2IdDocNumber, files.g2IdDoc?.[0]);
-    if (g2IdDoc) g2Data.identityDoc = g2IdDoc;
-    if (g2Sig) g2Data.signature = g2Sig;
-    const g2 = await Guarantor.create(g2Data);
-    guarantorIds.push(g2._id);
-  }
-
-  worker.guarantors = guarantorIds;
-  await worker.save();
-
-  await VerificationLog.create({
-    worker: worker._id, action: 'registered',
-    performedBy: req.user._id, newStatus: 'pending',
-    notes: `Registered by ${req.user.fullName}`
-  });
-
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-  logActivity('register_worker', req.user, worker._id, worker.fullName, { nin: worker.nin }, ip);
-
-  res.status(201).json({ success: true, message: 'Worker registered successfully', workerId: worker._id });
-
-  } catch (err) {
-    console.error('[registerWorker] ERROR:', err.name, err.message, err.code || '');
-    if (res.headersSent) return;
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern || {})[0] || 'field';
-      return res.status(400).json({ success: false, message: `A worker with this ${field} already exists.` });
-    }
-    if (err.name === 'ValidationError') {
-      const msg = Object.values(err.errors).map(e => e.message).join('. ');
-      return res.status(400).json({ success: false, message: msg });
-    }
-    res.status(500).json({ success: false, message: err.message || 'Failed to register worker. Please try again.' });
-  }
-};
-
-const getAllWorkers = async (req, res) => {
-  const { page = 1, limit = 20, status, search, branch, shift, employmentStatus, incomplete } = req.query;
-  const query = {};
-  if (req.companyId) query.company = req.companyId;
-
-  // Branch restriction for branch_manager
-  if (req.user.role === 'branch_manager' && req.user.branch) {
-    query.branch = req.user.branch;
-  } else if (req.user.role === 'staff') {
-    query.registeredBy = req.user._id;
-  }
-  if (status && status !== 'all')           query.verificationStatus = status;
-  if (branch && branch !== 'all')           query.branch = branch;
-  if (shift && shift !== 'all')             query.shift = shift;
-  if (employmentStatus && employmentStatus !== 'all') query.employmentStatus = employmentStatus;
-  // incomplete=true → workers not fully verified
-  if (incomplete === 'true') {
-    query.verificationStatus = { $in: ['pending', 'incomplete', 'legacy', 'temporary'] };
-  }
-
-  if (search) {
-    const guarantorWorkerIds = await Guarantor.find({
-      $or: [
-        { fullName: { $regex: search, $options: 'i' } },
-        { phone:    { $regex: search, $options: 'i' } },
-        { nin:      { $regex: search, $options: 'i' } }
-      ]
-    }).distinct('worker');
-
-    query.$or = [
-      { fullName: { $regex: search, $options: 'i' } },
-      { phone:    { $regex: search, $options: 'i' } },
-      { nin:      { $regex: search, $options: 'i' } },
-      { _id:      { $in: guarantorWorkerIds } }
-    ];
-  }
-
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-  const [workers, total] = await Promise.all([
-    Worker.find(query)
-      .populate('registeredBy', 'fullName username')
-      .populate('verifiedBy', 'fullName')
+    const w = await Worker.findOne({ _id: req.params.id, company: req.companyId })
       .populate('branch', 'name code')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit)),
-    Worker.countDocuments(query)
-  ]);
-
-  res.json({
-    success: true, workers,
-    pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
-  });
+      .populate('role',   'name color')
+      .populate('schedule', 'name type clockIn clockOut daysOn daysOff workDays');
+    if (!w) return res.status(404).json({ success: false, message: 'Worker not found' });
+    res.json({ success: true, worker: w });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-const getWorkerById = async (req, res) => {
-  const wbFilter = { _id: req.params.id };
-  if (req.companyId) wbFilter.company = req.companyId;
-  const worker = await Worker.findOne(wbFilter)
-    .populate('registeredBy', 'fullName username phone')
-    .populate('verifiedBy', 'fullName')
-    .populate('guarantors')
-    .populate('branch', 'name code address');
-
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  if (req.user.role === 'staff' && worker.registeredBy._id.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ success: false, message: 'Access denied' });
-  }
-
-  const [logs, transferLogs] = await Promise.all([
-    VerificationLog.find({ worker: worker._id })
-      .populate('performedBy', 'fullName role')
-      .sort({ createdAt: -1 }),
-    TransferLog.find({ worker: worker._id })
-      .populate('performedBy', 'fullName role')
-      .sort({ createdAt: -1 })
-  ]);
-
-  res.json({ success: true, worker, logs, transferLogs });
-};
-
-// ── Quick register (minimal fields, no full verification required) ─────────────
-const quickRegisterWorker = async (req, res) => {
+const createWorker = async (req, res) => {
   try {
-    const {
-      fullName, phone, gender, nin, occupation,
-      branch: branchId, shift, category, shiftRef,
-      monthlySalary, dailyRate, dateEmployed,
-      workerType,   // 'temporary' | 'legacy' | 'incomplete'
-      allowClockIn, allowPayroll
-    } = req.body;
+    const { fullName, phone, branch, role, schedule, scheduleStartDate, salary, nin, dateEmployed } = req.body;
+    if (!fullName?.trim()) return res.status(400).json({ success: false, message: 'Full name is required' });
+    if (!phone?.trim())    return res.status(400).json({ success: false, message: 'Phone number is required' });
+    if (!branch)           return res.status(400).json({ success: false, message: 'Branch is required' });
 
-    console.log('[quickRegister] body:', {
-      fullName, phone, gender, nin: nin ? '***' : undefined,
-      branchId, shift, monthlySalary, workerType
+    const branchDoc = await Branch.findOne({ _id: branch, company: req.companyId });
+    if (!branchDoc) return res.status(400).json({ success: false, message: 'Invalid branch' });
+
+    let photo = '';
+    if (req.file) photo = req.file.path; // CloudinaryStorage sets path = the Cloudinary URL
+
+    const worker = await Worker.create({
+      company: req.companyId, branch, fullName: fullName.trim(), phone: phone.trim(),
+      role: role || null, schedule: schedule || null,
+      scheduleStartDate: scheduleStartDate ? new Date(scheduleStartDate) : new Date(),
+      salary: parseFloat(salary) || 0,
+      nin: nin || '',
+      dateEmployed: dateEmployed ? new Date(dateEmployed) : new Date(),
+      photo, createdBy: req.user._id
     });
 
-    if (!fullName || !phone) {
-      return res.status(400).json({ success: false, message: 'Full name and phone number are required' });
-    }
-
-    if (!branchId) {
-      return res.status(400).json({ success: false, message: 'Branch is required' });
-    }
-
-    // Validate branch exists and belongs to this company
-    const branchFilter = { _id: branchId };
-    if (req.companyId) branchFilter.company = req.companyId;
-    const branch = await Branch.findOne(branchFilter);
-    if (!branch) {
-      return res.status(400).json({ success: false, message: 'Selected branch not found. Please refresh and try again.' });
-    }
-
-    if (nin) {
-      const ninFilter = { nin };
-      if (req.companyId) ninFilter.company = req.companyId;
-      const existing = await Worker.findOne(ninFilter);
-      if (existing) {
-        return res.status(400).json({ success: false, message: `A worker with NIN "${nin}" already exists.` });
-      }
-    }
-
-    const validTypes = ['incomplete', 'temporary', 'legacy'];
-    const verificationStatus = validTypes.includes(workerType) ? workerType : 'incomplete';
-
-    const workerData = {
-      fullName:     fullName.trim(),
-      phone:        String(phone).trim(),
-      gender:       gender || 'Male',
-      dateOfBirth:  req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : new Date('2000-01-01'),
-      nin:          nin || `QUICK-${Date.now()}`,
-      occupation:   occupation || 'General',
-      homeAddress:  req.body.homeAddress || 'Not Provided',
-      verificationStatus,
-      registeredBy: req.user._id,
-      allowClockIn: allowClockIn !== false && allowClockIn !== 'false',
-      allowPayroll: allowPayroll !== false && allowPayroll !== 'false'
-    };
-
-    if (req.companyId) workerData.company = req.companyId;
-    workerData.branch = branch._id;
-    if (shift && ['A', 'B'].includes(shift)) workerData.shift = shift;
-    if (category)     workerData.category = category;
-    if (shiftRef)     workerData.shiftRef = shiftRef;
-    if (dateEmployed) workerData.dateEmployed = new Date(dateEmployed);
-    if (monthlySalary) {
-      workerData.monthlySalary = parseFloat(monthlySalary) || 0;
-      workerData.dailyRate     = parseFloat(dailyRate) || workerData.monthlySalary / 26;
-    }
-
-    console.log('[quickRegister] creating worker for company:', req.companyId);
-    const worker = await Worker.create(workerData);
-    console.log('[quickRegister] worker created:', worker._id);
-
-    // Log verification — non-fatal if it fails
-    VerificationLog.create({
-      worker: worker._id, action: 'registered',
-      performedBy: req.user._id, newStatus: verificationStatus,
-      notes: `Quick-registered by ${req.user.fullName} (${verificationStatus})`
-    }).catch(e => console.warn('[quickRegister] VerificationLog failed:', e.message));
-
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-    logActivity('quick_register_worker', req.user, worker._id, worker.fullName,
-      { nin: worker.nin, workerType: verificationStatus }, ip);
-
-    res.status(201).json({
-      success: true,
-      message: 'Worker quick-registered successfully',
-      workerId: worker._id,
-      workerName: worker.fullName
-    });
-
-  } catch (err) {
-    console.error('[quickRegister] ERROR:', err.name, err.message, err.code || '');
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern || {})[0] || 'field';
-      return res.status(400).json({
-        success: false,
-        message: `A worker with this ${field} already exists in your company.`
-      });
-    }
-    if (err.name === 'ValidationError') {
-      const msg = Object.values(err.errors).map(e => e.message).join('. ');
-      return res.status(400).json({ success: false, message: msg });
-    }
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid value for field "${err.path}". Please check your inputs.`
-      });
-    }
-    res.status(500).json({ success: false, message: err.message || 'Failed to register worker. Please try again.' });
-  }
+    await worker.populate(['branch', 'role', 'schedule']);
+    res.status(201).json({ success: true, worker });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Get verification completion for a worker ───────────────────────────────────
-const getWorkerCompletion = async (req, res) => {
-  const worker = await findWorker(req.params.id, req, 'guarantors');
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
+const updateWorker = async (req, res) => {
+  try {
+    const { fullName, phone, branch, role, schedule, scheduleStartDate, salary, nin, status, dateEmployed } = req.body;
+    const w = await Worker.findOne({ _id: req.params.id, company: req.companyId });
+    if (!w) return res.status(404).json({ success: false, message: 'Worker not found' });
 
-  const steps = {
-    passportPhoto:    { done: !!worker.passportPhoto,          label: 'Passport Photo' },
-    homeAddress:      { done: !!(worker.homeAddress && worker.homeAddress !== 'Not Provided'), label: 'Home Address' },
-    locationPinned:   { done: !!(worker.location?.lat),        label: 'Location Pinned' },
-    identityDoc:      { done: !!(worker.identityDoc?.fileUrl), label: 'ID Document Uploaded' },
-    workerSignature:  { done: !!(worker.workerSignature?.url), label: 'Worker Signature' },
-    nin:              { done: !!(worker.nin && !worker.nin.startsWith('QUICK-')), label: 'NIN Provided' },
-    guarantor1:       { done: worker.guarantors?.length >= 1,  label: 'Guarantor 1 Added' },
-    guarantor2:       { done: worker.guarantors?.length >= 2,  label: 'Guarantor 2 Added' },
-    g1Photo:          { done: !!(worker.guarantors?.[0]?.passportPhoto), label: 'Guarantor 1 Photo' },
-    g1IdDoc:          { done: !!(worker.guarantors?.[0]?.identityDoc?.fileUrl), label: 'Guarantor 1 ID Doc' },
-    g2Photo:          { done: !!(worker.guarantors?.[1]?.passportPhoto), label: 'Guarantor 2 Photo' },
-    g2IdDoc:          { done: !!(worker.guarantors?.[1]?.identityDoc?.fileUrl), label: 'Guarantor 2 ID Doc' }
-  };
+    if (fullName)           w.fullName          = fullName.trim();
+    if (phone)              w.phone             = phone.trim();
+    if (branch)             w.branch            = branch;
+    if (role   !== undefined) w.role            = role   || null;
+    if (schedule !== undefined) w.schedule      = schedule || null;
+    if (scheduleStartDate)  w.scheduleStartDate = new Date(scheduleStartDate);
+    if (salary  !== undefined) w.salary         = parseFloat(salary) || 0;
+    if (nin     !== undefined) w.nin            = nin;
+    if (status)             w.status            = status;
+    if (dateEmployed)       w.dateEmployed      = new Date(dateEmployed);
 
-  const total = Object.keys(steps).length;
-  const done  = Object.values(steps).filter(s => s.done).length;
-  const pct   = Math.round((done / total) * 100);
+    if (req.file) w.photo = req.file.path;
 
-  res.json({ success: true, completion: { pct, done, total, steps } });
+    await w.save();
+    await w.populate(['branch', 'role', 'schedule']);
+    res.json({ success: true, worker: w });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Update worker clock-in / payroll restrictions ─────────────────────────────
-const updateRestrictions = async (req, res) => {
-  const { allowClockIn, allowPayroll } = req.body;
-  const worker = await findWorker(req.params.id, req);
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  if (allowClockIn !== undefined) worker.allowClockIn = Boolean(allowClockIn);
-  if (allowPayroll !== undefined) worker.allowPayroll = Boolean(allowPayroll);
-  await worker.save();
-
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-  logActivity('update_restrictions', req.user, worker._id, worker.fullName,
-    { allowClockIn: worker.allowClockIn, allowPayroll: worker.allowPayroll }, ip);
-
-  res.json({ success: true, message: 'Restrictions updated', allowClockIn: worker.allowClockIn, allowPayroll: worker.allowPayroll });
-};
-
-const updateVerificationStatus = async (req, res) => {
-  const { status, rejectionReason } = req.body;
-  const validStatuses = ['verified', 'rejected', 'pending', 'incomplete', 'legacy', 'temporary'];
-
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}` });
-  }
-
-  const worker = await findWorker(req.params.id, req);
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  const previousStatus = worker.verificationStatus;
-  worker.verificationStatus = status;
-  worker.verifiedBy = req.user._id;
-  worker.verifiedAt = new Date();
-  if (status === 'rejected') worker.rejectionReason = rejectionReason || '';
-
-  await worker.save();
-
-  await VerificationLog.create({
-    worker: worker._id,
-    action: status === 'verified' ? 'approved' : 'rejected',
-    performedBy: req.user._id,
-    previousStatus,
-    newStatus: status,
-    notes: rejectionReason || ''
-  });
-
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-  logActivity(`${status}_worker`, req.user, worker._id, worker.fullName,
-    { previousStatus, newStatus: status, rejectionReason }, ip);
-
-  res.json({ success: true, message: `Worker ${status} successfully` });
+const deleteWorker = async (req, res) => {
+  try {
+    await Worker.findOneAndUpdate({ _id: req.params.id, company: req.companyId }, { status: 'inactive' });
+    res.json({ success: true, message: 'Worker deactivated' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
 const searchWorkers = async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.json({ success: true, workers: [] });
-
-  const guarantorWorkerIds = await Guarantor.find({
-    $or: [
-      { fullName: { $regex: q, $options: 'i' } },
-      { phone:    { $regex: q, $options: 'i' } },
-      { nin:      { $regex: q, $options: 'i' } }
-    ]
-  }).distinct('worker');
-
-  const searchFilter = { $or: [
-    { fullName: { $regex: q, $options: 'i' } },
-    { phone:    { $regex: q, $options: 'i' } },
-    { nin:      { $regex: q, $options: 'i' } },
-    { _id:      { $in: guarantorWorkerIds } }
-  ]};
-  if (req.companyId) searchFilter.company = req.companyId;
-  const workers = await Worker.find(searchFilter).populate('registeredBy', 'fullName').limit(30);
-
-  res.json({ success: true, workers });
-};
-
-const flagDocument = async (req, res) => {
-  const { target, docStatus, reviewNotes } = req.body;
-  // target: 'worker' | 'g1' | 'g2'
-  const validStatuses = ['pending', 'approved', 'rejected', 'flagged'];
-  if (!validStatuses.includes(docStatus)) {
-    return res.status(400).json({ success: false, message: 'Invalid docStatus' });
-  }
-
-  const worker = await findWorker(req.params.id, req, 'guarantors');
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  let action = docStatus === 'approved' ? 'doc_approved' : 'doc_rejected';
-  if (docStatus === 'flagged') action = 'flagged';
-
-  if (target === 'worker') {
-    worker.identityDoc.docStatus   = docStatus;
-    worker.identityDoc.reviewNotes = reviewNotes || '';
-    await worker.save();
-  } else {
-    const gNum = target === 'g1' ? 1 : 2;
-    const guarantor = worker.guarantors.find(g => g.guarantorNumber === gNum);
-    if (!guarantor) return res.status(404).json({ success: false, message: 'Guarantor not found' });
-    guarantor.identityDoc.docStatus   = docStatus;
-    guarantor.identityDoc.reviewNotes = reviewNotes || '';
-    await guarantor.save();
-  }
-
-  await VerificationLog.create({
-    worker: worker._id,
-    action,
-    performedBy: req.user._id,
-    notes: `Doc ${docStatus} for ${target}${reviewNotes ? ': ' + reviewNotes : ''}`
-  });
-
-  res.json({ success: true, message: `Document ${docStatus} successfully` });
-};
-
-const updateSalary = async (req, res) => {
-  const { monthlySalary, dailyRate } = req.body;
-  const worker = await findWorker(req.params.id, req);
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-  if (monthlySalary !== undefined) worker.monthlySalary = parseFloat(monthlySalary) || 0;
-  if (dailyRate !== undefined)     worker.dailyRate     = parseFloat(dailyRate) || 0;
-  // Auto-compute daily rate if not set
-  if (!worker.dailyRate && worker.monthlySalary) worker.dailyRate = worker.monthlySalary / 26;
-  await worker.save();
-  res.json({ success: true, message: 'Salary updated', monthlySalary: worker.monthlySalary, dailyRate: worker.dailyRate });
-};
-
-const assignBranch = async (req, res) => {
-  const { branchId, notes } = req.body;
-  const worker = await findWorker(req.params.id, req, {path:'branch',select:'name code'});
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  if (branchId) {
-    const branch = await Branch.findById(branchId);
-    if (!branch) return res.status(404).json({ success: false, message: 'Branch not found' });
-  }
-
-  const oldBranch = worker.branch ? `${worker.branch.name} (${worker.branch.code})` : 'Unassigned';
-  worker.branch = branchId || null;
-  await worker.save();
-
-  const newWorker = await findWorker(req.params.id, req, {path:'branch',select:'name code'});
-  const newBranch = newWorker.branch ? `${newWorker.branch.name} (${newWorker.branch.code})` : 'Unassigned';
-
-  await TransferLog.create({
-    worker: worker._id,
-    changeType: 'branch_assignment',
-    oldValue: oldBranch,
-    newValue: newBranch,
-    performedBy: req.user._id,
-    notes: notes || ''
-  });
-
-  res.json({ success: true, message: 'Branch assignment updated', worker: newWorker });
-};
-
-const assignShift = async (req, res) => {
-  const { shift, notes } = req.body;
-  if (!['A', 'B', 'unassigned'].includes(shift)) {
-    return res.status(400).json({ success: false, message: 'Invalid shift. Use A, B, or unassigned' });
-  }
-
-  const worker = await findWorker(req.params.id, req);
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  const oldShift = worker.shift;
-  worker.shift = shift;
-  await worker.save();
-
-  await TransferLog.create({
-    worker: worker._id,
-    changeType: 'shift_change',
-    oldValue: `Shift ${oldShift}`,
-    newValue: `Shift ${shift}`,
-    performedBy: req.user._id,
-    notes: notes || ''
-  });
-
-  res.json({ success: true, message: 'Shift updated', shift });
-};
-
-const updateEmploymentStatus = async (req, res) => {
-  const { employmentStatus, notes } = req.body;
-  const validStatuses = ['active', 'suspended', 'resigned', 'sacked', 'on_leave'];
-  if (!validStatuses.includes(employmentStatus)) {
-    return res.status(400).json({ success: false, message: 'Invalid employment status' });
-  }
-
-  const worker = await findWorker(req.params.id, req);
-  if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-  const oldStatus = worker.employmentStatus;
-  worker.employmentStatus = employmentStatus;
-  await worker.save();
-
-  await TransferLog.create({
-    worker: worker._id,
-    changeType: 'status_change',
-    oldValue: oldStatus,
-    newValue: employmentStatus,
-    performedBy: req.user._id,
-    notes: notes || ''
-  });
-
-  res.json({ success: true, message: `Worker status updated to ${employmentStatus}`, employmentStatus });
-};
-
-// ── Assign schedule + optional role + branch (new schedule system) ────────────
-const assignWorkerSchedule = async (req, res) => {
   try {
-    const { scheduleId, scheduleStartDate, categoryId, branchId } = req.body;
-    const worker = await findWorker(req.params.id, req);
-    if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-
-    if (scheduleId    !== undefined) worker.scheduleRef       = scheduleId    || null;
-    if (scheduleStartDate !== undefined) worker.scheduleStartDate = scheduleStartDate ? new Date(scheduleStartDate) : null;
-    if (categoryId    !== undefined) worker.category          = categoryId    || null;
-    if (branchId      !== undefined) worker.branch            = branchId      || null;
-
-    await worker.save();
-
-    await TransferLog.create({
-      worker: worker._id,
-      changeType: 'schedule_assignment',
-      oldValue: '',
-      newValue: `schedule:${scheduleId || 'none'}`,
-      performedBy: req.user._id,
-      notes: `Schedule assigned via new schedule system`
-    });
-
-    res.json({ success: true, message: 'Worker schedule updated', worker });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    const { q } = req.query;
+    if (!q) return res.json({ success: true, workers: [] });
+    const workers = await Worker.find({
+      company: req.companyId,
+      status: { $ne: 'inactive' },
+      $or: [
+        { fullName: { $regex: q, $options: 'i' } },
+        { phone:    { $regex: q, $options: 'i' } },
+        { nin:      { $regex: q, $options: 'i' } }
+      ]
+    }).populate('role', 'name color').populate('branch', 'name').limit(20);
+    res.json({ success: true, workers });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-module.exports = {
-  registerWorker, quickRegisterWorker, getAllWorkers, getWorkerById,
-  updateVerificationStatus, searchWorkers, flagDocument,
-  assignBranch, assignShift, updateEmploymentStatus, updateSalary,
-  getWorkerCompletion, updateRestrictions, assignWorkerSchedule
-};
+module.exports = { getWorkers, getWorker, createWorker, updateWorker, deleteWorker, searchWorkers };

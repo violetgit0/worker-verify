@@ -1,634 +1,199 @@
-const Attendance     = require('../models/Attendance');
-const Deduction      = require('../models/Deduction');
-const DeductionRule  = require('../models/DeductionRule');
-const Worker         = require('../models/Worker');
-const Branch         = require('../models/Branch');
-const SecurityAlert  = require('../models/SecurityAlert');
-const { haversineDistance } = require('../utils/geo');
-const { toMidnightUTC, parseTimeOnDate, minutesDiff, monthYear } = require('../utils/time');
+const Attendance = require('../models/Attendance');
+const Worker     = require('../models/Worker');
 const { resolveIsWorkDay } = require('./scheduleController');
 
-// ── Schedule resolution helpers ───────────────────────────────────────────────
-
-// Returns 'HH:MM' clock-in time.
-// Priority: new ScheduleTemplate → legacy shiftRef → branch fallback
-function resolveResumeTime(worker, branch) {
-  if (worker.scheduleRef?.clockIn)  return worker.scheduleRef.clockIn;
-  if (worker.shiftRef?.resumeTime)  return worker.shiftRef.resumeTime;
-  if (worker.category?.resumeTime)  return worker.category.resumeTime;
-  return worker.shift === 'B' ? (branch.resumptionTimeB || '08:00') : (branch.resumptionTimeA || '08:00');
+function toMidnight(d) {
+  const dt = d ? new Date(d) : new Date();
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+function parseTime(hhMM, onDate) {
+  const [h, m] = hhMM.split(':').map(Number);
+  const dt = new Date(onDate);
+  dt.setHours(h, m, 0, 0);
+  return dt;
 }
 
-// Returns grace period in minutes.
-function resolveGraceMinutes(worker) {
-  if (worker.scheduleRef?.lateAfterMinutes != null) return worker.scheduleRef.lateAfterMinutes;
-  if (worker.shiftRef?.lateAfterMinutes    != null) return worker.shiftRef.lateAfterMinutes;
-  if (worker.category?.lateAfterMinutes    != null) return worker.category.lateAfterMinutes;
-  return 0;
-}
-
-// Returns true if the worker is scheduled to work on `date`.
-// New system (scheduleRef) takes priority; falls back to legacy shiftRef logic.
-function isScheduledToWork(worker, date) {
-  // ── New schedule system ────────────────────────────────────────────────────
-  if (worker.scheduleRef) {
-    return resolveIsWorkDay(worker, worker.scheduleRef, date);
-  }
-
-  // ── Legacy shiftRef fallback ───────────────────────────────────────────────
-  const dayOfWeek = date.getDay();
-  const shift    = worker.shiftRef;
-  const category = worker.category;
-  const pattern  = shift?.workPattern || category?.workPattern || 'all_week';
-  const offDays  = (shift?.offDays?.length ? shift.offDays : null) ?? category?.offDays ?? [];
-  const daysOn   = shift?.daysOn  ?? category?.daysOn  ?? 1;
-  const daysOff  = shift?.daysOff ?? category?.daysOff ?? 1;
-
-  switch (pattern) {
-    case 'all_week':  return true;
-    case 'weekdays':  return dayOfWeek !== 0 && dayOfWeek !== 6;
-    case 'custom':    return !offDays.includes(dayOfWeek);
-    case 'alternating': {
-      const refDate  = shift?.referenceDate ?? new Date('2025-01-06');
-      const diffDays = Math.floor((date - new Date(refDate)) / 86400000);
-      const cycle    = daysOn + daysOff;
-      const pos      = ((diffDays % cycle) + cycle) % cycle;
-      return pos < daysOn;
-    }
-    default: return true;
-  }
-}
-
-// ── Deduction helpers ──────────────────────────────────────────────────────────
-
-async function applyLatenessDeduction(worker, attendance, latenessMinutes, performedBy, companyId) {
-  if (latenessMinutes <= 0) return 0;
-  const ruleFilter = { type: 'lateness', isActive: true };
-  if (companyId) ruleFilter.company = companyId;
-  const rules = await DeductionRule.find(ruleFilter).sort({ minMinutes: 1 });
-  for (const rule of rules) {
-    if (latenessMinutes >= rule.minMinutes &&
-        (rule.maxMinutes === null || latenessMinutes <= rule.maxMinutes)) {
-      const { month, year } = monthYear(attendance.date);
-      await Deduction.create({
-        worker: worker._id, branch: attendance.branch,
-        attendance: attendance._id, rule: rule._id,
-        month, year, type: 'lateness', amount: rule.amount,
-        company: companyId || null,
-        description: `Late by ${latenessMinutes} min on ${attendance.date.toISOString().slice(0,10)}`,
-        createdBy: performedBy || null
-      });
-      return rule.amount;
-    }
-  }
-  return 0;
-}
-
-async function applyAbsenceDeduction(worker, attendance, performedBy, companyId) {
-  const dailyRate = worker.dailyRate || (worker.monthlySalary ? worker.monthlySalary / 26 : 0);
-  if (!dailyRate) return 0;
-  const { month, year } = monthYear(attendance.date);
-  await Deduction.create({
-    worker: worker._id, branch: attendance.branch,
-    attendance: attendance._id,
-    month, year, type: 'absence', amount: dailyRate,
-    company: companyId || null,
-    description: `Absent on ${attendance.date.toISOString().slice(0,10)}`,
-    createdBy: performedBy || null
-  });
-  return dailyRate;
-}
-
-// ── Clock In (worker self-service) ────────────────────────────────────────────
-const workerClockIn = async (req, res) => {
-  const worker = await Worker.findById(req.worker._id)
-    .populate('category')
-    .populate('shiftRef')
-    .populate('scheduleRef');
-
-  const { lat, lng, deviceFingerprint, deviceInfo } = req.body;
-  const selfieFile = req.file; // from selfieUpload middleware (optional)
-
-  if (!worker.branch) {
-    return res.status(400).json({ success: false, message: 'You are not assigned to a branch yet' });
-  }
-  if (worker.allowClockIn === false) {
-    return res.status(403).json({ success: false, message: 'Clock-in is restricted for your account. Contact your supervisor.' });
-  }
-
-  const today = toMidnightUTC();
-  const existing = await Attendance.findOne({ worker: worker._id, date: today });
-  if (existing && existing.clockInTime) {
-    return res.status(400).json({ success: false, message: 'Already clocked in today' });
-  }
-
-  const branch = await Branch.findById(worker.branch._id || worker.branch);
-
-  // Check if worker is scheduled to work today
-  if (!isScheduledToWork(worker, today)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Today is your day off based on your shift schedule. Contact your supervisor if this is an error.'
-    });
-  }
-  const now = new Date();
-
-  // ── GPS Verification (hard block if branch has GPS configured) ──────────────
-  let isLocationVerified = false;
-  let clockInDistance = null;
-
-  if (branch.location?.lat && branch.location?.lng) {
-    const parsedLat = parseFloat(lat);
-    const parsedLng = parseFloat(lng);
-
-    if (!lat || !lng || isNaN(parsedLat) || isNaN(parsedLng)) {
-      await SecurityAlert.create({
-        worker: worker._id, branch: branch._id,
-        type: 'location_mismatch', severity: 'high',
-        company: worker.company || null,
-        message: `${worker.fullName} attempted to clock in without GPS location`,
-        details: { selfieUrl: selfieFile.path, deviceInfo }
-      });
-      return res.status(403).json({
-        success: false,
-        message: 'GPS location is required to clock in at this branch. Please enable location services and try again.'
-      });
-    }
-
-    const dist = haversineDistance(parsedLat, parsedLng, branch.location.lat, branch.location.lng);
-    clockInDistance = Math.round(dist);
-    isLocationVerified = dist <= branch.attendanceRadiusM;
-
-    if (!isLocationVerified) {
-      await SecurityAlert.create({
-        worker: worker._id, branch: branch._id,
-        type: 'location_mismatch', severity: 'high',
-        company: worker.company || null,
-        message: `${worker.fullName} tried to clock in from ${clockInDistance}m away (limit: ${branch.attendanceRadiusM}m)`,
-        details: {
-          workerLat: parsedLat, workerLng: parsedLng,
-          branchLat: branch.location.lat, branchLng: branch.location.lng,
-          distance: clockInDistance, allowedRadius: branch.attendanceRadiusM,
-          selfieUrl: selfieFile.path, deviceInfo
-        }
-      });
-      return res.status(403).json({
-        success: false,
-        message: `You are ${clockInDistance}m from your branch. You must be within ${branch.attendanceRadiusM}m to clock in.`,
-        distance: clockInDistance,
-        allowed: branch.attendanceRadiusM
-      });
-    }
-  }
-
-  // ── Late detection (uses shift → category → branch priority chain) ─────────
-  const resumptionStr  = resolveResumeTime(worker, branch);
-  const graceMinutes   = resolveGraceMinutes(worker);
-  const resumptionTime = parseTimeOnDate(resumptionStr);
-  const rawLate        = Math.max(0, minutesDiff(resumptionTime, now));
-  const latenessMinutes = Math.max(0, rawLate - graceMinutes);
-  const isLate = latenessMinutes > 0;
-
-  // ── Device change detection ────────────────────────────────────────────────
-  const suspiciousFlags = [];
-
-  if (deviceFingerprint) {
-    const lastWithDevice = await Attendance.findOne({
-      worker: worker._id,
-      deviceFingerprint: { $ne: '' },
-      clockInTime: { $ne: null }
-    }).sort({ createdAt: -1 });
-
-    if (lastWithDevice?.deviceFingerprint && lastWithDevice.deviceFingerprint !== deviceFingerprint) {
-      suspiciousFlags.push('device_change');
-      await SecurityAlert.create({
-        worker: worker._id, branch: branch._id,
-        type: 'device_change', severity: 'medium',
-        company: worker.company || null,
-        message: `${worker.fullName} clocked in from a different device`,
-        details: {
-          previousFingerprint: lastWithDevice.deviceFingerprint,
-          newFingerprint: deviceFingerprint,
-          previousDevice: lastWithDevice.deviceInfo,
-          newDevice: deviceInfo,
-          selfieUrl: selfieFile.path
-        }
-      });
-    }
-  }
-
-  // ── Repeated late alert (3rd+ late this month) ─────────────────────────────
-  if (isLate) {
-    const monthStart = toMidnightUTC(new Date(now.getFullYear(), now.getMonth(), 1));
-    const lateCountThisMonth = await Attendance.countDocuments({
-      worker: worker._id,
-      date: { $gte: monthStart },
-      status: 'late'
-    });
-
-    if (lateCountThisMonth >= 2) {
-      suspiciousFlags.push('repeated_late');
-      const ordinal = lateCountThisMonth + 1;
-      await SecurityAlert.create({
-        worker: worker._id, branch: branch._id,
-        type: 'repeated_late', severity: 'low',
-        company: worker.company || null,
-        message: `${worker.fullName} is late for the ${ordinal}${['st','nd','rd'][ordinal-1]||'th'} time this month`,
-        details: { latenessMinutes, lateCountThisMonth: ordinal }
-      });
-    }
-  }
-
-  // ── Build and save attendance record ───────────────────────────────────────
-  const attendanceData = {
-    worker: worker._id, branch: branch._id,
-    date: today, shift: worker.shift,
-    shiftRef: worker.shiftRef?._id || null,
-    category: worker.category?._id || null,
-    clockInTime: now,
-    status: isLate ? 'late' : 'present',
-    latenessMinutes, isLocationVerified, clockInDistance,
-    isManual: false,
-    company: worker.company || null,
-    selfieUrl: selfieFile ? selfieFile.path : '',
-    faceMatchStatus: selfieFile ? 'pending' : 'skipped',
-    deviceFingerprint: deviceFingerprint || '',
-    deviceInfo: deviceInfo ? deviceInfo.slice(0, 300) : '',
-    suspiciousFlags
-  };
-
-  if (lat && lng) {
-    attendanceData.clockInLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
-  }
-
-  let attendance;
-  if (existing) {
-    Object.assign(existing, attendanceData);
-    attendance = await existing.save();
-  } else {
-    attendance = await Attendance.create(attendanceData);
-  }
-
-  const deductionAmount = await applyLatenessDeduction(worker, attendance, latenessMinutes, null, worker.company);
-  attendance.deductionAmount = deductionAmount;
-  await attendance.save();
-
-  res.json({
-    success: true,
-    message: isLate ? `Clocked in — ${latenessMinutes} min late` : 'Clocked in successfully',
-    attendance,
-    isLate, latenessMinutes, isLocationVerified,
-    suspiciousFlags
-  });
-};
-
-// ── Clock Out (worker self-service) ───────────────────────────────────────────
-const workerClockOut = async (req, res) => {
-  const worker = req.worker;
-  const { lat, lng } = req.body;
-
-  const today = toMidnightUTC();
-  const attendance = await Attendance.findOne({ worker: worker._id, date: today });
-  if (!attendance || !attendance.clockInTime) {
-    return res.status(400).json({ success: false, message: 'No clock-in found for today' });
-  }
-  if (attendance.clockOutTime) {
-    return res.status(400).json({ success: false, message: 'Already clocked out today' });
-  }
-
-  attendance.clockOutTime = new Date();
-  if (lat && lng) attendance.clockOutLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
-  await attendance.save();
-
-  res.json({ success: true, message: 'Clocked out successfully', attendance });
-};
-
-// ── Admin clock-in (manual, no selfie/GPS restriction) ────────────────────────
+// Admin: clock in worker
 const adminClockIn = async (req, res) => {
   try {
     const { workerId, date: dateStr, clockInTime: timeStr, notes } = req.body;
-    const workerFilter = { _id: workerId };
-    if (req.companyId) workerFilter.company = req.companyId;
-    const worker = await Worker.findOne(workerFilter)
-      .populate('branch').populate('category').populate('shiftRef').populate('scheduleRef');
+    const worker = await Worker.findOne({ _id: workerId, company: req.companyId }).populate('schedule');
     if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
-    if (!worker.branch) return res.status(400).json({ success: false, message: 'Worker has no branch' });
-    if (worker.allowClockIn === false) {
-      return res.status(403).json({ success: false, message: `Clock-in is restricted for ${worker.fullName}` });
-    }
 
-    const date = dateStr ? toMidnightUTC(new Date(dateStr)) : toMidnightUTC();
-    const existing = await Attendance.findOne({ worker: worker._id, date });
-    if (existing && existing.clockInTime) {
-      return res.status(400).json({ success: false, message: 'Already clocked in for this date' });
-    }
-
-    const branch = worker.branch;
+    const date     = toMidnight(dateStr);
+    const existing = await Attendance.findOne({ worker: workerId, date });
+    if (existing?.clockInTime) return res.status(400).json({ success: false, message: 'Already clocked in for this date' });
 
     let clockInTime;
     if (timeStr) {
       const [h, m] = timeStr.split(':').map(Number);
-      clockInTime = new Date(date);
-      clockInTime.setHours(h, m, 0, 0);
+      clockInTime = new Date(date); clockInTime.setHours(h, m, 0, 0);
     } else {
       clockInTime = new Date();
     }
 
-    const resumptionStr   = resolveResumeTime(worker, branch);
-    const graceMinutes    = resolveGraceMinutes(worker);
-    const resumptionTime  = parseTimeOnDate(resumptionStr, clockInTime);
-    const rawLate         = Math.max(0, minutesDiff(resumptionTime, clockInTime));
-    const latenessMinutes = Math.max(0, rawLate - graceMinutes);
+    const schedule = worker.schedule;
+    const resumeStr = schedule?.clockIn || '08:00';
+    const graceMin  = schedule?.lateAfterMinutes || 0;
+    const resumeTime = parseTime(resumeStr, clockInTime);
+    const rawLate    = Math.max(0, Math.floor((clockInTime - resumeTime) / 60000));
+    const latenessMinutes = Math.max(0, rawLate - graceMin);
 
-    const attendanceData = {
-      worker: worker._id, branch: branch._id, date,
-      shift: worker.shift,
-      shiftRef: worker.shiftRef?._id || null,
-      category: worker.category?._id || null,
-      clockInTime,
+    const data = {
+      company: req.companyId, branch: worker.branch, worker: workerId, date,
       status: latenessMinutes > 0 ? 'late' : 'present',
-      latenessMinutes,
-      isManual: true, markedBy: req.user._id,
-      faceMatchStatus: 'skipped',
-      company: req.companyId || worker.company || null,
-      notes: notes || ''
+      clockInTime, latenessMinutes, isManual: true, markedBy: req.user._id, notes: notes || ''
     };
 
-    let attendance;
-    if (existing) { Object.assign(existing, attendanceData); attendance = await existing.save(); }
-    else { attendance = await Attendance.create(attendanceData); }
+    let att;
+    if (existing) { Object.assign(existing, data); att = await existing.save(); }
+    else { att = await Attendance.create(data); }
 
-    const cid = req.companyId || worker.company;
-    const deductionAmount = await applyLatenessDeduction(worker, attendance, latenessMinutes, req.user._id, cid);
-    attendance.deductionAmount = deductionAmount;
-    await attendance.save();
-
-    res.json({ success: true, message: `${worker.fullName} clocked in`, attendance });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    res.json({ success: true, message: `${worker.fullName} clocked in`, attendance: att });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
+// Admin: clock out worker
 const adminClockOut = async (req, res) => {
   try {
     const { workerId, date: dateStr, clockOutTime: timeStr, notes } = req.body;
-    const date = dateStr ? toMidnightUTC(new Date(dateStr)) : toMidnightUTC();
-    const attFilter = { worker: workerId, date };
-    if (req.companyId) attFilter.company = req.companyId;
-    const attendance = await Attendance.findOne(attFilter);
-    if (!attendance || !attendance.clockInTime) {
-      return res.status(400).json({ success: false, message: 'No clock-in found for this date' });
-    }
-    if (attendance.clockOutTime) {
-      return res.status(400).json({ success: false, message: 'Already clocked out for this date' });
-    }
+    const date = toMidnight(dateStr);
+    const att  = await Attendance.findOne({ worker: workerId, date, company: req.companyId });
+    if (!att?.clockInTime) return res.status(400).json({ success: false, message: 'No clock-in found for this date' });
+    if (att.clockOutTime)  return res.status(400).json({ success: false, message: 'Already clocked out' });
 
-    let clockOutTime;
     if (timeStr) {
       const [h, m] = timeStr.split(':').map(Number);
-      clockOutTime = new Date(date);
-      clockOutTime.setHours(h, m, 0, 0);
+      att.clockOutTime = new Date(date); att.clockOutTime.setHours(h, m, 0, 0);
     } else {
-      clockOutTime = new Date();
+      att.clockOutTime = new Date();
     }
-
-    attendance.clockOutTime = clockOutTime;
-    attendance.isManual = true;
-    attendance.markedBy = req.user._id;
-    if (notes) attendance.notes = notes;
-    await attendance.save();
-    res.json({ success: true, message: 'Clocked out', attendance });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    att.isManual = true; att.markedBy = req.user._id;
+    if (notes) att.notes = notes;
+    await att.save();
+    res.json({ success: true, message: 'Clocked out', attendance: att });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Mark Absent ───────────────────────────────────────────────────────────────
+// Admin: mark workers absent
 const markAbsent = async (req, res) => {
   try {
     const { workerIds, date: dateStr, notes } = req.body;
-    if (!workerIds?.length) {
-      return res.status(400).json({ success: false, message: 'workerIds array required' });
-    }
-    const date = dateStr ? toMidnightUTC(new Date(dateStr)) : toMidnightUTC();
+    if (!workerIds?.length) return res.status(400).json({ success: false, message: 'workerIds required' });
+    const date = toMidnight(dateStr);
     const results = [];
-
-    for (const workerId of workerIds) {
-      const wFilter = { _id: workerId };
-      if (req.companyId) wFilter.company = req.companyId;
-      const worker = await Worker.findOne(wFilter);
-      if (!worker || !worker.branch) continue;
-
-      const existing = await Attendance.findOne({ worker: workerId, date });
-      if (existing && existing.clockInTime) {
-        results.push({ workerId, skipped: true, reason: 'Already clocked in' });
-        continue;
-      }
-
-      const data = {
-        worker: workerId, branch: worker.branch, date,
-        shift: worker.shift, status: 'absent',
-        isManual: true, markedBy: req.user._id,
-        faceMatchStatus: 'skipped',
-        company: req.companyId || worker.company || null,
-        notes: notes || ''
-      };
-
-      let attendance;
-      if (existing) { Object.assign(existing, data); attendance = await existing.save(); }
-      else { attendance = await Attendance.create(data); }
-
-      const cid = req.companyId || worker.company;
-      const deduction = await applyAbsenceDeduction(worker, attendance, req.user._id, cid);
-      attendance.deductionAmount = deduction;
-      await attendance.save();
-      results.push({ workerId, worker: worker.fullName, marked: true });
+    for (const wid of workerIds) {
+      const worker = await Worker.findOne({ _id: wid, company: req.companyId });
+      if (!worker) continue;
+      const existing = await Attendance.findOne({ worker: wid, date });
+      if (existing?.clockInTime) { results.push({ wid, skipped: true }); continue; }
+      const data = { company: req.companyId, branch: worker.branch, worker: wid, date, status: 'absent', isManual: true, markedBy: req.user._id, notes: notes || '' };
+      if (existing) { Object.assign(existing, data); await existing.save(); }
+      else await Attendance.create(data);
+      results.push({ wid, marked: true });
     }
-
     res.json({ success: true, results });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Get attendance list (admin) ───────────────────────────────────────────────
+// Get attendance list
 const getAttendance = async (req, res) => {
   try {
-    const { branch, worker, date, from, to, status, shift, page = 1, limit = 25 } = req.query;
-    const query = {};
-
-    if (req.companyId) query.company = req.companyId;
-    if (branch) query.branch = branch;
-    if (worker) query.worker = worker;
-    if (status) query.status = status;
-    if (shift)  query.shift  = shift;
-    if (date)   query.date   = toMidnightUTC(new Date(date));
-    if (from || to) {
-      query.date = {};
-      if (from) query.date.$gte = toMidnightUTC(new Date(from));
-      if (to)   query.date.$lte = toMidnightUTC(new Date(to));
+    const { branch, worker, status, date, from, to, page = 1, limit = 30 } = req.query;
+    const q = { company: req.companyId };
+    if (branch) q.branch = branch;
+    if (worker) q.worker = worker;
+    if (status) q.status = status;
+    if (date)   q.date   = toMidnight(date);
+    else if (from || to) {
+      q.date = {};
+      if (from) q.date.$gte = toMidnight(from);
+      if (to)   q.date.$lte = toMidnight(to);
     }
-
-    if (req.user.role === 'staff') {
-      const staffWorkers = await Worker.find({ registeredBy: req.user._id }).distinct('_id');
-      query.worker = { $in: staffWorkers };
-    }
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [records, total] = await Promise.all([
-      Attendance.find(query)
-        .populate('worker', 'fullName phone passportPhoto shift')
+      Attendance.find(q)
+        .populate('worker', 'fullName phone photo')
         .populate('branch', 'name code')
         .populate('markedBy', 'fullName')
         .sort({ date: -1, clockInTime: -1 })
         .skip(skip).limit(parseInt(limit)),
-      Attendance.countDocuments(query)
+      Attendance.countDocuments(q)
     ]);
-
-    const pages = Math.ceil(total / parseInt(limit));
-    res.json({
-      success: true,
-      attendance: records,
-      pagination: { total, page: parseInt(page), limit: parseInt(limit), pages }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    res.json({ success: true, attendance: records, total, pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Today's attendance for a branch ───────────────────────────────────────────
+// Today's branch attendance snapshot
 const getTodayAttendance = async (req, res) => {
   try {
     const { branchId } = req.params;
-    const { date: dateStr } = req.query;
-    const today = dateStr ? toMidnightUTC(new Date(dateStr)) : toMidnightUTC();
+    const today = toMidnight();
 
-    const workerFilter = { branch: branchId, employmentStatus: 'active' };
-    if (req.companyId) workerFilter.company = req.companyId;
-    const attFilter = { branch: branchId, date: today };
-    if (req.companyId) attFilter.company = req.companyId;
+    const [workers, records] = await Promise.all([
+      Worker.find({ company: req.companyId, branch: branchId, status: 'active' })
+        .populate('schedule').select('fullName phone photo schedule scheduleStartDate dateEmployed createdAt'),
+      Attendance.find({ company: req.companyId, branch: branchId, date: today })
+    ]);
 
-    const workers = await Worker.find(workerFilter)
-      .select('_id fullName passportPhoto shift phone');
+    const attMap = {};
+    records.forEach(r => { attMap[r.worker.toString()] = r; });
 
-    const attendanceRecords = await Attendance.find(attFilter)
-      .select('worker clockInTime clockOutTime status latenessMinutes deductionAmount isLocationVerified isManual selfieUrl faceMatchStatus suspiciousFlags clockInDistance');
-
-    const attendance = {};
-    attendanceRecords.forEach(a => { attendance[a.worker.toString()] = a; });
-
-    const summary = { present: 0, late: 0, absent: 0 };
-    attendanceRecords.forEach(a => {
-      if (a.status === 'present') summary.present++;
-      else if (a.status === 'late') { summary.present++; summary.late++; }
-      else if (a.status === 'absent') summary.absent++;
+    const list = workers.map(w => {
+      const att = attMap[w._id.toString()];
+      const isWorkDay = resolveIsWorkDay(w, w.schedule, today);
+      return {
+        _id: w._id, fullName: w.fullName, phone: w.phone, photo: w.photo,
+        isWorkDay,
+        status:    att?.status || (isWorkDay ? 'absent' : 'off_day'),
+        clockIn:   att?.clockInTime  || null,
+        clockOut:  att?.clockOutTime || null,
+        latenessMinutes: att?.latenessMinutes || 0
+      };
     });
 
-    res.json({ success: true, workers, attendance, summary });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// ── Worker's own attendance history ───────────────────────────────────────────
-const getWorkerAttendance = async (req, res) => {
-  const workerId = req.worker?._id || req.params.workerId;
-  const { month, year, page = 1, limit = 31 } = req.query;
-
-  const query = { worker: workerId };
-  if (month && year) {
-    const start = toMidnightUTC(new Date(parseInt(year), parseInt(month) - 1, 1));
-    const end   = toMidnightUTC(new Date(parseInt(year), parseInt(month), 0));
-    query.date  = { $gte: start, $lte: end };
-  }
-
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-  const [records, total] = await Promise.all([
-    Attendance.find(query)
-      .populate('branch', 'name code')
-      .sort({ date: -1 }).skip(skip).limit(parseInt(limit)),
-    Attendance.countDocuments(query)
-  ]);
-
-  let summary = null;
-  if (month && year) {
-    // Count across ALL records in the month, not just the current page
-    const [presentCount, lateCount, absentCount, onLeaveCount, deductions] = await Promise.all([
-      Attendance.countDocuments({ ...query, status: 'present' }),
-      Attendance.countDocuments({ ...query, status: 'late' }),
-      Attendance.countDocuments({ ...query, status: 'absent' }),
-      Attendance.countDocuments({ ...query, status: 'on_leave' }),
-      Deduction.aggregate([
-        { $match: { worker: require('mongoose').Types.ObjectId.createFromHexString(workerId.toString()), month: parseInt(month), year: parseInt(year) } },
-        { $group: { _id: null, total: { $sum: '$amount' } } }
-      ])
-    ]);
-    summary = {
-      present:  presentCount,
-      late:     lateCount,
-      absent:   absentCount,
-      onLeave:  onLeaveCount,
-      totalDeductions: deductions[0]?.total || 0
+    const summary = {
+      total:   list.length,
+      present: list.filter(w => ['present', 'late'].includes(w.status)).length,
+      late:    list.filter(w => w.status === 'late').length,
+      absent:  list.filter(w => w.status === 'absent').length,
+      offDay:  list.filter(w => w.status === 'off_day').length
     };
-  }
 
-  res.json({ success: true, attendance: records, total, summary });
+    res.json({ success: true, workers: list, summary });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Attendance report (date range, per branch) ────────────────────────────────
-const getAttendanceReport = async (req, res) => {
+// Worker's own attendance history
+const getWorkerAttendance = async (req, res) => {
   try {
-  const { branch, from, to, month, year } = req.query;
+    const { month, year, page = 1, limit = 35 } = req.query;
+    const q = { worker: req.params.workerId, company: req.companyId };
+    if (month && year) {
+      q.date = {
+        $gte: toMidnight(new Date(parseInt(year), parseInt(month) - 1, 1)),
+        $lte: toMidnight(new Date(parseInt(year), parseInt(month), 0))
+      };
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [records, total] = await Promise.all([
+      Attendance.find(q).sort({ date: -1 }).skip(skip).limit(parseInt(limit)),
+      Attendance.countDocuments(q)
+    ]);
 
-  let start, end;
-  if (from && to) {
-    start = toMidnightUTC(new Date(from));
-    end   = toMidnightUTC(new Date(to));
-  } else if (month && year) {
-    start = toMidnightUTC(new Date(parseInt(year), parseInt(month) - 1, 1));
-    end   = toMidnightUTC(new Date(parseInt(year), parseInt(month), 0));
-  } else {
-    return res.status(400).json({ success: false, message: 'Provide from/to dates or month/year' });
-  }
-
-  const matchStage = { date: { $gte: start, $lte: end } };
-  if (req.companyId) matchStage.company = req.companyId;
-  if (branch) {
-    matchStage.branch = require('mongoose').Types.ObjectId.createFromHexString(branch);
-  }
-
-  const report = await Attendance.aggregate([
-    { $match: matchStage },
-    { $group: {
-      _id: '$worker',
-      daysPresent:  { $sum: { $cond: [{ $eq: ['$status','present'] }, 1, 0] } },
-      daysLate:     { $sum: { $cond: [{ $eq: ['$status','late']    }, 1, 0] } },
-      daysAbsent:   { $sum: { $cond: [{ $eq: ['$status','absent']  }, 1, 0] } },
-      daysOnLeave:  { $sum: { $cond: [{ $eq: ['$status','on_leave']}, 1, 0] } },
-      totalDeductions: { $sum: '$deductionAmount' }
-    }},
-    { $lookup: { from: 'workers', localField: '_id', foreignField: '_id', as: 'worker' } },
-    { $unwind: '$worker' },
-    { $lookup: { from: 'branches', localField: 'worker.branch', foreignField: '_id', as: 'branch' } },
-    { $project: {
-      _id: 0, workerId: '$_id',
-      workerName: '$worker.fullName', phone: '$worker.phone', shift: '$worker.shift',
-      branchName: { $ifNull: [{ $arrayElemAt: ['$branch.name', 0] }, '—'] },
-      daysPresent: 1, daysLate: 1, daysAbsent: 1, daysOnLeave: 1, totalDeductions: 1
-    }},
-    { $sort: { workerName: 1 } }
-  ]);
-
-  res.json({ success: true, report });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    let summary = null;
+    if (month && year) {
+      const allMonth = await Attendance.find(q);
+      summary = {
+        present: allMonth.filter(a => a.status === 'present').length,
+        late:    allMonth.filter(a => a.status === 'late').length,
+        absent:  allMonth.filter(a => a.status === 'absent').length,
+        offDay:  allMonth.filter(a => a.status === 'off_day').length
+      };
+    }
+    res.json({ success: true, attendance: records, total, summary });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-module.exports = {
-  workerClockIn, workerClockOut,
-  adminClockIn, adminClockOut,
-  markAbsent,
-  getAttendance, getTodayAttendance,
-  getWorkerAttendance, getAttendanceReport
-};
+module.exports = { adminClockIn, adminClockOut, markAbsent, getAttendance, getTodayAttendance, getWorkerAttendance };

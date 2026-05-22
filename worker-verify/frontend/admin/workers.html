@@ -1,273 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Workers – WorkerSave</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../assets/css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workers — Sage Energy</title>
+  <link rel="stylesheet" href="/assets/css/style.css?v=6">
 </head>
 <body>
 <div class="app-layout">
-
-  <aside class="sidebar" id="sidebar"></aside>
-
+  <aside id="sidebar" class="sidebar"></aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="main-content">
     <header class="app-header">
-      <div class="flex items-center gap-2">
-        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-        <h1 class="header-title">Workers</h1>
-      </div>
-      <div class="flex gap-2">
-        <a href="quick-register.html" class="btn btn-outline btn-sm">⚡ Quick Register</a>
-        <a href="../staff/register-worker.html" class="btn btn-primary btn-sm">➕ Register Worker</a>
+      <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="page-title">Workers</h1>
+      <div class="header-actions">
+        <a href="/admin/worker-add.html" class="btn btn-primary btn-sm">+ Add Worker</a>
       </div>
     </header>
-
-    <main class="page-body">
+    <main class="page-content">
       <div class="card">
-
-        <!-- Search & Filters -->
-        <div class="search-bar" style="flex-wrap:wrap;gap:10px;">
-          <div class="search-input-wrap" style="flex:1;min-width:220px;">
-            <span class="search-icon">🔍</span>
-            <input id="searchInput" type="text" class="form-control" placeholder="Search by name, phone, NIN…" />
-          </div>
-          <div class="filter-group">
-            <select id="statusFilter" class="filter-select">
-              <option value="all">All Verification</option>
-              <option value="verified">Verified</option>
-              <option value="pending">Pending</option>
-              <option value="incomplete">Incomplete</option>
-              <option value="legacy">Legacy Worker</option>
-              <option value="temporary">Temporary</option>
-              <option value="rejected">Rejected</option>
-              <option value="unverified">Unverified (All)</option>
-            </select>
-            <select id="empFilter" class="filter-select">
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="on_leave">On Leave</option>
-              <option value="resigned">Resigned</option>
-              <option value="sacked">Sacked</option>
-            </select>
-            <select id="branchFilter" class="filter-select">
-              <option value="all">All Branches</option>
-            </select>
-            <select id="shiftFilter" class="filter-select">
-              <option value="all">All Shifts</option>
-              <option value="A">Shift A</option>
-              <option value="B">Shift B</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
-            <button class="btn btn-primary btn-sm" onclick="applyFilters()">Search</button>
-            <button class="btn btn-outline btn-sm" onclick="clearFilters()">Reset</button>
-          </div>
+        <div class="card-header filter-bar">
+          <input id="search" class="form-control form-control-sm" type="search" placeholder="Search name, phone, NIN…" oninput="debouncedLoad()">
+          <select id="f-branch" class="form-control form-control-sm" onchange="loadWorkers(1)"><option value="">All Branches</option></select>
+          <select id="f-role"   class="form-control form-control-sm" onchange="loadWorkers(1)"><option value="">All Roles</option></select>
+          <select id="f-status" class="form-control form-control-sm" onchange="loadWorkers(1)">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
-
-        <!-- Attention banner -->
-        <div id="attentionBanner" style="display:none;margin-bottom:12px;"></div>
-
-        <!-- Table -->
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Worker</th>
-                <th>Phone</th>
-                <th>Branch</th>
-                <th>Shift</th>
-                <th>Verification</th>
-                <th>Status</th>
-                <th>Registered</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="workersTable">
-              <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400);">Loading workers…</td></tr>
-            </tbody>
-          </table>
+        <div class="card-body p-0">
+          <div id="workers-table"></div>
         </div>
-
-        <!-- Pagination -->
-        <div id="pagination" class="pagination"></div>
-        <div id="tableSummary" class="text-xs text-muted mt-2"></div>
+        <div id="pagination" class="card-footer"></div>
       </div>
     </main>
   </div>
 </div>
-
-<script src="../assets/js/config.js?v=5"></script>
-<script src="../assets/js/api.js?v=5"></script>
-<script src="../assets/js/auth.js?v=5"></script>
-<script src="../assets/js/sidebar.js?v=5"></script>
+<script src="/assets/js/config.js?v=6"></script>
+<script src="/assets/js/api.js?v=6"></script>
+<script src="/assets/js/auth.js?v=6"></script>
+<script src="/assets/js/sidebar.js?v=6"></script>
 <script>
-  const user = requireAuth(['super_admin', 'company_admin']);
-  let currentPage = 1;
-  const pageSize = 20;
+  if (!Auth.requireAuth()) throw '';
+  populateSidebarUser();
 
-  if (user) {
-    populateSidebarUser();
-    loadBranchOptions();
-    // Pre-fill filters from URL params
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('status')) document.getElementById('statusFilter').value = p.get('status');
-    if (p.get('emp'))    document.getElementById('empFilter').value    = p.get('emp');
-    if (p.get('branch')) document.getElementById('branchFilter').value = p.get('branch');
-    if (p.get('shift'))  document.getElementById('shiftFilter').value  = p.get('shift');
-    loadWorkers();
-    loadAttentionCount();
-  }
+  let page = 1;
 
-  async function loadAttentionCount() {
+  async function loadWorkers(p = 1) {
+    page = p;
+    const params = {
+      page, limit: 30,
+      search: document.getElementById('search').value.trim(),
+      branch: document.getElementById('f-branch').value,
+      role:   document.getElementById('f-role').value,
+      status: document.getElementById('f-status').value
+    };
+    Object.keys(params).forEach(k => !params[k] && delete params[k]);
     try {
-      const res = await API.getWorkers('?incomplete=true&limit=1');
-      const count = res.pagination?.total || 0;
-      if (count > 0) {
-        const banner = document.getElementById('attentionBanner');
-        banner.style.display = '';
-        banner.innerHTML = `
-          <div class="status-warn-banner incomplete" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <span>⚠️ <strong>${count}</strong> worker${count===1?'':'s'} with incomplete or unverified records need attention.</span>
-            <button class="btn btn-sm btn-outline" style="border-color:currentColor;"
-              onclick="document.getElementById('statusFilter').value='unverified';applyFilters();">
-              View All
-            </button>
-          </div>`;
+      const data = await API.workers.list(params);
+      const workers = data.workers || [];
+      if (!workers.length) {
+        document.getElementById('workers-table').innerHTML = '<div class="empty-state">No workers found</div>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
       }
-    } catch(_) {}
+      const rows = workers.map(w => `
+        <tr>
+          <td>
+            <div class="worker-cell">
+              ${workerAvatar(w)}
+              <div>
+                <a href="/admin/worker-detail.html?id=${w._id}" class="worker-name">${w.fullName}</a>
+                <div class="worker-meta">${w.phone}</div>
+              </div>
+            </div>
+          </td>
+          <td>${w.branch?.name || '—'}</td>
+          <td>${w.role ? `<span class="badge" style="background:${w.role.color}20;color:${w.role.color}">${w.role.name}</span>` : '—'}</td>
+          <td>${w.schedule?.name || '—'}</td>
+          <td>${statusBadge(w.status)}</td>
+          <td>${formatDate(w.dateEmployed)}</td>
+          <td>
+            <a href="/admin/worker-detail.html?id=${w._id}" class="btn btn-ghost btn-xs">View</a>
+          </td>
+        </tr>`).join('');
+      document.getElementById('workers-table').innerHTML = `
+        <table class="table">
+          <thead><tr><th>Worker</th><th>Branch</th><th>Role</th><th>Schedule</th><th>Status</th><th>Employed</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      renderPagination('pagination', page, data.pages, 'loadWorkers');
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
   }
 
-  async function loadBranchOptions() {
+  const debouncedLoad = debounce(() => loadWorkers(1));
+
+  async function init() {
     try {
-      const res = await API.getBranches();
-      const sel = document.getElementById('branchFilter');
-      res.branches.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b._id;
-        opt.textContent = `${b.name} (${b.code})`;
-        sel.appendChild(opt);
-      });
-    } catch(_) {}
-  }
-
-  let searchTimer;
-  document.getElementById('searchInput').addEventListener('input', () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { currentPage = 1; loadWorkers(); }, 400);
-  });
-  ['statusFilter','empFilter','branchFilter','shiftFilter'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => { currentPage = 1; loadWorkers(); });
-  });
-
-  function applyFilters() { currentPage = 1; loadWorkers(); }
-
-  function clearFilters() {
-    document.getElementById('searchInput').value  = '';
-    document.getElementById('statusFilter').value = 'all';
-    document.getElementById('empFilter').value    = 'all';
-    document.getElementById('branchFilter').value = 'all';
-    document.getElementById('shiftFilter').value  = 'all';
-    currentPage = 1;
+      const [bData, rData] = await Promise.all([API.branches.list(), API.roles.list()]);
+      const bSel = document.getElementById('f-branch');
+      (bData.branches || []).forEach(b => bSel.innerHTML += `<option value="${b._id}">${b.name}</option>`);
+      const rSel = document.getElementById('f-role');
+      (rData.roles || []).forEach(r => rSel.innerHTML += `<option value="${r._id}">${r.name}</option>`);
+    } catch(e) {}
     loadWorkers();
   }
-
-  async function loadWorkers(page = currentPage) {
-    currentPage = page;
-    const search = document.getElementById('searchInput').value.trim();
-    const status = document.getElementById('statusFilter').value;
-    const emp    = document.getElementById('empFilter').value;
-    const branch = document.getElementById('branchFilter').value;
-    const shift  = document.getElementById('shiftFilter').value;
-
-    let qs = `?page=${page}&limit=${pageSize}`;
-    if (search) qs += `&search=${encodeURIComponent(search)}`;
-    if (status === 'unverified') qs += '&incomplete=true';
-    else if (status !== 'all') qs += `&status=${status}`;
-    if (emp    !== 'all') qs += `&employmentStatus=${emp}`;
-    if (branch !== 'all') qs += `&branch=${branch}`;
-    if (shift  !== 'all') qs += `&shift=${shift}`;
-
-    try {
-      const res = await API.getWorkers(qs);
-      renderTable(res.workers);
-      renderPagination(res.pagination);
-    } catch (err) {
-      showToast('Failed to load workers: ' + err.message, 'error');
-    }
-  }
-
-  function renderTable(workers) {
-    const tbody = document.getElementById('workersTable');
-    if (!workers.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;">
-        <div class="empty-icon">👷</div><p class="text-muted">No workers found</p>
-      </td></tr>`;
-      return;
-    }
-    tbody.innerHTML = workers.map((w, i) => `
-      <tr>
-        <td>${((currentPage - 1) * pageSize) + i + 1}</td>
-        <td>
-          <div class="flex items-center gap-2">
-            ${w.passportPhoto
-              ? `<img src="${w.passportPhoto}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" />`
-              : `<div style="width:34px;height:34px;border-radius:50%;background:var(--gray-200);display:flex;align-items:center;justify-content:center;">👤</div>`}
-            <div>
-              <div class="font-semibold">
-                ${w.fullName}
-                ${['pending','incomplete','legacy','temporary'].includes(w.verificationStatus)
-                  ? `<span title="Needs attention" style="display:inline-block;width:7px;height:7px;background:var(--warning);border-radius:50%;margin-left:5px;vertical-align:middle;"></span>`
-                  : ''}
-              </div>
-              <div class="text-xs text-muted">${w.gender || '—'} &bull; ${w.occupation || '—'}</div>
-            </div>
-          </div>
-        </td>
-        <td>${w.phone}</td>
-        <td>
-          ${w.branch
-            ? `<div class="font-semibold text-sm">${w.branch.name}</div><span class="branch-card-code">${w.branch.code}</span>`
-            : `<span class="text-muted text-xs">—</span>`}
-        </td>
-        <td>${shiftBadge(w.shift)}</td>
-        <td>${statusBadge(w.verificationStatus)}</td>
-        <td>${empBadge(w.employmentStatus)}</td>
-        <td><div class="text-xs">${formatDate(w.createdAt)}</div></td>
-        <td>
-          <a href="worker-detail.html?id=${w._id}" class="btn btn-sm btn-outline">View</a>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  function renderPagination({ total, page, pages, limit }) {
-    const el = document.getElementById('pagination');
-    document.getElementById('tableSummary').textContent =
-      `Showing ${Math.min((page-1)*limit+1, total)}–${Math.min(page*limit, total)} of ${total} workers`;
-
-    if (pages <= 1) { el.innerHTML = ''; return; }
-    let html = `<button class="page-btn" onclick="loadWorkers(${page-1})" ${page===1?'disabled':''}>‹</button>`;
-    for (let p = Math.max(1, page-2); p <= Math.min(pages, page+2); p++) {
-      html += `<button class="page-btn ${p===page?'active':''}" onclick="loadWorkers(${p})">${p}</button>`;
-    }
-    html += `<button class="page-btn" onclick="loadWorkers(${page+1})" ${page===pages?'disabled':''}>›</button>`;
-    el.innerHTML = html;
-  }
-
-  function shiftBadge(shift) {
-    const label = shift === 'unassigned' ? '—' : `Shift ${shift}`;
-    return `<span class="shift-badge ${shift}">${label}</span>`;
-  }
-  function empBadge(s) {
-    const labels = { active:'Active', suspended:'Suspended', on_leave:'On Leave', resigned:'Resigned', sacked:'Sacked' };
-    return `<span class="emp-badge ${s}">${labels[s] || s}</span>`;
-  }
+  init();
 </script>
-<script src="../assets/js/theme.js"></script>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
 </body>
 </html>

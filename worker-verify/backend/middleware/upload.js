@@ -1,3 +1,3 @@
-const { workerUpload, singleUpload } = require('../config/cloudinary');
+const { workerUpload, workerPhotoUpload, singleUpload } = require('../config/cloudinary');
 
-module.exports = { workerUpload, singleUpload };
+module.exports = { workerUpload, workerPhotoUpload, singleUpload };

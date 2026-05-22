@@ -1,109 +1,123 @@
-/* Shared sidebar builder — inject into any admin page via <aside id="sidebar"></aside> */
-(function () {
-  const ICONS = {
-    dashboard: `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>`,
-    workers:   `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-    branches:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 21h18M3 7V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2M9 21V9M15 21V9M3 7h18"/></svg>`,
-    roles:     `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
-    schedules: `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
-    attendance:`<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
-    payroll:   `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
-    security:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-    staff:     `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    register:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
-    logout:    `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
-  };
+// Sidebar builder
+(function buildSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
 
-  const NAV = [
-    { section: 'Overview' },
-    { href: 'dashboard.html',  icon: 'dashboard',  label: 'Dashboard' },
-    { section: 'Workforce' },
-    { href: 'workers.html',    icon: 'workers',    label: 'Workers' },
-    { href: 'roles.html',      icon: 'roles',      label: 'Worker Roles' },
-    { href: 'schedules.html',  icon: 'schedules',  label: 'Schedules' },
-    { href: 'attendance.html', icon: 'attendance', label: 'Attendance' },
-    { section: 'Finance' },
-    { href: 'payroll.html',    icon: 'payroll',    label: 'Payroll' },
-    { section: 'Admin' },
-    { href: 'branches.html',   icon: 'branches',   label: 'Branches' },
-    { href: 'staff.html',      icon: 'staff',      label: 'Staff Accounts' },
-    { section: 'Worker Entry' },
-    { href: 'quick-register.html', icon: 'register', label: 'Quick Register' },
+  const path = window.location.pathname;
+
+  const navGroups = [
+    {
+      label: 'Overview',
+      items: [
+        { href: '/admin/dashboard.html', icon: iconGrid(), label: 'Dashboard' }
+      ]
+    },
+    {
+      label: 'Workforce',
+      items: [
+        { href: '/admin/workers.html',   icon: iconUsers(),    label: 'Workers'   },
+        { href: '/admin/roles.html',     icon: iconTag(),      label: 'Roles'     },
+        { href: '/admin/schedules.html', icon: iconClock(),    label: 'Schedules' }
+      ]
+    },
+    {
+      label: 'Operations',
+      items: [
+        { href: '/admin/attendance.html', icon: iconCheck(),  label: 'Attendance' },
+        { href: '/admin/shortages.html',  icon: iconAlert(),  label: 'Shortages'  },
+        { href: '/admin/sales.html',      icon: iconChart(),  label: 'Daily Sales'}
+      ]
+    },
+    {
+      label: 'Finance',
+      items: [
+        { href: '/admin/payroll.html', icon: iconMoney(), label: 'Payroll' }
+      ]
+    },
+    {
+      label: 'Admin',
+      items: [
+        { href: '/admin/branches.html', icon: iconBranch(), label: 'Branches' }
+      ]
+    }
   ];
 
-  function currentPage() {
-    return location.pathname.split('/').pop() || 'dashboard.html';
+  function isActive(href) {
+    return path.endsWith(href.replace(/^\//, '')) || path === href;
   }
 
-  function buildNav() {
-    const page = currentPage();
-    return NAV.map(item => {
-      if (item.section) {
-        return `<div class="nav-section-title">${item.section}</div>`;
-      }
-      const active = page === item.href ? 'active' : '';
-      return `<a href="${item.href}" class="nav-link ${active}">
-        <span class="nav-icon">${ICONS[item.icon] || ''}</span>
-        <span>${item.label}</span>
-      </a>`;
-    }).join('');
-  }
-
-  function buildSidebar() {
-    const el = document.getElementById('sidebar');
-    if (!el) return;
-
-    el.innerHTML = `
+  let html = `
+    <div class="sidebar-header">
       <div class="sidebar-brand">
-        <div class="brand-logo">
-          <div class="brand-icon">
-            <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          </div>
-          <span id="sidebarBrandName">WorkerSave</span>
-        </div>
+        <div class="sidebar-logo">S</div>
+        <span class="sidebar-brand-name">Sage Energy</span>
       </div>
+    </div>
+    <nav class="sidebar-nav">`;
+
+  for (const group of navGroups) {
+    html += `<div class="nav-group"><div class="nav-group-label">${group.label}</div>`;
+    for (const item of group.items) {
+      const active = isActive(item.href) ? ' active' : '';
+      html += `<a href="${item.href}" class="nav-item${active}">${item.icon}<span>${item.label}</span></a>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</nav>
+    <div class="sidebar-footer">
       <div class="sidebar-user">
-        <img id="sidebarAvatar" class="sidebar-avatar" src="" alt=""
-          onerror="this.src=''" style="object-fit:cover;" />
+        <div class="sidebar-user-avatar" id="sidebar-user-avatar"></div>
         <div class="sidebar-user-info">
-          <div class="user-name" id="sidebarUserName">Loading…</div>
-          <div class="user-role" id="sidebarUserRole"></div>
+          <div class="sidebar-user-name" id="sidebar-user-name"></div>
+          <div class="sidebar-user-role" id="sidebar-user-role"></div>
         </div>
-      </div>
-      <nav class="sidebar-nav">${buildNav()}</nav>
-      <div class="sidebar-footer">
-        <button class="logout-btn" onclick="logout()">
-          ${ICONS.logout} Sign Out
+        <button class="btn btn-icon btn-ghost sidebar-logout" onclick="Auth.logout()" title="Logout">
+          ${iconLogout()}
         </button>
       </div>
-    `;
-  }
+    </div>`;
 
-  function wireOverlay() {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-    if (!sidebar || !overlay) return;
-    sidebar.addEventListener('transitionend', () => {
-      overlay.classList.toggle('active', sidebar.classList.contains('open'));
-    });
-    overlay.addEventListener('click', () => {
-      sidebar.classList.remove('open');
-      overlay.classList.remove('active');
-    });
-  }
-
-  function init() {
-    buildSidebar();
-    wireOverlay();
-    // The sidebar DOM now exists — populate user info immediately
-    if (typeof populateSidebarUser === 'function') populateSidebarUser();
-  }
-
-  // Run immediately — the <aside id="sidebar"> placeholder is always in the DOM
-  // before bottom-of-body scripts execute (HTML is parsed top-to-bottom), so there
-  // is no need to wait for DOMContentLoaded. Running now means populateSidebarUser()
-  // in the inline script below will find the fully-built sidebar elements.
-  init();
-
-  window._rebuildSidebar = buildSidebar;
+  sidebar.innerHTML = html;
+  if (typeof populateSidebarUser === 'function') populateSidebarUser();
 })();
+
+// Mobile toggle
+function toggleSidebar() {
+  const s = document.getElementById('sidebar');
+  const o = document.getElementById('sidebar-overlay');
+  if (s) s.classList.toggle('open');
+  if (o) o.classList.toggle('show');
+}
+
+// SVG icons
+function iconGrid() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`;
+}
+function iconUsers() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+}
+function iconTag() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
+}
+function iconClock() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+}
+function iconCheck() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`;
+}
+function iconAlert() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+}
+function iconChart() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`;
+}
+function iconMoney() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`;
+}
+function iconBranch() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+}
+function iconLogout() {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+}

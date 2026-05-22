@@ -1,722 +1,224 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Payroll – WorkerSave</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../assets/css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll — Sage Energy</title>
+  <link rel="stylesheet" href="/assets/css/style.css?v=6">
 </head>
 <body>
 <div class="app-layout">
-
-  <aside class="sidebar" id="sidebar"></aside>
-
+  <aside id="sidebar" class="sidebar"></aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="main-content">
     <header class="app-header">
-      <div class="flex items-center gap-2">
-        <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-        <h1 class="header-title">Payroll</h1>
-      </div>
-      <div class="header-right">
-        <button class="btn btn-outline btn-sm" onclick="switchTab('rules')">⚙️ Deduction Rules</button>
-        <button class="btn btn-primary btn-sm" onclick="openGenerateModal()">⚡ Generate Payroll</button>
+      <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="page-title">Payroll</h1>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" onclick="openGenerateModal()">Generate Payroll</button>
       </div>
     </header>
-
-    <main class="page-body">
-
-      <!-- Tab Navigation -->
-      <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--gray-200);">
-        <button class="tab-btn active" id="tabSummary" onclick="switchTab('summary')">Summary</button>
-        <button class="tab-btn"        id="tabList"    onclick="switchTab('list')">Payroll Records</button>
-        <button class="tab-btn"        id="tabRules"   onclick="switchTab('rules')">Deduction Rules</button>
+    <main class="page-content">
+      <div class="card">
+        <div class="card-header filter-bar">
+          <select id="f-branch" class="form-control form-control-sm" onchange="load(1)"><option value="">All Branches</option></select>
+          <select id="f-month"  class="form-control form-control-sm" onchange="load(1)"></select>
+          <select id="f-year"   class="form-control form-control-sm" onchange="load(1)"></select>
+          <select id="f-status" class="form-control form-control-sm" onchange="load(1)">
+            <option value="">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div id="table-body" class="card-body p-0"></div>
+        <div id="pagination" class="card-footer"></div>
       </div>
-
-      <!-- ── SUMMARY TAB ── -->
-      <div id="panelSummary">
-
-        <!-- Month selector -->
-        <div class="card" style="margin-bottom:16px;">
-          <div class="flex items-center gap-12" style="flex-wrap:wrap;">
-            <div>
-              <label class="form-label">Month</label>
-              <select id="sumMonth" class="filter-select" onchange="loadSummary()">
-                <option value="1">January</option><option value="2">February</option>
-                <option value="3">March</option><option value="4">April</option>
-                <option value="5">May</option><option value="6">June</option>
-                <option value="7">July</option><option value="8">August</option>
-                <option value="9">September</option><option value="10">October</option>
-                <option value="11">November</option><option value="12">December</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label">Year</label>
-              <input type="number" id="sumYear" class="filter-select" style="width:90px;" onchange="loadSummary()" />
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary btn-sm" onclick="loadSummary()">Load</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Summary stat cards -->
-        <div class="payroll-summary-grid" id="summaryCards" style="margin-bottom:20px;">
-          <div class="payroll-summary-card draft">
-            <div class="font-semibold text-sm text-muted">Draft</div>
-            <div style="font-size:1.6rem;font-weight:700;margin:4px 0;" id="sumDraftCount">—</div>
-            <div class="text-sm text-muted">workers</div>
-          </div>
-          <div class="payroll-summary-card approved">
-            <div class="font-semibold text-sm text-muted">Approved</div>
-            <div style="font-size:1.6rem;font-weight:700;margin:4px 0;" id="sumApprovedCount">—</div>
-            <div class="text-sm text-muted">workers</div>
-          </div>
-          <div class="payroll-summary-card paid">
-            <div class="font-semibold text-sm text-muted">Paid</div>
-            <div style="font-size:1.6rem;font-weight:700;margin:4px 0;" id="sumPaidCount">—</div>
-            <div class="text-sm text-muted">workers</div>
-          </div>
-          <div class="payroll-summary-card" style="border-bottom-color:var(--primary);">
-            <div class="font-semibold text-sm text-muted">Total Net Payroll</div>
-            <div style="font-size:1.4rem;font-weight:700;margin:4px 0;color:var(--primary);" id="sumTotalNet">—</div>
-            <div class="text-sm text-muted">this month</div>
-          </div>
-        </div>
-
-        <!-- Branch breakdown -->
-        <div class="card">
-          <div class="card-header"><h2 class="card-title">By Branch</h2></div>
-          <div id="branchPayrollTable">
-            <div class="empty-state"><div class="empty-icon">💰</div><p class="text-muted">Select month to load summary</p></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── LIST TAB ── -->
-      <div id="panelList" style="display:none;">
-        <div class="card">
-          <div class="search-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Month</label>
-              <select id="listMonth" class="filter-select">
-                <option value="1">January</option><option value="2">February</option>
-                <option value="3">March</option><option value="4">April</option>
-                <option value="5">May</option><option value="6">June</option>
-                <option value="7">July</option><option value="8">August</option>
-                <option value="9">September</option><option value="10">October</option>
-                <option value="11">November</option><option value="12">December</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Year</label>
-              <input type="number" id="listYear" class="filter-select" style="width:90px;" />
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Branch</label>
-              <select id="listBranch" class="filter-select">
-                <option value="">All Branches</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="margin-bottom:3px;">Status</label>
-              <select id="listStatus" class="filter-select">
-                <option value="">All Statuses</option>
-                <option value="draft">Draft</option>
-                <option value="approved">Approved</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="loadPayrollList(1)">Search</button>
-              <button class="btn btn-outline btn-sm" onclick="clearListFilters()">Reset</button>
-            </div>
-          </div>
-
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Worker</th>
-                  <th>Branch</th>
-                  <th>Base Salary</th>
-                  <th>Deductions</th>
-                  <th>Overtime</th>
-                  <th>Net Salary</th>
-                  <th>Days</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="payrollTable">
-                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400);">Use filters above to load payroll records</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="listPagination" class="pagination"></div>
-          <div id="listSummary" class="text-xs text-muted mt-2"></div>
-        </div>
-      </div>
-
-      <!-- ── DEDUCTION RULES TAB ── -->
-      <div id="panelRules" style="display:none;">
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-header">
-            <h2 class="card-title">Deduction Rules</h2>
-            <button class="btn btn-primary btn-sm" onclick="openRuleModal()">+ Add Rule</button>
-          </div>
-          <div id="rulesList">
-            <div class="empty-state"><div class="empty-icon">⚙️</div><p class="text-muted">Loading rules…</p></div>
-          </div>
-        </div>
-      </div>
-
     </main>
   </div>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('active')"></div>
+</div>
 
-<!-- Generate Payroll Modal -->
-<div id="generateModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:440px;">
+<!-- Generate Modal -->
+<div id="gen-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-sm">
     <div class="modal-header">
       <h3 class="modal-title">Generate Payroll</h3>
-      <button class="modal-close" onclick="closeModal('generateModal')">×</button>
+      <button class="btn btn-icon btn-ghost" onclick="document.getElementById('gen-modal').style.display='none'">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="modal-body">
-      <p class="text-sm text-muted" style="margin-bottom:12px;">
-        Calculates net salary from attendance, deductions and overtime for the selected period.
-        Existing draft payrolls will be recalculated; paid records are skipped.
-      </p>
-      <div class="form-group">
-        <label class="form-label">Month</label>
-        <select id="genMonth" class="form-control">
-          <option value="1">January</option><option value="2">February</option>
-          <option value="3">March</option><option value="4">April</option>
-          <option value="5">May</option><option value="6">June</option>
-          <option value="7">July</option><option value="8">August</option>
-          <option value="9">September</option><option value="10">October</option>
-          <option value="11">November</option><option value="12">December</option>
-        </select>
+      <div class="alert alert-info" style="margin-bottom:16px;">Payroll will be calculated from attendance records for the selected period. Approved shortages will be deducted.</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Branch</label>
+          <select id="g-branch" class="form-control"><option value="">All Branches</option></select>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Year</label>
-        <input type="number" id="genYear" class="form-control" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Branch (optional – leave blank for all)</label>
-        <select id="genBranch" class="form-control">
-          <option value="">All Branches</option>
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Month <span class="required">*</span></label>
+          <select id="g-month" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year <span class="required">*</span></label>
+          <select id="g-year" class="form-control"></select>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('generateModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitGenerate()">Generate</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('gen-modal').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" id="gen-btn" onclick="doGenerate()">Generate</button>
     </div>
   </div>
 </div>
 
-<!-- Payroll Detail / Status Update Modal -->
-<div id="detailModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:500px;">
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
     <div class="modal-header">
-      <h3 class="modal-title" id="detailTitle">Payroll Details</h3>
-      <button class="modal-close" onclick="closeModal('detailModal')">×</button>
+      <h3 class="modal-title" id="detail-title">Payroll Details</h3>
+      <button class="btn btn-icon btn-ghost" onclick="document.getElementById('detail-modal').style.display='none'">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
-    <div class="modal-body" id="detailBody"></div>
-    <div class="modal-footer" id="detailFooter"></div>
+    <div id="detail-body" class="modal-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
   </div>
 </div>
 
-<!-- Deduction Rule Modal -->
-<div id="ruleModal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:440px;">
-    <div class="modal-header">
-      <h3 class="modal-title" id="ruleModalTitle">Add Deduction Rule</h3>
-      <button class="modal-close" onclick="closeModal('ruleModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="ruleId" />
-      <div class="form-group">
-        <label class="form-label">Rule Name</label>
-        <input type="text" id="ruleName" class="form-control" placeholder="e.g. Late 1–15 min" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Type</label>
-        <select id="ruleType" class="form-control">
-          <option value="lateness">Lateness</option>
-          <option value="absence">Absence</option>
-          <option value="manual">Manual</option>
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">Min Minutes</label>
-          <input type="number" id="ruleMinMin" class="form-control" placeholder="0" min="0" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Max Minutes (blank = unlimited)</label>
-          <input type="number" id="ruleMaxMin" class="form-control" placeholder="leave blank" min="0" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Deduction Amount (₦)</label>
-        <input type="number" id="ruleAmount" class="form-control" placeholder="500" min="0" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <input type="text" id="ruleDesc" class="form-control" placeholder="Short description" />
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('ruleModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitRule()">Save Rule</button>
-    </div>
-  </div>
-</div>
-
-<script src="../assets/js/config.js?v=5"></script>
-<script src="../assets/js/api.js?v=5"></script>
-<script src="../assets/js/auth.js?v=5"></script>
-<script src="../assets/js/sidebar.js?v=5"></script>
+<script src="/assets/js/config.js?v=6"></script>
+<script src="/assets/js/api.js?v=6"></script>
+<script src="/assets/js/auth.js?v=6"></script>
+<script src="/assets/js/sidebar.js?v=6"></script>
 <script>
-  const user = requireAuth(['super_admin', 'company_admin']);
-  let listPage = 1;
+  if (!Auth.requireAuth()) throw '';
+  populateSidebarUser();
 
-  if (user) {
-    populateSidebarUser();
-    const now = new Date();
-    ['sumMonth','listMonth','genMonth'].forEach(id => {
-      document.getElementById(id).value = now.getMonth() + 1;
-    });
-    ['sumYear','listYear','genYear'].forEach(id => {
-      document.getElementById(id).value = now.getFullYear();
-    });
-    loadBranchOptions();
-    loadSummary();
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  let page = 1;
+  const now = new Date();
+
+  function buildMonthYear(selId, defVal) {
+    const sel = document.getElementById(selId);
+    MONTHS.forEach((m, i) => sel.innerHTML += `<option value="${i+1}" ${i+1===defVal?'selected':''}>${m}</option>`);
+  }
+  function buildYear(selId, defVal) {
+    const sel = document.getElementById(selId);
+    for (let y = now.getFullYear(); y >= now.getFullYear()-3; y--)
+      sel.innerHTML += `<option value="${y}" ${y===defVal?'selected':''}>${y}</option>`;
   }
 
-  async function loadBranchOptions() {
+  async function load(p = 1) {
+    page = p;
+    const params = {
+      branch: document.getElementById('f-branch').value,
+      month:  document.getElementById('f-month').value,
+      year:   document.getElementById('f-year').value,
+      status: document.getElementById('f-status').value,
+      page, limit: 30
+    };
+    Object.keys(params).forEach(k => !params[k] && delete params[k]);
     try {
-      const res = await API.getBranches();
-      const branches = res.branches || [];
-      ['listBranch','genBranch'].forEach(id => {
-        const sel = document.getElementById(id);
-        branches.forEach(b => {
-          const opt = document.createElement('option');
-          opt.value = b._id;
-          opt.textContent = `${b.name} (${b.code})`;
-          sel.appendChild(opt);
-        });
-      });
-    } catch(_) {}
+      const data = await API.payroll.list(params);
+      const rows = (data.payroll || []).map(p => `
+        <tr>
+          <td>
+            <div class="worker-cell">
+              ${workerAvatar(p.worker)}
+              <a href="/admin/worker-detail.html?id=${p.worker?._id}" class="worker-name">${p.worker?.fullName || '—'}</a>
+            </div>
+          </td>
+          <td>${p.branch?.name || '—'}</td>
+          <td>${MONTHS[(p.month||1)-1]} ${p.year}</td>
+          <td>${formatCurrency(p.baseSalary)}</td>
+          <td>${p.daysWorked}/${p.daysScheduled}</td>
+          <td class="text-red">${formatCurrency(p.totalDeductions)}</td>
+          <td class="fw-600">${formatCurrency(p.netSalary)}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td>
+            <button class="btn btn-ghost btn-xs" onclick="viewDetail('${p._id}')">View</button>
+            ${p.status === 'draft' ? `<button class="btn btn-success btn-xs" onclick="updateStatus('${p._id}','approved')">Approve</button>` : ''}
+            ${p.status === 'approved' ? `<button class="btn btn-primary btn-xs" onclick="updateStatus('${p._id}','paid')">Mark Paid</button>` : ''}
+          </td>
+        </tr>`).join('');
+      document.getElementById('table-body').innerHTML = rows ? `<table class="table"><thead><tr><th>Worker</th><th>Branch</th><th>Period</th><th>Base</th><th>Days</th><th>Deductions</th><th>Net Pay</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty-state">No payroll records</div>';
+      renderPagination('pagination', page, data.pages || 1, 'load');
+    } catch(e) { showToast(e.message, 'error'); }
   }
 
-  // ── TABS ──────────────────────────────────────────────────────────────────
-
-  function switchTab(tab) {
-    ['summary','list','rules'].forEach(t => {
-      document.getElementById('tab' + cap(t)).classList.toggle('active', t === tab);
-      document.getElementById('panel' + cap(t)).style.display = t === tab ? '' : 'none';
-    });
-    if (tab === 'rules') loadRules();
-    if (tab === 'list') loadPayrollList(1);
+  function openGenerateModal() {
+    document.getElementById('gen-modal').style.display = 'flex';
   }
 
-  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-  // ── SUMMARY TAB ───────────────────────────────────────────────────────────
-
-  async function loadSummary() {
-    const month = document.getElementById('sumMonth').value;
-    const year  = document.getElementById('sumYear').value;
+  async function doGenerate() {
+    const branch = document.getElementById('g-branch').value;
+    const month  = document.getElementById('g-month').value;
+    const year   = document.getElementById('g-year').value;
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating…';
     try {
-      const res = await API.getPayrollSummary(`?month=${month}&year=${year}`);
-      renderSummaryCards(res.byStatus || {}, res.totalNet || 0);
-      renderBranchPayroll(res.byBranch || []);
-    } catch (err) {
-      showToast('Failed to load summary: ' + err.message, 'error');
-    }
+      const data = await API.payroll.generate({ branch: branch || undefined, month: parseInt(month), year: parseInt(year) });
+      showToast(`Generated ${data.count || 0} payroll records`, 'success');
+      document.getElementById('gen-modal').style.display = 'none';
+      load();
+    } catch(e) { showToast(e.message, 'error'); }
+    btn.disabled = false; btn.textContent = 'Generate';
   }
 
-  function renderSummaryCards(byStatus, totalNet) {
-    document.getElementById('sumDraftCount').textContent    = byStatus.draft    || 0;
-    document.getElementById('sumApprovedCount').textContent = byStatus.approved || 0;
-    document.getElementById('sumPaidCount').textContent     = byStatus.paid     || 0;
-    document.getElementById('sumTotalNet').textContent      = '₦' + totalNet.toLocaleString();
-  }
-
-  function renderBranchPayroll(rows) {
-    const el = document.getElementById('branchPayrollTable');
-    if (!rows.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div><p class="text-muted">No payroll records for this period</p></div>';
-      return;
-    }
-    el.innerHTML = `
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Branch</th>
-              <th>Workers</th>
-              <th>Total Base</th>
-              <th>Deductions</th>
-              <th>Net Payroll</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(r => `
-              <tr>
-                <td>
-                  <div class="font-semibold text-sm">${r.branchName || 'Unassigned'}</div>
-                  ${r.branchCode ? `<span class="branch-card-code">${r.branchCode}</span>` : ''}
-                </td>
-                <td>${r.count || 0}</td>
-                <td class="text-sm">₦${(r.totalBase || 0).toLocaleString()}</td>
-                <td class="text-sm" style="color:var(--danger);">₦${(r.totalDeductions || 0).toLocaleString()}</td>
-                <td class="font-semibold" style="color:var(--success);">₦${(r.totalNet || 0).toLocaleString()}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  }
-
-  // ── PAYROLL LIST ──────────────────────────────────────────────────────────
-
-  async function loadPayrollList(page = 1) {
-    listPage = page;
-    const month  = document.getElementById('listMonth').value;
-    const year   = document.getElementById('listYear').value;
-    const branch = document.getElementById('listBranch').value;
-    const status = document.getElementById('listStatus').value;
-
-    let qs = `?page=${page}&limit=25&month=${month}&year=${year}`;
-    if (branch) qs += `&branch=${branch}`;
-    if (status) qs += `&status=${status}`;
-
+  async function viewDetail(id) {
     try {
-      const res = await API.getPayroll(qs);
-      renderPayrollTable(res.payrolls || []);
-      renderListPagination(res.pagination || {});
-    } catch (err) {
-      showToast('Failed to load payroll: ' + err.message, 'error');
-    }
-  }
-
-  function renderPayrollTable(records) {
-    const tbody = document.getElementById('payrollTable');
-    if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;"><div class="empty-icon">💰</div><p class="text-muted">No payroll records found</p></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = records.map((p, i) => `
-      <tr>
-        <td>${((listPage - 1) * 25) + i + 1}</td>
-        <td>
-          <div class="font-semibold text-sm">${p.worker?.fullName || '—'}</div>
-          <div class="text-xs text-muted">${p.worker?.phone || ''}</div>
-        </td>
-        <td>
-          <div class="text-sm">${p.branch?.name || '—'}</div>
-          ${p.branch?.code ? `<span class="branch-card-code">${p.branch.code}</span>` : ''}
-        </td>
-        <td class="text-sm">₦${(p.baseSalary || 0).toLocaleString()}</td>
-        <td class="text-sm" style="color:var(--danger);">
-          ${p.totalDeductions > 0 ? `₦${p.totalDeductions.toLocaleString()}` : '—'}
-        </td>
-        <td class="text-sm" style="color:var(--info);">
-          ${p.overtimeAmount > 0 ? `₦${p.overtimeAmount.toLocaleString()}` : '—'}
-        </td>
-        <td class="font-semibold" style="color:var(--success);">₦${(p.netSalary || 0).toLocaleString()}</td>
-        <td class="text-xs">${p.daysPresent || 0}P / ${p.daysAbsent || 0}A / ${p.daysLate || 0}L</td>
-        <td>${payrollBadge(p.status)}</td>
-        <td>
-          <button class="btn btn-sm btn-outline" onclick="openDetail('${p._id}')">View</button>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  function renderListPagination(p) {
-    const el = document.getElementById('listPagination');
-    const sm = document.getElementById('listSummary');
-    if (p.total !== undefined) {
-      sm.textContent = `Showing ${Math.min((p.page-1)*p.limit+1,p.total)}–${Math.min(p.page*p.limit,p.total)} of ${p.total} records`;
-    }
-    if (!p.pages || p.pages <= 1) { el.innerHTML = ''; return; }
-    let html = `<button class="page-btn" onclick="loadPayrollList(${p.page-1})" ${p.page===1?'disabled':''}>‹</button>`;
-    for (let pg = Math.max(1,p.page-2); pg <= Math.min(p.pages,p.page+2); pg++) {
-      html += `<button class="page-btn ${pg===p.page?'active':''}" onclick="loadPayrollList(${pg})">${pg}</button>`;
-    }
-    html += `<button class="page-btn" onclick="loadPayrollList(${p.page+1})" ${p.page===p.pages?'disabled':''}>›</button>`;
-    el.innerHTML = html;
-  }
-
-  function clearListFilters() {
-    const now = new Date();
-    document.getElementById('listMonth').value  = now.getMonth() + 1;
-    document.getElementById('listYear').value   = now.getFullYear();
-    document.getElementById('listBranch').value = '';
-    document.getElementById('listStatus').value = '';
-    loadPayrollList(1);
-  }
-
-  // ── PAYROLL DETAIL ────────────────────────────────────────────────────────
-
-  let currentPayroll = null;
-
-  async function openDetail(id) {
-    try {
-      const records = [];
-      // use list data we already have to find record (or re-fetch)
-      document.getElementById('detailTitle').textContent = 'Loading…';
-      document.getElementById('detailBody').innerHTML   = '<div style="text-align:center;padding:20px;">Loading…</div>';
-      document.getElementById('detailFooter').innerHTML = '';
-      openModal('detailModal');
-
-      // We find the payroll record from our table data by _id
-      const month  = document.getElementById('listMonth').value;
-      const year   = document.getElementById('listYear').value;
-      const res    = await API.getPayroll(`?month=${month}&year=${year}&limit=200`);
-      const p      = (res.payrolls || []).find(x => x._id === id);
-      if (!p) { showToast('Record not found', 'error'); closeModal('detailModal'); return; }
-      currentPayroll = p;
-      renderDetailModal(p);
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-      closeModal('detailModal');
-    }
-  }
-
-  function renderDetailModal(p) {
-    const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    document.getElementById('detailTitle').textContent = `${p.worker?.fullName || 'Worker'} — ${MONTH_NAMES[p.month]} ${p.year}`;
-
-    document.getElementById('detailBody').innerHTML = `
-      <div class="salary-breakdown">
-        <div class="salary-row">
-          <span>Monthly Salary</span>
-          <span>₦${(p.monthlySalary || 0).toLocaleString()}</span>
+      const data = await API.payroll.list({ _id: id, limit: 1 });
+      const p = (data.payroll || [])[0];
+      if (!p) return;
+      document.getElementById('detail-title').textContent = `${p.worker?.fullName || '—'} — ${MONTHS[(p.month||1)-1]} ${p.year}`;
+      const dedRows = (p.deductions || []).map(d => `<tr><td>${d.type}</td><td>${d.reason || '—'}</td><td class="text-red">${formatCurrency(d.amount)}</td></tr>`).join('');
+      document.getElementById('detail-body').innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><div class="detail-label">Base Salary</div><div class="detail-value">${formatCurrency(p.baseSalary)}</div></div>
+          <div class="detail-item"><div class="detail-label">Days Scheduled</div><div class="detail-value">${p.daysScheduled}</div></div>
+          <div class="detail-item"><div class="detail-label">Days Worked</div><div class="detail-value">${p.daysWorked}</div></div>
+          <div class="detail-item"><div class="detail-label">Days Absent</div><div class="detail-value">${p.daysAbsent}</div></div>
+          <div class="detail-item"><div class="detail-label">Days Late</div><div class="detail-value">${p.daysLate}</div></div>
+          <div class="detail-item"><div class="detail-label">Net Salary</div><div class="detail-value fw-600">${formatCurrency(p.netSalary)}</div></div>
         </div>
-        <div class="salary-row">
-          <span>Working Days</span>
-          <span>${p.workingDays || 26}</span>
-        </div>
-        <div class="salary-row">
-          <span>Days Present</span>
-          <span style="color:var(--success);">${p.daysPresent || 0}</span>
-        </div>
-        <div class="salary-row">
-          <span>Days Late</span>
-          <span style="color:var(--warning);">${p.daysLate || 0}</span>
-        </div>
-        <div class="salary-row">
-          <span>Days Absent</span>
-          <span style="color:var(--danger);">${p.daysAbsent || 0}</span>
-        </div>
-        <div class="salary-row">
-          <span>Base Salary</span>
-          <span>₦${(p.baseSalary || 0).toLocaleString()}</span>
-        </div>
-        ${(p.overtimeAmount > 0) ? `
-        <div class="salary-row">
-          <span>Overtime (${p.overtimeHours}h @ ₦${p.overtimeRate}/h)</span>
-          <span style="color:var(--info);">+₦${(p.overtimeAmount).toLocaleString()}</span>
-        </div>` : ''}
-        <div class="salary-row deduction">
-          <span>Total Deductions</span>
-          <span>-₦${(p.totalDeductions || 0).toLocaleString()}</span>
-        </div>
-        <div class="salary-row net">
-          <span>Net Salary</span>
-          <span>₦${(p.netSalary || 0).toLocaleString()}</span>
-        </div>
-      </div>
-      ${p.notes ? `<div class="text-xs text-muted mt-2">Notes: ${p.notes}</div>` : ''}
-      ${p.paymentRef ? `<div class="text-xs text-muted mt-1">Ref: ${p.paymentRef}</div>` : ''}
-      <div style="margin-top:12px;">
-        ${payrollBadge(p.status)}
-        ${p.approvedBy ? `<span class="text-xs text-muted ml-2">Approved by ${p.approvedBy.fullName}</span>` : ''}
-      </div>`;
-
-    const footer = document.getElementById('detailFooter');
-    if (p.status === 'draft') {
-      footer.innerHTML = `
-        <button class="btn btn-outline" onclick="closeModal('detailModal')">Close</button>
-        <button class="btn btn-warning" onclick="updateStatus('${p._id}','approved')">Approve</button>`;
-    } else if (p.status === 'approved') {
-      footer.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;flex:1;">
-          <input type="text" id="paymentRef" class="form-control" placeholder="Payment reference (optional)" style="flex:1;" />
-        </div>
-        <button class="btn btn-outline" onclick="closeModal('detailModal')">Close</button>
-        <button class="btn btn-primary" onclick="updateStatus('${p._id}','paid')">Mark Paid</button>`;
-    } else {
-      footer.innerHTML = `<button class="btn btn-outline" onclick="closeModal('detailModal')">Close</button>`;
-    }
+        ${dedRows ? `<h4 style="margin:16px 0 8px;font-size:13px;">Deductions</h4><table class="table"><thead><tr><th>Type</th><th>Reason</th><th>Amount</th></tr></thead><tbody>${dedRows}</tbody></table>` : ''}
+        ${p.notes ? `<p class="text-muted text-sm" style="margin-top:12px;">${p.notes}</p>` : ''}
+      `;
+      document.getElementById('detail-footer').innerHTML = `
+        <button class="btn btn-ghost" onclick="document.getElementById('detail-modal').style.display='none'">Close</button>
+        ${p.status === 'draft' ? `<button class="btn btn-primary btn-sm" onclick="updateStatus('${p._id}','approved');document.getElementById('detail-modal').style.display='none'">Approve</button>` : ''}
+        ${p.status === 'approved' ? `<button class="btn btn-success btn-sm" onclick="updateStatus('${p._id}','paid');document.getElementById('detail-modal').style.display='none'">Mark Paid</button>` : ''}
+      `;
+      document.getElementById('detail-modal').style.display = 'flex';
+    } catch(e) { showToast(e.message, 'error'); }
   }
 
   async function updateStatus(id, status) {
-    const body = { status };
-    if (status === 'paid') {
-      const ref = document.getElementById('paymentRef');
-      if (ref) body.paymentRef = ref.value;
-    }
     try {
-      await API.updatePayrollStatus(id, body);
-      showToast(`Payroll ${status}`, 'success');
-      closeModal('detailModal');
-      loadPayrollList(listPage);
-      loadSummary();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
+      await API.payroll.updateStatus(id, { status });
+      showToast(`Status updated to ${status}`, 'success');
+      load(page);
+    } catch(e) { showToast(e.message, 'error'); }
   }
 
-  // ── GENERATE PAYROLL ──────────────────────────────────────────────────────
-
-  function openGenerateModal() { openModal('generateModal'); }
-
-  async function submitGenerate() {
-    const month  = document.getElementById('genMonth').value;
-    const year   = document.getElementById('genYear').value;
-    const branch = document.getElementById('genBranch').value;
+  async function init() {
+    buildMonthYear('f-month', now.getMonth()+1);
+    buildYear('f-year', now.getFullYear());
+    buildMonthYear('g-month', now.getMonth()+1);
+    buildYear('g-year', now.getFullYear());
     try {
-      const body = { month: parseInt(month), year: parseInt(year) };
-      if (branch) body.branchId = branch;
-      const res = await API.generatePayroll(body);
-      showToast(res.message || 'Payroll generated', 'success');
-      closeModal('generateModal');
-      loadSummary();
-      if (document.getElementById('panelList').style.display !== 'none') loadPayrollList(1);
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
+      const data = await API.branches.list();
+      (data.branches || []).forEach(b => {
+        document.getElementById('f-branch').innerHTML += `<option value="${b._id}">${b.name}</option>`;
+        document.getElementById('g-branch').innerHTML += `<option value="${b._id}">${b.name}</option>`;
+      });
+    } catch(e) {}
+    load();
   }
-
-  // ── DEDUCTION RULES ───────────────────────────────────────────────────────
-
-  async function loadRules() {
-    try {
-      const res = await API.getDeductionRules();
-      renderRules(res.rules || []);
-    } catch (err) {
-      showToast('Failed to load rules: ' + err.message, 'error');
-    }
-  }
-
-  function renderRules(rules) {
-    const el = document.getElementById('rulesList');
-    if (!rules.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><p class="text-muted">No deduction rules configured</p></div>';
-      return;
-    }
-    el.innerHTML = `
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Type</th><th>Range (min)</th><th>Amount (₦)</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            ${rules.map(r => `
-              <tr>
-                <td>
-                  <div class="font-semibold text-sm">${r.name}</div>
-                  ${r.description ? `<div class="text-xs text-muted">${r.description}</div>` : ''}
-                </td>
-                <td><span class="badge badge-info">${r.type}</span></td>
-                <td class="text-sm">
-                  ${r.type === 'lateness'
-                    ? `${r.minMinutes}–${r.maxMinutes ?? '∞'} min`
-                    : r.type === 'absence' ? 'per day' : '—'}
-                </td>
-                <td class="font-semibold text-sm">
-                  ${r.amount > 0
-                    ? `₦${r.amount.toLocaleString()}`
-                    : '<span class="text-muted">daily rate</span>'}
-                </td>
-                <td>
-                  <span class="badge ${r.isActive ? 'badge-success' : 'badge-warning'}">
-                    ${r.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td>
-                  <div class="flex items-center gap-1">
-                    <button class="btn btn-xs btn-outline" onclick="editRule(${JSON.stringify(r).replace(/"/g,'&quot;')})">Edit</button>
-                    <button class="btn btn-xs btn-outline" style="color:var(--danger);" onclick="deleteRule('${r._id}')">Del</button>
-                  </div>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  }
-
-  function openRuleModal(rule = null) {
-    document.getElementById('ruleModalTitle').textContent = rule ? 'Edit Deduction Rule' : 'Add Deduction Rule';
-    document.getElementById('ruleId').value     = rule?._id || '';
-    document.getElementById('ruleName').value   = rule?.name || '';
-    document.getElementById('ruleType').value   = rule?.type || 'lateness';
-    document.getElementById('ruleMinMin').value = rule?.minMinutes ?? '';
-    document.getElementById('ruleMaxMin').value = rule?.maxMinutes ?? '';
-    document.getElementById('ruleAmount').value = rule?.amount ?? '';
-    document.getElementById('ruleDesc').value   = rule?.description || '';
-    openModal('ruleModal');
-  }
-
-  function editRule(rule) { openRuleModal(rule); }
-
-  async function submitRule() {
-    const id     = document.getElementById('ruleId').value;
-    const body   = {
-      name:        document.getElementById('ruleName').value,
-      type:        document.getElementById('ruleType').value,
-      minMinutes:  parseInt(document.getElementById('ruleMinMin').value) || 0,
-      maxMinutes:  document.getElementById('ruleMaxMin').value ? parseInt(document.getElementById('ruleMaxMin').value) : null,
-      amount:      parseFloat(document.getElementById('ruleAmount').value) || 0,
-      description: document.getElementById('ruleDesc').value
-    };
-    try {
-      if (id) {
-        await API.updateDeductionRule(id, body);
-        showToast('Rule updated', 'success');
-      } else {
-        await API.createDeductionRule(body);
-        showToast('Rule created', 'success');
-      }
-      closeModal('ruleModal');
-      loadRules();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
-  }
-
-  async function deleteRule(id) {
-    if (!confirm('Delete this deduction rule?')) return;
-    try {
-      await API.deleteDeductionRule(id);
-      showToast('Rule deleted', 'success');
-      loadRules();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
-    }
-  }
-
-  // ── HELPERS ───────────────────────────────────────────────────────────────
-
-  function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
-  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-  document.querySelectorAll('.modal-overlay').forEach(o => {
-    o.addEventListener('click', e => { if (e.target === o) o.style.display = 'none'; });
-  });
-
-  function payrollBadge(status) {
-    return `<span class="payroll-status-badge ${status}">${status}</span>`;
-  }
+  init();
 </script>
-<script src="../assets/js/theme.js"></script>
 </body>
 </html>

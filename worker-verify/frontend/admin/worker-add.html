@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Worker — Sage Energy</title>
+  <link rel="stylesheet" href="/assets/css/style.css?v=6">
+</head>
+<body>
+<div class="app-layout">
+  <aside id="sidebar" class="sidebar"></aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <div class="main-content">
+    <header class="app-header">
+      <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="page-title">Add Worker</h1>
+      <div class="header-actions">
+        <a href="/admin/workers.html" class="btn btn-ghost btn-sm">Back to Workers</a>
+      </div>
+    </header>
+    <main class="page-content">
+      <div class="form-card">
+        <div class="form-section">
+          <h3 class="form-section-title">Photo</h3>
+          <div class="photo-upload-area" id="photo-area" onclick="document.getElementById('photo-input').click()">
+            <div id="photo-preview" class="photo-preview-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span>Click to add photo</span>
+            </div>
+          </div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="previewPhoto(this)">
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Personal Info</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Full Name <span class="required">*</span></label>
+              <input id="fullName" class="form-control" type="text" placeholder="e.g. Emeka Okafor">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone <span class="required">*</span></label>
+              <input id="phone" class="form-control" type="tel" placeholder="e.g. 08012345678">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">NIN (optional)</label>
+              <input id="nin" class="form-control" type="text" placeholder="National ID Number">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date Employed</label>
+              <input id="dateEmployed" class="form-control" type="date">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Assignment</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Branch <span class="required">*</span></label>
+              <select id="branch" class="form-control"><option value="">Select Branch</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select id="role" class="form-control"><option value="">Select Role</option></select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Schedule</label>
+              <select id="schedule" class="form-control"><option value="">Select Schedule</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Schedule Start Date</label>
+              <input id="scheduleStartDate" class="form-control" type="date">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Salary</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Monthly Salary (₦)</label>
+              <input id="salary" class="form-control" type="number" min="0" placeholder="0.00">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <a href="/admin/workers.html" class="btn btn-ghost">Cancel</a>
+          <button class="btn btn-primary" id="save-btn" onclick="saveWorker()">Save Worker</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="/assets/js/config.js?v=6"></script>
+<script src="/assets/js/api.js?v=6"></script>
+<script src="/assets/js/auth.js?v=6"></script>
+<script src="/assets/js/sidebar.js?v=6"></script>
+<script>
+  if (!Auth.requireAuth()) throw '';
+  populateSidebarUser();
+
+  function previewPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('photo-preview').innerHTML = `<img src="${e.target.result}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;">`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function saveWorker() {
+    const fullName = document.getElementById('fullName').value.trim();
+    const phone    = document.getElementById('phone').value.trim();
+    const branch   = document.getElementById('branch').value;
+    if (!fullName) return showToast('Full name is required', 'warning');
+    if (!phone)    return showToast('Phone is required', 'warning');
+    if (!branch)   return showToast('Branch is required', 'warning');
+
+    const fd = new FormData();
+    fd.append('fullName', fullName);
+    fd.append('phone', phone);
+    fd.append('branch', branch);
+    fd.append('role',   document.getElementById('role').value);
+    fd.append('schedule', document.getElementById('schedule').value);
+    fd.append('scheduleStartDate', document.getElementById('scheduleStartDate').value);
+    fd.append('nin',    document.getElementById('nin').value.trim());
+    fd.append('salary', document.getElementById('salary').value || '0');
+    fd.append('dateEmployed', document.getElementById('dateEmployed').value);
+    const photoFile = document.getElementById('photo-input').files[0];
+    if (photoFile) fd.append('photo', photoFile);
+
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const data = await API.workers.create(fd);
+      showToast('Worker added!', 'success');
+      setTimeout(() => window.location.href = `/admin/worker-detail.html?id=${data.worker._id}`, 800);
+    } catch(e) {
+      showToast(e.message, 'error');
+      btn.disabled = false; btn.textContent = 'Save Worker';
+    }
+  }
+
+  async function init() {
+    document.getElementById('scheduleStartDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dateEmployed').value = new Date().toISOString().split('T')[0];
+    try {
+      const [bData, rData, sData] = await Promise.all([API.branches.list(), API.roles.list(), API.schedules.list()]);
+      (bData.branches || []).forEach(b => document.getElementById('branch').innerHTML += `<option value="${b._id}">${b.name}</option>`);
+      (rData.roles || []).forEach(r => document.getElementById('role').innerHTML += `<option value="${r._id}">${r.name}</option>`);
+      (sData.schedules || []).forEach(s => document.getElementById('schedule').innerHTML += `<option value="${s._id}">${s.name}</option>`);
+    } catch(e) { showToast('Failed to load options', 'error'); }
+  }
+  init();
+</script>
+</body>
+</html>

@@ -1,26 +1,23 @@
-const jwt = require('jsonwebtoken');
+const jwt  = require('jsonwebtoken');
 const User = require('../models/User');
 
 const protect = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'Not authorized – no token' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer '))
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+
+    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
+    if (!user || !user.isActive)
+      return res.status(401).json({ success: false, message: 'Session expired. Please log in again.' });
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ success: false, message: 'Account not found or deactivated' });
-    }
-
-    req.user = user;
+    req.user      = user;
+    req.companyId = user.company;
     next();
-  } catch {
-    return res.status(401).json({ success: false, message: 'Token invalid or expired' });
+  } catch (err) {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
 

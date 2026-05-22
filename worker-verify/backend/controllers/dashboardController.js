@@ -1,111 +1,87 @@
 const Worker     = require('../models/Worker');
-const User       = require('../models/User');
-const Branch     = require('../models/Branch');
 const Attendance = require('../models/Attendance');
-const Payroll    = require('../models/Payroll');
-const VerificationLog = require('../models/VerificationLog');
-const { toMidnightUTC } = require('../utils/time');
+const DailySales = require('../models/DailySales');
+const Shortage   = require('../models/Shortage');
+const Branch     = require('../models/Branch');
 
-const getAdminStats = async (req, res) => {
+function toMidnight(d) { const dt = d ? new Date(d) : new Date(); dt.setHours(0,0,0,0); return dt; }
+
+const getDashboard = async (req, res) => {
   try {
     const cid   = req.companyId;
-    const cf    = cid ? { company: cid } : {};
-    const today = toMidnightUTC();
-    const now   = new Date();
-    const thisMonth = now.getMonth() + 1;
-    const thisYear  = now.getFullYear();
+    const today = toMidnight();
+    const m     = today.getMonth();
+    const y     = today.getFullYear();
+    const monthStart = toMidnight(new Date(y, m, 1));
+    const monthEnd   = toMidnight(new Date(y, m + 1, 0));
 
     const [
-      totalWorkers, verifiedWorkers, pendingWorkers, rejectedWorkers,
-      incompleteWorkers, legacyWorkers, temporaryWorkers,
-      activeWorkers, suspendedWorkers, sackedWorkers, onLeaveWorkers,
-      totalBranches, totalStaff,
-      recentWorkers, recentLogs,
-      branchBreakdown, shiftBreakdown,
-      todayPresent, todayAbsent, todayLate, monthPayrollTotal
+      totalWorkers, activeWorkers, pendingWorkers,
+      todayPresent, todayLate, todayAbsent,
+      pendingShortages, branches,
+      todaySales
     ] = await Promise.all([
-      Worker.countDocuments(cf),
-      Worker.countDocuments({ ...cf, verificationStatus: 'verified' }),
-      Worker.countDocuments({ ...cf, verificationStatus: 'pending' }),
-      Worker.countDocuments({ ...cf, verificationStatus: 'rejected' }),
-      Worker.countDocuments({ ...cf, verificationStatus: 'incomplete' }),
-      Worker.countDocuments({ ...cf, verificationStatus: 'legacy' }),
-      Worker.countDocuments({ ...cf, verificationStatus: 'temporary' }),
-      Worker.countDocuments({ ...cf, employmentStatus: 'active' }),
-      Worker.countDocuments({ ...cf, employmentStatus: 'suspended' }),
-      Worker.countDocuments({ ...cf, employmentStatus: 'sacked' }),
-      Worker.countDocuments({ ...cf, employmentStatus: 'on_leave' }),
-      Branch.countDocuments({ ...cf, isActive: true }),
-      User.countDocuments({ ...cf, role: { $nin: ['super_admin'] }, isActive: true, isDeleted: { $ne: true } }),
-      Worker.find(cf).sort({ createdAt: -1 }).limit(8)
-        .populate('registeredBy', 'fullName')
-        .populate('branch', 'name code'),
-      VerificationLog.find(cf).sort({ createdAt: -1 }).limit(10)
-        .populate('worker', 'fullName')
-        .populate('performedBy', 'fullName role'),
-      Worker.aggregate([
-        { $match: { ...cf, branch: { $ne: null } } },
-        { $group: { _id: '$branch', total: { $sum: 1 }, active: { $sum: { $cond: [{ $eq: ['$employmentStatus', 'active'] }, 1, 0] } } } },
-        { $lookup: { from: 'branches', localField: '_id', foreignField: '_id', as: 'branch' } },
-        { $unwind: '$branch' },
-        { $project: { _id: 1, name: '$branch.name', code: '$branch.code', total: 1, active: 1 } },
-        { $sort: { total: -1 } }
-      ]),
-      Worker.aggregate([{ $match: cf }, { $group: { _id: '$shift', count: { $sum: 1 } } }]),
-      Attendance.countDocuments({ ...cf, date: today, status: { $in: ['present','late'] } }),
-      Attendance.countDocuments({ ...cf, date: today, status: 'absent' }),
-      Attendance.countDocuments({ ...cf, date: today, status: 'late' }),
-      Payroll.aggregate([
-        { $match: { ...cf, month: thisMonth, year: thisYear } },
-        { $group: { _id: null, total: { $sum: '$netSalary' }, count: { $sum: 1 } } }
+      Worker.countDocuments({ company: cid }),
+      Worker.countDocuments({ company: cid, status: 'active' }),
+      Worker.countDocuments({ company: cid, status: 'pending' }),
+      Attendance.countDocuments({ company: cid, date: today, status: 'present' }),
+      Attendance.countDocuments({ company: cid, date: today, status: 'late' }),
+      Attendance.countDocuments({ company: cid, date: today, status: 'absent' }),
+      Shortage.countDocuments({ company: cid, status: 'pending' }),
+      Branch.find({ company: cid, isActive: true }).select('name'),
+      DailySales.aggregate([
+        { $match: { company: cid, date: today } },
+        { $group: { _id: null, total: { $sum: '$totalSales' }, cash: { $sum: '$cashSales' }, pos: { $sum: '$posSales' }, transfer: { $sum: '$transferSales' } } }
       ])
     ]);
 
-    const shiftMap = {};
-    shiftBreakdown.forEach(s => { shiftMap[s._id] = s.count; });
+    // Month sales
+    const monthSalesAgg = await DailySales.aggregate([
+      { $match: { company: cid, date: { $gte: monthStart, $lte: monthEnd } } },
+      { $group: { _id: null, total: { $sum: '$totalSales' } } }
+    ]);
+
+    // Recent activity: last 5 clock-ins today
+    const recentActivity = await Attendance.find({ company: cid, date: today, clockInTime: { $ne: null } })
+      .populate('worker', 'fullName photo')
+      .populate('branch', 'name')
+      .sort({ clockInTime: -1 }).limit(5);
+
+    // Branch summaries
+    const branchIds = branches.map(b => b._id);
+    const branchAttendance = await Attendance.aggregate([
+      { $match: { company: cid, branch: { $in: branchIds }, date: today } },
+      { $group: { _id: '$branch', present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }, absent: { $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] } } } }
+    ]);
+    const branchMap = {};
+    branchAttendance.forEach(b => { branchMap[b._id.toString()] = b; });
+
+    const branchSummaries = await Promise.all(branches.map(async (b) => {
+      const wCount = await Worker.countDocuments({ company: cid, branch: b._id, status: 'active' });
+      const att    = branchMap[b._id.toString()];
+      return { _id: b._id, name: b.name, workers: wCount, present: att?.present || 0, absent: att?.absent || 0 };
+    }));
 
     res.json({
       success: true,
       stats: {
-        totalWorkers, verifiedWorkers, pendingWorkers, rejectedWorkers,
-        incompleteWorkers, legacyWorkers, temporaryWorkers,
-        activeWorkers, suspendedWorkers, sackedWorkers, onLeaveWorkers,
-        totalBranches, totalStaff,
-        shiftA: shiftMap['A'] || 0,
-        shiftB: shiftMap['B'] || 0,
-        unassignedShift: shiftMap['unassigned'] || 0,
-        todayPresent, todayAbsent, todayLate,
-        monthPayrollTotal: monthPayrollTotal[0]?.total || 0,
-        monthPayrollCount: monthPayrollTotal[0]?.count || 0
+        totalWorkers, activeWorkers, pendingWorkers,
+        todayPresent: todayPresent + todayLate,
+        todayLate, todayAbsent,
+        pendingShortages,
+        todaySales: todaySales[0]?.total || 0,
+        todayCash:  todaySales[0]?.cash  || 0,
+        todayPOS:   todaySales[0]?.pos   || 0,
+        todayTransfer: todaySales[0]?.transfer || 0,
+        monthSales: monthSalesAgg[0]?.total || 0
       },
-      recentWorkers,
-      recentLogs,
-      branchBreakdown
+      branchSummaries,
+      recentActivity
     });
   } catch (err) {
-    console.error('[getAdminStats]', err);
+    console.error('[getDashboard]', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-const getStaffStats = async (req, res) => {
-  try {
-    const id  = req.user._id;
-    const cf  = req.companyId ? { company: req.companyId } : {};
-    const [total, verified, pending, rejected, recentWorkers] = await Promise.all([
-      Worker.countDocuments({ ...cf, registeredBy: id }),
-      Worker.countDocuments({ ...cf, registeredBy: id, verificationStatus: 'verified' }),
-      Worker.countDocuments({ ...cf, registeredBy: id, verificationStatus: 'pending' }),
-      Worker.countDocuments({ ...cf, registeredBy: id, verificationStatus: 'rejected' }),
-      Worker.find({ ...cf, registeredBy: id }).sort({ createdAt: -1 }).limit(8)
-        .populate('branch', 'name code')
-    ]);
-
-    res.json({ success: true, stats: { total, verified, pending, rejected }, recentWorkers });
-  } catch (err) {
-    console.error('[getStaffStats]', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-module.exports = { getAdminStats, getStaffStats };
+module.exports = { getDashboard };

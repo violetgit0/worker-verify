@@ -1,117 +1,70 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const jwt     = require('jsonwebtoken');
 const Company = require('../models/Company');
-const ActivityLog = require('../models/ActivityLog');
+const User    = require('../models/User');
 
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+const signToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
+
+const register = async (req, res) => {
+  try {
+    const { companyName, companySlug, email, fullName, username, password, phone } = req.body;
+    if (!companyName || !companySlug || !fullName || !username || !password)
+      return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+
+    const slug = companySlug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (await Company.findOne({ slug }))
+      return res.status(400).json({ success: false, message: 'Company ID is already taken' });
+
+    const resolvedEmail = email?.trim() || `${username.trim().toLowerCase()}@${slug}.local`;
+    const company = await Company.create({ name: companyName.trim(), slug, email: resolvedEmail, phone: phone || '' });
+    const admin   = await User.create({
+      company: company._id,
+      fullName: fullName.trim(), username: username.trim().toLowerCase(),
+      email: resolvedEmail.toLowerCase(), password, phone: phone || '', role: 'company_admin'
+    });
+
+    const token = signToken(admin._id);
+    res.status(201).json({
+      success: true, token,
+      user:    { _id: admin._id, fullName: admin.fullName, username: admin.username, role: admin.role },
+      company: { _id: company._id, name: company.name, slug: company.slug }
+    });
+  } catch (err) {
+    if (err.code === 11000) return res.status(400).json({ success: false, message: 'Username or email already in use' });
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 const login = async (req, res) => {
   try {
-    const { username, password, companySlug } = req.body;
+    const { companySlug, username, password } = req.body;
+    if (!companySlug || !username || !password)
+      return res.status(400).json({ success: false, message: 'Company ID, username, and password are required' });
 
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username and password are required' });
-    }
+    const company = await Company.findOne({ slug: companySlug.toLowerCase() });
+    if (!company || !company.isActive)
+      return res.status(401).json({ success: false, message: 'Company not found or inactive' });
 
-    let companyId = null;
-    let company   = null;
+    const user = await User.findOne({ company: company._id, username: username.toLowerCase(), isActive: true });
+    if (!user || !(await user.comparePassword(password)))
+      return res.status(401).json({ success: false, message: 'Invalid username or password' });
 
-    if (companySlug) {
-      company = await Company.findOne({ slug: companySlug.toLowerCase().trim() });
-      if (!company) {
-        return res.status(401).json({ success: false, message: 'Company not found. Check your company ID.' });
-      }
-      if (!company.isActive) {
-        return res.status(401).json({ success: false, message: 'This company account is suspended.' });
-      }
-      companyId = company._id;
-    }
-
-    // Find user — if companySlug provided, scope to that company; otherwise look for platform super_admin
-    let user;
-    if (companyId) {
-      user = await User.findOne({
-        company: companyId,
-        $or: [{ username: username.toLowerCase() }, { email: username.toLowerCase() }],
-        isDeleted: { $ne: true }
-      });
-    } else {
-      // No slug — only super_admin (platform level, company: null) can log in this way
-      user = await User.findOne({
-        company: null,
-        role: 'super_admin',
-        $or: [{ username: username.toLowerCase() }, { email: username.toLowerCase() }]
-      });
-    }
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    if (!user.isActive) {
-      return res.status(401).json({ success: false, message: 'Account suspended. Contact your administrator.' });
-    }
-
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
-    const ua = req.headers['user-agent'] || '';
-
-    user.loginHistory.unshift({ timestamp: new Date(), ip, userAgent: ua });
-    if (user.loginHistory.length > 20) user.loginHistory.length = 20;
-    await user.save();
-
-    ActivityLog.create({
-      company:         user.company || null,
-      action:          'login',
-      performedBy:     user._id,
-      performedByName: user.fullName,
-      performedByRole: user.role,
-      targetType:      'system',
-      details:         { ip, userAgent: ua },
-      ip
-    }).catch(() => {});
-
-    const token = generateToken(user._id);
-
+    const token = signToken(user._id);
     res.json({
-      success: true,
-      token,
-      user: {
-        id:            user._id,
-        fullName:      user.fullName,
-        username:      user.username,
-        email:         user.email,
-        role:          user.role,
-        company:       user.company,
-        branch:        user.branch,
-        passportPhoto: user.passportPhoto
-      },
-      company: company ? {
-        id:       company._id,
-        name:     company.name,
-        slug:     company.slug,
-        plan:     company.plan,
-        branding: company.branding
-      } : null
+      success: true, token,
+      user:    { _id: user._id, fullName: user.fullName, username: user.username, email: user.email, role: user.role, branch: user.branch, photo: user.photo },
+      company: { _id: company._id, name: company.name, slug: company.slug, branding: company.branding }
     });
   } catch (err) {
-    console.error('[login]', err);
-    res.status(500).json({ success: false, message: err.message || 'Login failed' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 const getMe = async (req, res) => {
   try {
-    let companyData = null;
-    if (req.user.company) {
-      companyData = await Company.findById(req.user.company).select('name slug plan planStatus branding trialEndsAt subscriptionEndsAt');
-    }
-    res.json({ success: true, user: req.user, company: companyData });
+    const user    = await User.findById(req.user._id).select('-password').populate('branch', 'name code');
+    const company = await Company.findById(req.user.company);
+    res.json({ success: true, user, company });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -120,26 +73,25 @@ const getMe = async (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Both fields are required' });
-    }
-
     const user = await User.findById(req.user._id);
-    const isMatch = await user.comparePassword(currentPassword);
-
-    if (!isMatch) {
+    if (!(await user.comparePassword(currentPassword)))
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-    }
-
     user.password = newPassword;
     await user.save();
-
-    res.json({ success: true, message: 'Password updated successfully' });
+    res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
-    console.error('[changePassword]', err);
-    res.status(500).json({ success: false, message: err.message || 'Failed to change password' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-module.exports = { login, getMe, changePassword };
+const lookupCompany = async (req, res) => {
+  try {
+    const company = await Company.findOne({ slug: req.params.slug.toLowerCase(), isActive: true }).select('name slug branding');
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+    res.json({ success: true, company });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { register, login, getMe, changePassword, lookupCompany };

@@ -107,4 +107,22 @@ const uploadDataUrl = (dataUrl, folder = 'sage-worker-verify/signatures') => {
   });
 };
 
-module.exports = { cloudinary, upload, workerUpload, singleUpload, selfieUpload, uploadDataUrl };
+// Simple single-photo upload for new worker schema (field name: 'photo')
+const photoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async () => ({
+    folder:          'sage-energy/workers',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation:  [{ width: 400, height: 400, crop: 'fill', quality: 'auto' }]
+  })
+});
+const workerPhotoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg','image/jpg','image/png','image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG/PNG/WebP images allowed'), false);
+  }
+}).single('photo');
+
+module.exports = { cloudinary, upload, workerUpload, workerPhotoUpload, singleUpload, selfieUpload, uploadDataUrl };

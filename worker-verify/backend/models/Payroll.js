@@ -1,40 +1,42 @@
 const mongoose = require('mongoose');
 
+const deductionItemSchema = new mongoose.Schema({
+  type:   { type: String, enum: ['lateness', 'absence', 'shortage', 'manual'], required: true },
+  amount: { type: Number, required: true },
+  reason: { type: String, default: '' },
+  date:   { type: Date, default: null }
+}, { _id: false });
+
 const payrollSchema = new mongoose.Schema({
-  // Multi-tenant
-  company:      { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-
-  worker:       { type: mongoose.Schema.Types.ObjectId, ref: 'Worker', required: true },
-  branch:       { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
-  month:        { type: Number, required: true, min: 1, max: 12 },
-  year:         { type: Number, required: true },
-
-  monthlySalary:  { type: Number, default: 0 },
-  dailyRate:      { type: Number, default: 0 },
-
-  workingDays:  { type: Number, default: 26 },
-  daysPresent:  { type: Number, default: 0 },
-  daysAbsent:   { type: Number, default: 0 },
-  daysLate:     { type: Number, default: 0 },
-  daysOnLeave:  { type: Number, default: 0 },
+  company:  { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
+  branch:   { type: mongoose.Schema.Types.ObjectId, ref: 'Branch',  default: null },
+  worker:   { type: mongoose.Schema.Types.ObjectId, ref: 'Worker',  required: true },
+  month:    { type: Number, required: true },
+  year:     { type: Number, required: true },
 
   baseSalary:      { type: Number, default: 0 },
-  overtimeHours:   { type: Number, default: 0 },
-  overtimeRate:    { type: Number, default: 0 },
-  overtimeAmount:  { type: Number, default: 0 },
+  daysScheduled:   { type: Number, default: 0 },
+  daysWorked:      { type: Number, default: 0 },
+  daysAbsent:      { type: Number, default: 0 },
+  daysLate:        { type: Number, default: 0 },
+  daysOff:         { type: Number, default: 0 },
 
+  deductions:      [deductionItemSchema],
   totalDeductions: { type: Number, default: 0 },
   netSalary:       { type: Number, default: 0 },
 
-  status: { type: String, enum: ['draft', 'approved', 'paid'], default: 'draft' },
+  status: {
+    type: String,
+    enum: ['draft', 'approved', 'paid'],
+    default: 'draft'
+  },
+
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   approvedAt: { type: Date, default: null },
-  paidAt:     { type: Date, default: null },
-  paymentRef: { type: String, default: '' },
   notes:      { type: String, default: '' }
 }, { timestamps: true });
 
-payrollSchema.index({ company: 1, worker: 1, month: 1, year: 1 }, { unique: true });
-payrollSchema.index({ company: 1, branch: 1, month: 1, year: 1 });
+payrollSchema.index({ company: 1, month: 1, year: 1 });
+payrollSchema.index({ worker: 1, month: 1, year: 1 }, { unique: true });
 
 module.exports = mongoose.model('Payroll', payrollSchema);

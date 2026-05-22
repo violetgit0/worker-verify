@@ -1,135 +1,142 @@
-// ─── Auth Utilities ───────────────────────────────────────────────────────────
+// Session management + UI helpers
+const Auth = (() => {
+  const TOKEN_KEY = 'sage_token';
+  const USER_KEY  = 'sage_user';
 
-function getUser() {
-  try { return JSON.parse(localStorage.getItem('wv_user')); } catch { return null; }
-}
-
-function getToken() {
-  return localStorage.getItem('wv_token');
-}
-
-function saveSession(token, user) {
-  localStorage.setItem('wv_token', token);
-  localStorage.setItem('wv_user', JSON.stringify(user));
-}
-
-function logout() {
-  localStorage.removeItem('wv_token');
-  localStorage.removeItem('wv_user');
-  window.location.replace('/index.html');
-}
-
-// Call on every protected page – redirects to login if not authenticated
-function requireAuth(allowedRoles = []) {
-  const user = getUser();
-  const token = getToken();
-
-  if (!token || !user) {
-    window.location.replace('/index.html');
-    return null;
+  function saveSession(token, user) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+  function getToken()  { return localStorage.getItem(TOKEN_KEY); }
+  function getUser()   {
+    try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; }
+  }
+  function clearSession() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   }
 
-  if (allowedRoles.length && !allowedRoles.includes(user.role)) {
-    if (user.role === 'super_admin' && !user.company) {
-      window.location.href = '/superadmin/dashboard.html';
-    } else if (['super_admin', 'company_admin'].includes(user.role)) {
-      window.location.href = '/admin/dashboard.html';
-    } else {
-      window.location.href = '/staff/dashboard.html';
-    }
-    return null;
+  function requireAuth() {
+    if (!getToken()) { window.location.href = '/index.html'; return false; }
+    return true;
   }
 
-  return user;
-}
+  function logout() {
+    clearSession();
+    window.location.href = '/index.html';
+  }
 
-const ROLE_DISPLAY = {
-  super_admin:          'Platform Admin',
-  company_admin:        'Company Admin',
-  branch_manager:       'Branch Manager',
-  hr_staff:             'HR Staff',
-  attendance_officer:   'Attendance Officer',
-  verification_officer: 'Verification Officer',
-  staff:                'Staff'
-};
+  return { saveSession, getToken, getUser, clearSession, requireAuth, logout };
+})();
 
-// Populate sidebar user info on any page that has #sidebarUserName / #sidebarUserRole
-function populateSidebarUser() {
-  const user = getUser();
-  if (!user) return;
-
-  const nameEl   = document.getElementById('sidebarUserName');
-  const roleEl   = document.getElementById('sidebarUserRole');
-  const avatarEl = document.getElementById('sidebarAvatar');
-
-  if (nameEl)   nameEl.textContent = user.fullName;
-  if (roleEl)   roleEl.textContent = ROLE_DISPLAY[user.role] || user.role;
-  if (avatarEl && user.passportPhoto) avatarEl.src = user.passportPhoto;
-
-  applyCompanyBranding();
-}
-
-// Apply stored company branding (name, colors) to the current page
-function applyCompanyBranding() {
-  try {
-    const company = JSON.parse(localStorage.getItem('wv_company') || 'null');
-    if (!company) return;
-
-    const brandNameEl = document.getElementById('sidebarBrandName');
-    if (brandNameEl) brandNameEl.textContent = company.name || 'WorkerSave';
-
-    if (company.branding?.primaryColor) {
-      document.documentElement.style.setProperty('--primary', company.branding.primaryColor);
-    }
-    if (company.branding?.accentColor) {
-      document.documentElement.style.setProperty('--accent', company.branding.accentColor);
-    }
-  } catch (_) {}
-}
-
-// Toast notification system
-function showToast(message, type = 'success') {
-  let container = document.getElementById('toastContainer');
+// Toast notifications
+function showToast(message, type = 'success', duration = 3500) {
+  let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
-    container.id = 'toastContainer';
-    container.className = 'toast-container';
+    container.id = 'toast-container';
     document.body.appendChild(container);
   }
-
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-    <span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
-    <span>${message}</span>
-  `;
+  toast.textContent = message;
   container.appendChild(toast);
-
-  setTimeout(() => toast.classList.add('toast-show'), 10);
+  requestAnimationFrame(() => toast.classList.add('show'));
   setTimeout(() => {
-    toast.classList.remove('toast-show');
+    toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  }, duration);
 }
 
-// Format date nicely
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-NG', {
-    year: 'numeric', month: 'short', day: 'numeric'
-  });
+// Populate sidebar user info
+function populateSidebarUser() {
+  const user = Auth.getUser();
+  if (!user) return;
+  const nameEl = document.getElementById('sidebar-user-name');
+  const roleEl = document.getElementById('sidebar-user-role');
+  const avatarEl = document.getElementById('sidebar-user-avatar');
+  if (nameEl) nameEl.textContent = user.fullName || user.username || '';
+  if (roleEl) roleEl.textContent = (user.role || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  if (avatarEl) {
+    if (user.photo) {
+      avatarEl.innerHTML = `<img src="${user.photo}" alt="">`;
+    } else {
+      const initials = (user.fullName || user.username || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+      avatarEl.textContent = initials;
+    }
+  }
+}
+
+// Format helpers
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function formatTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+function formatCurrency(n) {
+  if (n === undefined || n === null) return '—';
+  return '₦' + Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function formatMinutes(m) {
+  if (!m) return '—';
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m/60)}h ${m%60}m`;
 }
 
 // Status badge HTML
 function statusBadge(status) {
   const map = {
-    pending:    { cls: 'badge-warning',    label: 'Pending' },
-    verified:   { cls: 'badge-success',    label: 'Verified' },
-    rejected:   { cls: 'badge-danger',     label: 'Rejected' },
-    incomplete: { cls: 'badge-incomplete', label: 'Incomplete' },
-    legacy:     { cls: 'badge-legacy',     label: 'Legacy Worker' },
-    temporary:  { cls: 'badge-temporary',  label: 'Temporary' },
+    active:    ['green',  'Active'],
+    inactive:  ['gray',   'Inactive'],
+    suspended: ['red',    'Suspended'],
+    pending:   ['amber',  'Pending'],
+    present:   ['green',  'Present'],
+    late:      ['amber',  'Late'],
+    absent:    ['red',    'Absent'],
+    off_day:   ['gray',   'Off Day'],
+    on_leave:  ['blue',   'On Leave'],
+    draft:     ['gray',   'Draft'],
+    approved:  ['green',  'Approved'],
+    paid:      ['blue',   'Paid'],
+    rejected:  ['red',    'Rejected'],
+    submitted: ['blue',   'Submitted']
   };
-  const m = map[status] || { cls: '', label: status };
-  return `<span class="badge ${m.cls}">${m.label}</span>`;
+  const [color, label] = map[status] || ['gray', status || '—'];
+  return `<span class="badge badge-${color}">${label}</span>`;
+}
+
+// Avatar HTML
+function workerAvatar(worker, size = '') {
+  const cls = `worker-thumb${size ? ' avatar-' + size : ''}`;
+  if (worker?.photo) return `<img src="${worker.photo}" class="${cls}" alt="">`;
+  const initials = (worker?.fullName || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return `<span class="worker-initials${size ? ' avatar-' + size : ''}">${initials}</span>`;
+}
+
+// Pagination renderer
+function renderPagination(containerId, currentPage, totalPages, onPageChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = '<div class="pagination">';
+  html += `<button class="btn btn-ghost btn-sm" ${currentPage===1?'disabled':''} onclick="(${onPageChange})(${currentPage-1})">Previous</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 1) {
+      html += `<button class="btn btn-sm ${i===currentPage?'btn-primary':'btn-ghost'}" onclick="(${onPageChange})(${i})">${i}</button>`;
+    } else if (Math.abs(i - currentPage) === 2) {
+      html += '<span class="px-1">…</span>';
+    }
+  }
+  html += `<button class="btn btn-ghost btn-sm" ${currentPage===totalPages?'disabled':''} onclick="(${onPageChange})(${currentPage+1})">Next</button>`;
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// Simple debounce
+function debounce(fn, ms = 300) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
