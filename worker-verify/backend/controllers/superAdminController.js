@@ -225,12 +225,18 @@ const updatePlan  = async (req, res) => {
 
 const getPlatformLogs = async (req, res) => {
   try {
-    const limit  = Math.min(parseInt(req.query.limit) || 50, 200);
-    const skip   = parseInt(req.query.skip) || 0;
+    const limit  = Math.min(parseInt(req.query.limit) || 20, 200);
+    const page   = Math.max(parseInt(req.query.page) || 1, 1);
+    const skip   = (page - 1) * limit;
+    const total  = await ActivityLog.countDocuments({ company: null });
     const logs   = await ActivityLog.find({ company: null })
       .sort({ createdAt: -1 }).skip(skip).limit(limit)
       .populate('performedBy', 'fullName');
-    res.json({ success: true, logs });
+    res.json({
+      success: true,
+      logs,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

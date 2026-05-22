@@ -452,6 +452,7 @@
 
   // ── Companies ─────────────────────────────────────────────────────────────
   async function loadCompanies() {
+    companiesLoaded = false;
     document.getElementById('companiesTbody').innerHTML =
       `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>`;
     try {
@@ -462,7 +463,9 @@
       document.getElementById('companiesCount').textContent = `${allCompanies.length} companies`;
     } catch (err) {
       document.getElementById('companiesTbody').innerHTML =
-        `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;color:var(--danger);">${esc(err.message)}</td></tr>`;
+        `<tr><td colspan="8" class="text-muted text-center" style="padding:24px;color:var(--danger);">
+          ${esc(err.message)}<br/><button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="loadCompanies()">↻ Retry</button>
+        </td></tr>`;
       showToast('Failed to load companies: ' + err.message, 'error');
     }
   }
@@ -535,10 +538,12 @@
 
   // ── Plans ─────────────────────────────────────────────────────────────────
   async function loadPlans() {
+    plansLoaded = false;
+    const grid = document.getElementById('plansGrid');
+    grid.innerHTML = '<div style="padding:24px;color:var(--gray-400);">Loading plans…</div>';
     try {
       const { plans } = await API.getSuperAdminPlans();
       plansLoaded = true;
-      const grid = document.getElementById('plansGrid');
       if (!plans?.length) { grid.innerHTML = '<p class="text-muted">No plans found.</p>'; return; }
       grid.innerHTML = plans.map(p => {
         const monthly = p.monthlyPrice ? `₦${(p.monthlyPrice/100).toLocaleString()}/mo` : 'Free';
@@ -560,6 +565,8 @@
         </div>`;
       }).join('');
     } catch (err) {
+      grid.innerHTML = `<div style="padding:24px;color:var(--danger);">${esc(err.message)}<br/>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="loadPlans()">↻ Retry</button></div>`;
       showToast('Failed to load plans: ' + err.message, 'error');
     }
   }
@@ -568,14 +575,16 @@
   let logsPage = 1;
   async function loadLogs(page = 1) {
     logsPage = page;
-    logsLoaded = true;
+    logsLoaded = false;
     const tbody = document.getElementById('logsTbody');
     tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;">Loading…</td></tr>`;
     try {
       const res = await API.getPlatformLogs(`?page=${page}&limit=20`);
+      logsLoaded = true;
       const logs = res.logs || [];
       if (!logs.length) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;">No platform logs yet</td></tr>`;
+        document.getElementById('logsPagination').innerHTML = '';
         return;
       }
       tbody.innerHTML = logs.map(l => `
@@ -597,7 +606,9 @@
         pag.innerHTML = '';
       }
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;color:var(--danger);">${esc(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:24px;color:var(--danger);">
+        ${esc(err.message)}<br/><button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="loadLogs(${page})">↻ Retry</button>
+      </td></tr>`;
     }
   }
 
