@@ -95,6 +95,8 @@
   function init() {
     buildSidebar();
     wireOverlay();
+    // Re-populate user info in case populateSidebarUser() ran before sidebar was built
+    if (typeof populateSidebarUser === 'function') populateSidebarUser();
   }
 
   if (document.readyState === 'loading') {
