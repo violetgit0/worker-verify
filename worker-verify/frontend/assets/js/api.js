@@ -51,7 +51,7 @@ async function apiFetch(path, options = {}) {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 100000);
+    const timer = setTimeout(() => controller.abort(), 20000);
 
     let res;
     try {
@@ -73,15 +73,21 @@ async function apiFetch(path, options = {}) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      cleanup();
       if (res.status === 401) {
         localStorage.removeItem('wv_token');
         localStorage.removeItem('wv_user');
+        localStorage.removeItem('wv_company');
         window.location.replace('/index.html');
+        return; // stop execution while navigation happens
       }
-      cleanup();
-      const err = new Error(data.message || `HTTP ${res.status}`);
-      err.status = res.status;
-      err.data   = data;
+      if (res.status === 402) {
+        const err = new Error(data.message || 'Subscription required. Please upgrade your plan.');
+        err.status = 402; err.data = data;
+        throw err;
+      }
+      const err = new Error(data.message || `Request failed (${res.status})`);
+      err.status = res.status; err.data = data;
       throw err;
     }
 

@@ -95,15 +95,15 @@
   function init() {
     buildSidebar();
     wireOverlay();
-    // Re-populate user info in case populateSidebarUser() ran before sidebar was built
+    // The sidebar DOM now exists — populate user info immediately
     if (typeof populateSidebarUser === 'function') populateSidebarUser();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  // Run immediately — the <aside id="sidebar"> placeholder is always in the DOM
+  // before bottom-of-body scripts execute (HTML is parsed top-to-bottom), so there
+  // is no need to wait for DOMContentLoaded. Running now means populateSidebarUser()
+  // in the inline script below will find the fully-built sidebar elements.
+  init();
 
   window._rebuildSidebar = buildSidebar;
 })();
