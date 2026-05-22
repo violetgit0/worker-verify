@@ -10,10 +10,21 @@ function getAuthHeaders(isFormData = false) {
 
 async function apiFetch(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const res = await fetch(CONFIG.API_URL + path, {
-    ...options,
-    headers: { ...getAuthHeaders(isFormData), ...(options.headers || {}) }
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let res;
+  try {
+    res = await fetch(CONFIG.API_URL + path, {
+      ...options,
+      headers: { ...getAuthHeaders(isFormData), ...(options.headers || {}) },
+      signal: options.signal || controller.signal
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') throw new Error('Request timed out. Please check your connection and try again.');
+    throw err;
+  }
+  clearTimeout(timer);
 
   const data = await res.json().catch(() => ({}));
 

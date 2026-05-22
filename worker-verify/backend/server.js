@@ -14,8 +14,14 @@ const allowedOrigins = process.env.FRONTEND_URL
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin) ||
-        /\.vercel\.app$/.test(origin) || /localhost/.test(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin) ||
+      /\.onrender\.com$/.test(origin) ||
+      /localhost/.test(origin)
+    ) {
       cb(null, true);
     } else {
       cb(new Error('Not allowed by CORS'));
