@@ -6,45 +6,53 @@ const Branch         = require('../models/Branch');
 const SecurityAlert  = require('../models/SecurityAlert');
 const { haversineDistance } = require('../utils/geo');
 const { toMidnightUTC, parseTimeOnDate, minutesDiff, monthYear } = require('../utils/time');
+const { resolveIsWorkDay } = require('./scheduleController');
 
 // ── Schedule resolution helpers ───────────────────────────────────────────────
 
-// Returns 'HH:MM' resumption time — shift override → category → branch legacy
+// Returns 'HH:MM' clock-in time.
+// Priority: new ScheduleTemplate → legacy shiftRef → branch fallback
 function resolveResumeTime(worker, branch) {
-  if (worker.shiftRef?.resumeTime) return worker.shiftRef.resumeTime;
-  if (worker.category?.resumeTime) return worker.category.resumeTime;
+  if (worker.scheduleRef?.clockIn)  return worker.scheduleRef.clockIn;
+  if (worker.shiftRef?.resumeTime)  return worker.shiftRef.resumeTime;
+  if (worker.category?.resumeTime)  return worker.category.resumeTime;
   return worker.shift === 'B' ? (branch.resumptionTimeB || '08:00') : (branch.resumptionTimeA || '08:00');
 }
 
-// Returns grace period in minutes — shift → category → 0
+// Returns grace period in minutes.
 function resolveGraceMinutes(worker) {
-  if (worker.shiftRef?.lateAfterMinutes != null) return worker.shiftRef.lateAfterMinutes;
-  if (worker.category?.lateAfterMinutes != null)  return worker.category.lateAfterMinutes;
+  if (worker.scheduleRef?.lateAfterMinutes != null) return worker.scheduleRef.lateAfterMinutes;
+  if (worker.shiftRef?.lateAfterMinutes    != null) return worker.shiftRef.lateAfterMinutes;
+  if (worker.category?.lateAfterMinutes    != null) return worker.category.lateAfterMinutes;
   return 0;
 }
 
-// Returns true if the worker should be working on `date` (a JS Date object).
-// Priority: shift pattern → category pattern → all_week (never off)
+// Returns true if the worker is scheduled to work on `date`.
+// New system (scheduleRef) takes priority; falls back to legacy shiftRef logic.
 function isScheduledToWork(worker, date) {
-  const dayOfWeek = date.getDay(); // 0=Sun … 6=Sat
+  // ── New schedule system ────────────────────────────────────────────────────
+  if (worker.scheduleRef) {
+    return resolveIsWorkDay(worker, worker.scheduleRef, date);
+  }
 
+  // ── Legacy shiftRef fallback ───────────────────────────────────────────────
+  const dayOfWeek = date.getDay();
   const shift    = worker.shiftRef;
   const category = worker.category;
-
   const pattern  = shift?.workPattern || category?.workPattern || 'all_week';
   const offDays  = (shift?.offDays?.length ? shift.offDays : null) ?? category?.offDays ?? [];
   const daysOn   = shift?.daysOn  ?? category?.daysOn  ?? 1;
   const daysOff  = shift?.daysOff ?? category?.daysOff ?? 1;
 
   switch (pattern) {
-    case 'all_week':   return true;
-    case 'weekdays':   return dayOfWeek !== 0 && dayOfWeek !== 6;
-    case 'custom':     return !offDays.includes(dayOfWeek);
+    case 'all_week':  return true;
+    case 'weekdays':  return dayOfWeek !== 0 && dayOfWeek !== 6;
+    case 'custom':    return !offDays.includes(dayOfWeek);
     case 'alternating': {
-      const refDate = shift?.referenceDate ?? new Date('2025-01-06'); // arbitrary Mon anchor
+      const refDate  = shift?.referenceDate ?? new Date('2025-01-06');
       const diffDays = Math.floor((date - new Date(refDate)) / 86400000);
-      const cycle = daysOn + daysOff;
-      const pos = ((diffDays % cycle) + cycle) % cycle; // always positive
+      const cycle    = daysOn + daysOff;
+      const pos      = ((diffDays % cycle) + cycle) % cycle;
       return pos < daysOn;
     }
     default: return true;
@@ -93,10 +101,10 @@ async function applyAbsenceDeduction(worker, attendance, performedBy, companyId)
 
 // ── Clock In (worker self-service) ────────────────────────────────────────────
 const workerClockIn = async (req, res) => {
-  // Populate category + shiftRef so helpers can resolve schedule/times
   const worker = await Worker.findById(req.worker._id)
     .populate('category')
-    .populate('shiftRef');
+    .populate('shiftRef')
+    .populate('scheduleRef');
 
   const { lat, lng, deviceFingerprint, deviceInfo } = req.body;
   const selfieFile = req.file; // from selfieUpload middleware (optional)
@@ -302,7 +310,7 @@ const adminClockIn = async (req, res) => {
     const workerFilter = { _id: workerId };
     if (req.companyId) workerFilter.company = req.companyId;
     const worker = await Worker.findOne(workerFilter)
-      .populate('branch').populate('category').populate('shiftRef');
+      .populate('branch').populate('category').populate('shiftRef').populate('scheduleRef');
     if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
     if (!worker.branch) return res.status(400).json({ success: false, message: 'Worker has no branch' });
     if (worker.allowClockIn === false) {

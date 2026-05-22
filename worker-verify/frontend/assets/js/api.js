@@ -185,19 +185,23 @@ const API = {
   getStaffLoginHistory:(id)     => apiFetch(`/staff/${id}/login-history`),
   assignStaffBranch:  (id, b)   => apiFetch(`/staff/${id}/assign-branch`,    { method: 'PUT', body: JSON.stringify(b) }),
 
-  // Shifts & Categories
-  getCategories:       (qs='')    => apiFetch(`/shifts/categories${qs}`),
-  getCategory:         (id)       => apiFetch(`/shifts/categories/${id}`),
-  createCategory:      (body)     => apiFetch('/shifts/categories',    { method: 'POST',   body: JSON.stringify(body) }),
-  updateCategory:      (id, body) => apiFetch(`/shifts/categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteCategory:      (id)       => apiFetch(`/shifts/categories/${id}`, { method: 'DELETE' }),
-  getShifts:           (qs='')    => apiFetch(`/shifts${qs}`),
-  getShift:            (id)       => apiFetch(`/shifts/${id}`),
-  getShiftSummary:     ()         => apiFetch('/shifts/summary'),
-  createShift:         (body)     => apiFetch('/shifts',    { method: 'POST',   body: JSON.stringify(body) }),
-  updateShift:         (id, body) => apiFetch(`/shifts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteShift:         (id)       => apiFetch(`/shifts/${id}`, { method: 'DELETE' }),
-  assignWorkersToShift:(body)     => apiFetch('/shifts/assign-workers', { method: 'POST', body: JSON.stringify(body) }),
+  // Worker Roles (categories)
+  getCategories:  (qs='')    => apiFetch(`/shifts/categories${qs}`),
+  getCategory:    (id)       => apiFetch(`/shifts/categories/${id}`),
+  createCategory: (body)     => apiFetch('/shifts/categories',       { method: 'POST',   body: JSON.stringify(body) }),
+  updateCategory: (id, body) => apiFetch(`/shifts/categories/${id}`, { method: 'PUT',    body: JSON.stringify(body) }),
+  deleteCategory: (id)       => apiFetch(`/shifts/categories/${id}`, { method: 'DELETE' }),
+
+  // Schedule Templates (replaces Shifts)
+  getSchedules:          (qs='')    => apiFetch(`/schedules${qs}`),
+  getSchedule:           (id)       => apiFetch(`/schedules/${id}`),
+  createSchedule:        (body)     => apiFetch('/schedules',       { method: 'POST',   body: JSON.stringify(body) }),
+  updateSchedule:        (id, body) => apiFetch(`/schedules/${id}`, { method: 'PUT',    body: JSON.stringify(body) }),
+  deleteSchedule:        (id)       => apiFetch(`/schedules/${id}`, { method: 'DELETE' }),
+  checkWorkerSchedule:   (id, date) => apiFetch(`/schedules/check/${id}${date ? '?date='+date : ''}`),
+
+  // Assign schedule + role + branch to worker
+  assignWorkerSchedule: (id, body) => apiFetch(`/workers/${id}/assign-schedule`, { method: 'PUT', body: JSON.stringify(body) }),
 
   // Activity logs (super_admin only)
   getActivityLogs: (qs = '') => apiFetch(`/activity-logs${qs}`),

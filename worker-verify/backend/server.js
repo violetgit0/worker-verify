@@ -63,6 +63,7 @@ app.use('/api/alerts',      require('./routes/alerts'));
 app.use('/api/activity-logs', require('./routes/activityLog'));
 app.use('/api/billing',     require('./routes/billing'));
 app.use('/api/shifts',      require('./routes/shifts'));
+app.use('/api/schedules',   require('./routes/schedules'));
 
 // Platform super admin
 app.use('/api/superadmin',  require('./routes/superadmin'));

@@ -62,6 +62,12 @@ const workerSchema = new mongoose.Schema({
   shift:              { type: String, enum: ['A', 'B', 'unassigned'], default: 'unassigned' },
   category:           { type: mongoose.Schema.Types.ObjectId, ref: 'WorkerCategory', default: null },
   shiftRef:           { type: mongoose.Schema.Types.ObjectId, ref: 'Shift', default: null },
+
+  // New schedule system — replaces shiftRef
+  scheduleRef:        { type: mongoose.Schema.Types.ObjectId, ref: 'ScheduleTemplate', default: null },
+  // Anchor date for rotation schedules: day 0 of the cycle = first work day
+  scheduleStartDate:  { type: Date, default: null },
+
   employmentStatus:   { type: String, enum: ['active', 'suspended', 'resigned', 'sacked', 'on_leave'], default: 'active' },
   dateEmployed:       { type: Date, default: Date.now },
   monthlySalary:      { type: Number, default: 0 },

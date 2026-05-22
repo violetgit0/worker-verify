@@ -632,9 +632,38 @@ const updateEmploymentStatus = async (req, res) => {
   res.json({ success: true, message: `Worker status updated to ${employmentStatus}`, employmentStatus });
 };
 
+// ── Assign schedule + optional role + branch (new schedule system) ────────────
+const assignWorkerSchedule = async (req, res) => {
+  try {
+    const { scheduleId, scheduleStartDate, categoryId, branchId } = req.body;
+    const worker = await findWorker(req.params.id, req);
+    if (!worker) return res.status(404).json({ success: false, message: 'Worker not found' });
+
+    if (scheduleId    !== undefined) worker.scheduleRef       = scheduleId    || null;
+    if (scheduleStartDate !== undefined) worker.scheduleStartDate = scheduleStartDate ? new Date(scheduleStartDate) : null;
+    if (categoryId    !== undefined) worker.category          = categoryId    || null;
+    if (branchId      !== undefined) worker.branch            = branchId      || null;
+
+    await worker.save();
+
+    await TransferLog.create({
+      worker: worker._id,
+      changeType: 'schedule_assignment',
+      oldValue: '',
+      newValue: `schedule:${scheduleId || 'none'}`,
+      performedBy: req.user._id,
+      notes: `Schedule assigned via new schedule system`
+    });
+
+    res.json({ success: true, message: 'Worker schedule updated', worker });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   registerWorker, quickRegisterWorker, getAllWorkers, getWorkerById,
   updateVerificationStatus, searchWorkers, flagDocument,
   assignBranch, assignShift, updateEmploymentStatus, updateSalary,
-  getWorkerCompletion, updateRestrictions
+  getWorkerCompletion, updateRestrictions, assignWorkerSchedule
 };

@@ -4,7 +4,7 @@ const {
   registerWorker, quickRegisterWorker, getAllWorkers, getWorkerById,
   updateVerificationStatus, searchWorkers, flagDocument,
   assignBranch, assignShift, updateEmploymentStatus, updateSalary,
-  getWorkerCompletion, updateRestrictions
+  getWorkerCompletion, updateRestrictions, assignWorkerSchedule
 } = require('../controllers/workerController');
 const { protect } = require('../middleware/auth');
 const { companyScope } = require('../middleware/companyScope');
@@ -27,6 +27,7 @@ router.put('/:id/flag-document',     hasPermission('canApproveVerification'),   
 router.put('/:id/restrictions',      hasPermission('canEditWorkers', 'canApproveVerification'), updateRestrictions);
 router.put('/:id/assign-branch',     hasPermission('canMoveWorkersBranch'),                     assignBranch);
 router.put('/:id/assign-shift',      hasPermission('canAssignShifts'),                          assignShift);
+router.put('/:id/assign-schedule',   hasPermission('canAssignShifts'),                          assignWorkerSchedule);
 router.put('/:id/employment-status', hasPermission('canSackWorkers', 'canRestoreWorkers'),      updateEmploymentStatus);
 router.put('/:id/salary',            hasPermission('canEditPayroll'),                           updateSalary);
 
