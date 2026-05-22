@@ -35,45 +35,62 @@ let _wakeUpTimer    = null;
 async function apiFetch(path, options = {}) {
   const isFormData = options.body instanceof FormData;
 
-  // Show "warming up" banner if server takes >5s
   _activeRequests++;
   _wakeUpTimer = _wakeUpTimer || setTimeout(() => _showWakeUpBanner(true), 5000);
 
-  const controller = new AbortController();
-  // 100s timeout — longer than Render's worst-case 90s cold start
-  const timer = setTimeout(() => controller.abort(), 100000);
-
-  let res;
-  try {
-    res = await fetch(CONFIG.API_URL + path, {
-      ...options,
-      headers: { ...getAuthHeaders(isFormData), ...(options.headers || {}) },
-      signal: options.signal || controller.signal
-    });
-  } catch (err) {
-    clearTimeout(timer);
+  const cleanup = () => {
     if (--_activeRequests === 0) { clearTimeout(_wakeUpTimer); _wakeUpTimer = null; _showWakeUpBanner(false); }
-    if (err.name === 'AbortError') throw new Error('Server did not respond in time. Please reload the page and try again.');
-    throw new Error('Cannot connect to server. Please check your connection.');
-  }
-  clearTimeout(timer);
-  if (--_activeRequests === 0) { clearTimeout(_wakeUpTimer); _wakeUpTimer = null; _showWakeUpBanner(false); }
+  };
 
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    // Auto-logout on 401
-    if (res.status === 401) {
-      localStorage.removeItem('wv_token');
-      localStorage.removeItem('wv_user');
-      window.location.replace('/index.html');
+  // Retry up to 2 times for network errors — handles Render cold start where
+  // the connection is refused for the first few seconds before the proxy holds it.
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    if (attempt > 0) {
+      _showWakeUpBanner(true);
+      await new Promise(r => setTimeout(r, 12000)); // wait 12s then retry
     }
-    const err = new Error(data.message || `HTTP ${res.status}`);
-    err.status = res.status;
-    err.data   = data;
-    throw err;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 100000);
+
+    let res;
+    try {
+      res = await fetch(CONFIG.API_URL + path, {
+        ...options,
+        headers: { ...getAuthHeaders(isFormData), ...(options.headers || {}) },
+        signal: options.signal || controller.signal
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        cleanup();
+        throw new Error('Server did not respond in time. Please reload the page and try again.');
+      }
+      continue; // network error — retry
+    }
+    clearTimeout(timer);
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        localStorage.removeItem('wv_token');
+        localStorage.removeItem('wv_user');
+        window.location.replace('/index.html');
+      }
+      cleanup();
+      const err = new Error(data.message || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.data   = data;
+      throw err;
+    }
+
+    cleanup();
+    return data;
   }
-  return data;
+
+  cleanup();
+  throw new Error('Cannot reach the server. It may still be starting up — please wait 30 seconds and try again.');
 }
 
 const API = {
