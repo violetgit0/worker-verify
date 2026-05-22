@@ -66,7 +66,7 @@ async function apiFetch(path, options = {}) {
     if (res.status === 401) {
       localStorage.removeItem('wv_token');
       localStorage.removeItem('wv_user');
-      window.location.href = '/index.html';
+      window.location.replace('/index.html');
     }
     const err = new Error(data.message || `HTTP ${res.status}`);
     err.status = res.status;

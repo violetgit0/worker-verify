@@ -34,7 +34,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Static Frontend ───────────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '../frontend')));
+const FRONTEND_DIR = path.join(__dirname, '../frontend');
+app.use(express.static(FRONTEND_DIR));
+
+// Explicit root handler — guarantees index.html is served for /
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
+});
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 
@@ -198,6 +204,15 @@ app.get('/api/resolve-maps', async (req, res) => {
     console.error('[resolve-maps] error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// ── SPA Catch-all — serve index.html for any non-API GET ─────────────────────
+// Prevents 404/JSON for deep-links and refreshes on frontend routes
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ success: false, message: 'API route not found' });
+  }
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
 // ── Global error handler ──────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ function saveSession(token, user) {
 function logout() {
   localStorage.removeItem('wv_token');
   localStorage.removeItem('wv_user');
-  window.location.href = '/index.html';
+  window.location.replace('/index.html');
 }
 
 // Call on every protected page – redirects to login if not authenticated
@@ -25,7 +25,7 @@ function requireAuth(allowedRoles = []) {
   const token = getToken();
 
   if (!token || !user) {
-    window.location.href = '/index.html';
+    window.location.replace('/index.html');
     return null;
   }
 
